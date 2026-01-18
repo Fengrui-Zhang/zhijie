@@ -1,11 +1,27 @@
-<div align="center">
+# DeepSeek R1 Next.js App
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+本项目是一个基于 Next.js 的前后端一体应用，后端通过服务器端 API 路由调用 DeepSeek R1 模型，API Key 仅保存在服务器环境变量中，不会暴露到浏览器端。
 
-  <h1>Built with AI Studio</h2>
+## 开发
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+1. 安装依赖：
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+```bash
+npm install
+```
 
-</div>
+2. 配置环境变量：
+
+```bash
+cp .env.example .env.local
+```
+
+将 `.env.local` 中的 `DEEPSEEK_API_KEY` 填入你的真实密钥。
+
+3. 启动开发服务器：
+
+```bash
+npm run dev
+```
+
+访问 `http://localhost:3000`。
