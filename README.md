@@ -1,27 +1,20 @@
-# DeepSeek R1 Next.js App
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-本项目是一个基于 Next.js 的前后端一体应用，后端通过服务器端 API 路由调用 DeepSeek R1 模型，API Key 仅保存在服务器环境变量中，不会暴露到浏览器端。
+# Run and deploy your AI Studio app
 
-## 开发
+This contains everything you need to run your app locally.
 
-1. 安装依赖：
+View your app in AI Studio: https://ai.studio/apps/drive/1_h6yeTZ0StGlY-hXo4vEW1Vz8WlbX0NZ
 
-```bash
-npm install
-```
+## Run Locally
 
-2. 配置环境变量：
+**Prerequisites:**  Node.js
 
-```bash
-cp .env.example .env.local
-```
 
-将 `.env.local` 中的 `DEEPSEEK_API_KEY` 填入你的真实密钥。
-
-3. 启动开发服务器：
-
-```bash
-npm run dev
-```
-
-访问 `http://localhost:3000`。
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
