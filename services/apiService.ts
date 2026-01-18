@@ -6,13 +6,6 @@ import {
   ModelType, LiuyaoMode 
 } from '../types';
 
-// Using allorigins raw proxy which is generally more stable for these Chinese APIs
-const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-const BASE_API = "https://api.yuanfenju.com/index.php/v1";
-// The key provided is a standard demo/paid key. 
-// "Invalid Key" usually indicates it didn't reach the server in the request body.
-const DEFAULT_API_KEY = "Z7qrCrMEoNEExAp5QTABhXZW8";
-
 const ENDPOINTS = {
   [ModelType.QIMEN]: "/Liupan/qimendunjia",
   [ModelType.BAZI]: "/Bazi/paipan",
@@ -27,49 +20,24 @@ const ENDPOINTS = {
  * have difficulty forwarding POST bodies correctly to the destination.
  * Yuanfenju API supports both GET and POST.
  */
-async function fetchApi<T>(endpoint: string, params: Record<string, string>, customApiKey?: string): Promise<T> {
-  const apiKey = customApiKey || DEFAULT_API_KEY;
-  const baseUrl = BASE_API + endpoint;
-
-  const urlParams = new URLSearchParams();
-  urlParams.append('api_key', apiKey);
-  
-  Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== '') {
-        urlParams.append(k, v);
-      }
-  });
-
-  // For maximum compatibility with proxies, we put everything in the query string
-  // and use a GET request.
-  const targetUrl = `${baseUrl}?${urlParams.toString()}`;
-  const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
-
+async function fetchApi<T>(endpoint: string, params: Record<string, string>): Promise<T> {
   try {
-    const response = await fetch(proxiedUrl, {
-      method: 'GET',
+    const response = await fetch('/api/fortune', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint, params }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Network Error: ${response.status} - ${errorText}`);
     }
-    
-    const json = await response.json();
-    
-    // Yuanfenju specific error codes
-    if (json.errcode !== 0) {
-      throw new Error(`API Error (${json.errcode}): ${json.errmsg}`);
-    }
-    
-    if (!json.data) {
-      throw new Error("No data returned from API");
-    }
 
+    const json = await response.json();
     return json.data as T;
   } catch (error: any) {
     console.error(`Fetch error for ${endpoint}:`, error.message);
-    throw new Error(error.message || "Failed to connect to API.");
+    throw new Error(error.message || 'Failed to connect to API.');
   }
 }
 

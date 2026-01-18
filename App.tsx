@@ -1,4 +1,6 @@
 
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,7 +10,7 @@ import {
   fetchQimen, fetchBazi, fetchZiwei, fetchMeihua, fetchLiuyao,
   formatQimenPrompt, formatBaziPrompt, formatZiweiPrompt, formatMeihuaPrompt, formatLiuyaoPrompt 
 } from './services/apiService';
-import { startQimenChat, sendMessageToGemini, clearChatSession } from './services/geminiService';
+import { startQimenChat, sendMessageToDeepseek, clearChatSession } from './services/deepseekService';
 
 // Types
 import { ModelType, LiuyaoMode } from './types';
@@ -239,7 +241,7 @@ const App: React.FC = () => {
       setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
       setIsTyping(true);
       
-      const response = await sendMessageToGemini(prompt);
+      const response = await sendMessageToDeepseek(prompt);
       
       setChatHistory(prev => [...prev, {
         id: 'init-m', role: 'model', content: response, timestamp: new Date()
@@ -262,7 +264,7 @@ const App: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const responseText = await sendMessageToGemini(inputMessage);
+      const responseText = await sendMessageToDeepseek(inputMessage);
       setChatHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', content: responseText, timestamp: new Date() }]);
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
@@ -301,7 +303,7 @@ const App: React.FC = () => {
       <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-amber-700 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
-          <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">Gemini Powered</div>
+          <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
         </div>
       </header>
 
