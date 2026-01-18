@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const messages = body.messages as ChatMessage[] | undefined;
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
+  const stream = body.stream === true;
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
@@ -35,12 +36,23 @@ export async function POST(request: Request) {
       model: 'deepseek-reasoner',
       messages,
       temperature,
+      stream,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     return NextResponse.json({ error: errorText }, { status: response.status });
+  }
+
+  if (stream) {
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      },
+    });
   }
 
   const data = await response.json();

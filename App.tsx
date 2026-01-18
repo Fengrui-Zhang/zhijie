@@ -10,7 +10,7 @@ import {
   fetchQimen, fetchBazi, fetchZiwei, fetchMeihua, fetchLiuyao,
   formatQimenPrompt, formatBaziPrompt, formatZiweiPrompt, formatMeihuaPrompt, formatLiuyaoPrompt 
 } from './services/apiService';
-import { startQimenChat, sendMessageToDeepseek, clearChatSession } from './services/deepseekService';
+import { startQimenChat, sendMessageToDeepseekStream, clearChatSession } from './services/deepseekService';
 
 // Types
 import { ModelType, LiuyaoMode } from './types';
@@ -81,6 +81,12 @@ const App: React.FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
+
+  const updateChatMessage = (id: string, content: string) => {
+    setChatHistory(prev =>
+      prev.map(msg => (msg.id === id ? { ...msg, content } : msg))
+    );
+  };
 
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
@@ -240,12 +246,16 @@ const App: React.FC = () => {
 
       setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
       setIsTyping(true);
-      
-      const response = await sendMessageToDeepseek(prompt);
-      
-      setChatHistory(prev => [...prev, {
-        id: 'init-m', role: 'model', content: response, timestamp: new Date()
-      }]);
+
+      const modelId = 'init-m';
+      setChatHistory(prev => [
+        ...prev,
+        { id: modelId, role: 'model', content: '', timestamp: new Date() }
+      ]);
+
+      await sendMessageToDeepseekStream(prompt, (_delta, fullText) => {
+        updateChatMessage(modelId, fullText);
+      });
 
     } catch (err: any) {
       console.error(err);
@@ -264,8 +274,11 @@ const App: React.FC = () => {
     setIsTyping(true);
 
     try {
-      const responseText = await sendMessageToDeepseek(inputMessage);
-      setChatHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'model', content: responseText, timestamp: new Date() }]);
+      const modelId = (Date.now() + 1).toString();
+      setChatHistory(prev => [...prev, { id: modelId, role: 'model', content: '', timestamp: new Date() }]);
+      await sendMessageToDeepseekStream(inputMessage, (_delta, fullText) => {
+        updateChatMessage(modelId, fullText);
+      });
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
     } finally {
