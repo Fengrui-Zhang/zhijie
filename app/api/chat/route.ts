@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
+import { formatKnowledgeContext, retrieveKnowledge } from '../../../utils/knowledge';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
+};
+
+type KnowledgeRequest = {
+  enabled?: boolean;
+  board?: string;
+  query?: string;
+  topK?: number;
 };
 
 export async function POST(request: Request) {
@@ -18,12 +26,53 @@ export async function POST(request: Request) {
   const messages = body.messages as ChatMessage[] | undefined;
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
   const stream = body.stream === true;
+  const knowledge = body.knowledge as KnowledgeRequest | undefined;
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
       { error: 'Messages are required.' },
       { status: 400 }
     );
+  }
+
+  let finalMessages = messages;
+  if (knowledge?.enabled) {
+    const board = knowledge.board || 'bazi';
+    const query =
+      knowledge.query || messages[messages.length - 1]?.content || '';
+
+    if (!query.trim()) {
+      return NextResponse.json(
+        { error: 'Knowledge retrieval requires a non-empty query.' },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const chunks = await retrieveKnowledge(board, query, knowledge.topK, true);
+      const context = formatKnowledgeContext(chunks);
+      if (context) {
+        if (messages[0]?.role === 'system') {
+          finalMessages = [
+            {
+              role: 'system',
+              content: `${messages[0].content}\n\n${context}`,
+            },
+            ...messages.slice(1),
+          ];
+        } else {
+          const knowledgeMessage: ChatMessage = {
+            role: 'system',
+            content: context,
+          };
+          finalMessages = [knowledgeMessage, ...messages];
+        }
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Knowledge retrieval failed.';
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -34,7 +83,7 @@ export async function POST(request: Request) {
     },
     body: JSON.stringify({
       model: 'deepseek-reasoner',
-      messages,
+      messages: finalMessages,
       temperature,
       stream,
     }),

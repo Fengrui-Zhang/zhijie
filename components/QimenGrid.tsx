@@ -21,130 +21,210 @@ const BAGUA_MAP: Record<string, string> = {
   '坎': '☵', '坤': '☷', '震': '☳', '巽': '☴', '中': '', '乾': '☰', '兑': '☱', '艮': '☶', '离': '☲'
 };
 
+const PALACE_BY_NUMBER: Record<number, string> = Object.entries(PALACE_NUMBERS).reduce(
+  (acc, [key, value]) => {
+    acc[value] = key;
+    return acc;
+  },
+  {} as Record<number, string>
+);
+PALACE_BY_NUMBER[0] = '中';
+
+const LIST_INDEX_MAP = ['坎', '艮', '震', '巽', '离', '坤', '兑', '乾', '中'];
+
 const QimenGrid: React.FC<Props> = ({ data }) => {
   
   const gridCells = useMemo(() => {
     const map: Record<string, PalaceData> = {};
-    
+    const pending: PalaceData[] = [];
+
+    const isCenterCandidate = (item: PalaceData) => {
+      const hasStar = Boolean(item.tianpan?.jiuxing);
+      const hasDoor = Boolean(item.renpan?.bamen);
+      const hasDeity = Boolean(item.shenpan?.bashen);
+      const isCenterDoor = item.renpan?.bamen === '中门';
+      return isCenterDoor || (!hasStar && !hasDoor && !hasDeity);
+    };
+
     data.gong_pan.forEach((item: any) => {
+      if (!map['中'] && isCenterCandidate(item)) {
+        map['中'] = item as PalaceData;
+      }
+    });
+    
+    data.gong_pan.forEach((item: any, index: number) => {
+      let keyByList = '';
+      if (LIST_INDEX_MAP[index]) {
+        keyByList = LIST_INDEX_MAP[index];
+      }
+
+      let keyByIndex = '';
+      if (item.gong_pan_index !== undefined && item.gong_pan_index !== null) {
+        const rawIndex =
+          typeof item.gong_pan_index === 'number'
+            ? item.gong_pan_index
+            : Number.parseInt(String(item.gong_pan_index), 10);
+        if (!Number.isNaN(rawIndex)) {
+          keyByIndex = PALACE_BY_NUMBER[rawIndex] || '';
+        }
+      }
+
+      if (keyByIndex && !map[keyByIndex] && keyByIndex !== '中') {
+        map[keyByIndex] = item as PalaceData;
+        return;
+      }
+
       const desc = item.description?.luo_gong_desc || "";
-      let key = "";
+      let keyByDesc = "";
       for (const k of GRID_ORDER) {
         if (desc.includes(k) || (k === '中' && (desc.includes('中宫') || desc.includes('中门')))) {
-          key = k;
+          keyByDesc = k;
           break;
         }
       }
-      if (key) {
-        map[key] = item as PalaceData;
+
+      if (keyByDesc && !map[keyByDesc]) {
+        map[keyByDesc] = item as PalaceData;
+        return;
+      }
+
+      if (keyByList && !map[keyByList] && keyByList !== '中') {
+        map[keyByList] = item as PalaceData;
+        return;
+      }
+
+      pending.push(item as PalaceData);
+    });
+
+    const missing = GRID_ORDER.filter(key => !map[key]);
+    missing.forEach((key, index) => {
+      if (pending[index]) {
+        map[key] = pending[index];
       }
     });
     
     return GRID_ORDER.map(key => ({ key, data: map[key] }));
   }, [data]);
 
+  const pillars = [
+    { label: '年', value: `${data.sizhu_info.year_gan}${data.sizhu_info.year_zhi}` },
+    { label: '月', value: `${data.sizhu_info.month_gan}${data.sizhu_info.month_zhi}` },
+    { label: '日', value: `${data.sizhu_info.day_gan}${data.sizhu_info.day_zhi}` },
+    { label: '时', value: `${data.sizhu_info.hour_gan}${data.sizhu_info.hour_zhi}` },
+  ];
+
+  const dunInfo = `${data.dunju} · ${data.xunshou}`;
+  const zhifuInfo = `值符: ${data.zhifu_info?.zhifu_name || '-'}   值使: ${data.zhifu_info?.zhishi_name || '-'}`;
+
   return (
-    <div className="w-full max-w-2xl mx-auto my-6 select-none">
-      <div className="grid grid-cols-3 gap-0.5 bg-stone-900 border-2 border-stone-900 shadow-2xl rounded overflow-hidden">
-        {gridCells.map((cell, idx) => {
-            const pData = cell.data;
-            if (!pData) return <div key={idx} className="bg-stone-100 min-h-[140px]"></div>;
-
-            const isKong = pData.is_kongwang == 1 || pData.is_kongwang == "1";
-            const isMa = pData.is_maxing == 1 || pData.is_maxing == "1";
-            const palaceColor = getWuxingColor(cell.key);
-            
-            // Stems
-            const tpStem = pData.tianpan?.sanqiliuyi || '';
-            const dpStem = pData.dipan?.sanqiliuyi || '';
-            const tpColor = getWuxingColor(tpStem);
-            const dpColor = getWuxingColor(dpStem);
-
-            return (
-              <div key={idx} className="relative bg-[#fdfbf7] p-1 min-h-[140px] flex flex-col hover:bg-white transition-colors">
-                
-                {/* 1. Header: Deity (Center Top) */}
-                <div className="flex justify-center items-start h-6">
-                   <span className={`text-sm font-bold ${pData.shenpan?.bashen === '值符' ? 'text-amber-600' : 'text-stone-800'}`}>
-                     {pData.shenpan?.bashen || ''}
-                   </span>
+    <div className="w-full max-w-4xl mx-auto my-6 select-none">
+      <div className="rounded-2xl border border-stone-200 bg-white shadow-lg">
+        <div className="px-5 py-4 border-b border-stone-200">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4 text-stone-800">
+              {pillars.map((pillar) => (
+                <div key={pillar.label} className="flex items-center gap-2">
+                  <span className="text-xs text-stone-400">{pillar.label}</span>
+                  <span className="text-2xl font-semibold tracking-wider text-stone-800">
+                    {pillar.value}
+                  </span>
                 </div>
+              ))}
+            </div>
+            <div className="text-right text-sm text-stone-600 leading-snug">
+              <div className="font-semibold text-stone-700">{dunInfo}</div>
+              <div className="text-stone-500">{zhifuInfo}</div>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-stone-400">
+            {data.gongli} · {data.nongli}
+          </div>
+        </div>
 
-                {/* 2. Body: Star (Left) vs Door (Right) */}
-                <div className="flex justify-between items-center flex-1 px-2">
-                   {/* Left: Star */}
-                   <div className="flex flex-col items-center w-1/2 border-r border-stone-100/50">
-                      <span className="text-[10px] text-stone-400 scale-90 mb-0.5">星</span>
-                      <span className={`font-semibold text-indigo-900 ${pData.tianpan?.jiuxing === '天禽' ? 'text-amber-700' : ''}`}>
-                        {pData.tianpan?.jiuxing || '-'}
-                      </span>
-                   </div>
+        <div className="p-4">
+          <div className="grid grid-cols-3 gap-0 border border-stone-800 bg-stone-800">
+            {gridCells.map((cell, idx) => {
+              const pData = cell.data;
+              if (!pData) return <div key={idx} className="bg-white min-h-[170px]"></div>;
 
-                   {/* Right: Door */}
-                   <div className="flex flex-col items-center w-1/2">
-                      <span className="text-[10px] text-stone-400 scale-90 mb-0.5">门</span>
-                      <span className={`font-semibold ${['开','休','生'].includes(pData.renpan?.bamen) ? 'text-red-700' : 'text-stone-600'}`}>
-                        {pData.renpan?.bamen || '-'}
-                      </span>
-                   </div>
-                </div>
+              const isKong = pData.is_kongwang == 1 || pData.is_kongwang == '1';
+              const isMa = pData.is_maxing == 1 || pData.is_maxing == '1';
+              const palaceColor = getWuxingColor(cell.key);
 
-                {/* 3. Footer: Stems (Center Bottom) */}
-                <div className="mt-2 flex flex-col items-center justify-center bg-stone-50/50 rounded py-1">
-                   <div className="flex items-center gap-2 text-lg leading-none">
-                      {/* Tianpan */}
-                      <div className={`font-bold relative ${tpColor}`}>
-                        {tpStem}
-                        {/* Parasitic Stem */}
-                        {pData.tianpan?.jiuxing_tianqin_sanqiliuyi && (
-                          <span className="absolute -top-2 -right-2 text-[10px] text-stone-400 scale-75">
-                            {pData.tianpan.jiuxing_tianqin_sanqiliuyi}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-stone-300 text-xs">|</span>
-                      {/* Dipan */}
-                      <div className={`font-bold relative ${dpColor}`}>
-                        {dpStem}
-                         {pData.dipan?.jiuxing_tianqin_sanqiliuyi && (
-                          <span className="absolute -top-2 -right-2 text-[10px] text-stone-400 scale-75">
-                            {pData.dipan.jiuxing_tianqin_sanqiliuyi}
-                          </span>
-                        )}
-                      </div>
-                   </div>
-                </div>
+              const tpStem = pData.tianpan?.sanqiliuyi || '';
+              const dpStem = pData.dipan?.sanqiliuyi || '';
+              const tpColor = getWuxingColor(tpStem);
+              const dpColor = getWuxingColor(dpStem);
 
-                {/* Decorations / Status */}
-                
-                {/* Palace Name & Number (Bottom Left) */}
-                <div className={`absolute bottom-0.5 left-1 text-[10px] font-bold flex gap-0.5 ${palaceColor}`}>
-                   <span>{cell.key}</span>
-                   <span className="text-stone-300 font-normal">{PALACE_NUMBERS[cell.key]}</span>
-                </div>
+              const bashen = pData.shenpan?.bashen || '';
+              const bashenLabel = bashen === '值符' ? `○${bashen}` : bashen;
+              const bashenStyle =
+                bashen === '值符' ? 'text-blue-600' : 'text-stone-700';
 
-                {/* Bagua Icon (Background Watermark) */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl text-stone-900 opacity-[0.03] pointer-events-none font-serif">
-                   {BAGUA_MAP[cell.key]}
-                </div>
-                
-                {/* Kong Wang (Empty) */}
-                {isKong && (
-                  <div className="absolute top-0 right-0 w-5 h-5 flex items-center justify-center bg-stone-100 rounded-bl text-[10px] text-stone-400 border-l border-b border-stone-200" title="空亡">
-                    ⭕
+              return (
+                <div
+                  key={idx}
+                  className="relative bg-white min-h-[170px] border border-stone-800 px-2 py-2 font-['STKaiti','KaiTi','Songti_SC','serif'] text-stone-900"
+                >
+                  <div className="absolute left-2 top-2 text-xs text-stone-400">
+                    <span className={`font-semibold ${palaceColor}`}>
+                      {cell.key}
+                    </span>
                   </div>
-                )}
-                
-                {/* Ma Xing (Horse Star) */}
-                {isMa && (
-                   <div className="absolute bottom-0 right-0 w-5 h-5 flex items-center justify-center text-blue-600 font-bold text-xs" title="马星">
-                      🐴
-                   </div>
-                )}
 
-              </div>
-            );
-        })}
+                  <div className="absolute right-2 top-2 text-sm font-semibold">
+                    <span className={bashenStyle}>{bashenLabel || ''}</span>
+                  </div>
+
+                  <div className="absolute left-2 top-10 flex flex-col items-start gap-1 text-lg">
+                    <span className={`${tpColor} font-semibold`}>
+                      {tpStem || '-'}
+                    </span>
+                    <span className="text-[11px] text-stone-400">天盘</span>
+                  </div>
+
+                  <div className="absolute left-2 bottom-3 flex flex-col items-start gap-1 text-lg">
+                    <span className={`${dpColor} font-semibold`}>
+                      {dpStem || '-'}
+                    </span>
+                    <span className="text-[11px] text-stone-400">地盘</span>
+                  </div>
+
+                  <div className="absolute inset-x-0 top-[34%] flex flex-col items-center gap-1">
+                    <span className="text-xl font-semibold">
+                      {pData.tianpan?.jiuxing || '-'}
+                    </span>
+                    <span
+                      className={`text-2xl font-bold ${
+                        ['开', '休', '生'].includes(pData.renpan?.bamen)
+                          ? 'text-emerald-600'
+                          : 'text-stone-900'
+                      }`}
+                    >
+                      {pData.renpan?.bamen || '-'}
+                    </span>
+                  </div>
+
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-6xl text-stone-900 opacity-[0.03]">
+                    {BAGUA_MAP[cell.key]}
+                  </div>
+
+                  {isKong && (
+                    <div className="absolute top-2 right-2 translate-y-6 rounded-full border border-stone-300 bg-white px-1 text-[10px] text-stone-400">
+                      空
+                    </div>
+                  )}
+
+                  {isMa && (
+                    <div className="absolute bottom-2 right-2 text-xs text-red-600">
+                      马
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

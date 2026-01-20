@@ -3,13 +3,23 @@ type ChatMessage = {
   content: string;
 };
 
+type KnowledgeOptions = {
+  enabled?: boolean;
+  board?: string;
+  query?: string;
+  topK?: number;
+};
+
 let chatMessages: ChatMessage[] = [];
 
 export const startQimenChat = async (systemInstruction: string) => {
   chatMessages = [{ role: 'system', content: systemInstruction }];
 };
 
-export const sendMessageToDeepseek = async (message: string): Promise<string> => {
+export const sendMessageToDeepseek = async (
+  message: string,
+  knowledge?: KnowledgeOptions
+): Promise<string> => {
   if (chatMessages.length === 0) {
     throw new Error('Chat session not initialized. Please start a reading first.');
   }
@@ -23,6 +33,7 @@ export const sendMessageToDeepseek = async (message: string): Promise<string> =>
     },
     body: JSON.stringify({
       messages: chatMessages,
+      knowledge,
     }),
   });
 
@@ -39,7 +50,8 @@ export const sendMessageToDeepseek = async (message: string): Promise<string> =>
 
 export const sendMessageToDeepseekStream = async (
   message: string,
-  onDelta: (delta: string, fullText: string) => void
+  onDelta: (delta: string, fullText: string) => void,
+  knowledge?: KnowledgeOptions
 ): Promise<string> => {
   if (chatMessages.length === 0) {
     throw new Error('Chat session not initialized. Please start a reading first.');
@@ -55,6 +67,7 @@ export const sendMessageToDeepseekStream = async (
     body: JSON.stringify({
       messages: chatMessages,
       stream: true,
+      knowledge,
     }),
   });
 
@@ -92,7 +105,10 @@ export const sendMessageToDeepseekStream = async (
 
         try {
           const json = JSON.parse(payload);
-          const delta = json.choices?.[0]?.delta?.content ?? '';
+          const delta =
+            json.choices?.[0]?.delta?.content ??
+            json.choices?.[0]?.delta?.reasoning_content ??
+            '';
           if (delta) {
             fullText += delta;
             onDelta(delta, fullText);

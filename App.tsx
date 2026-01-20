@@ -77,6 +77,7 @@ const App: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [useKnowledge, setUseKnowledge] = useState(false);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +87,14 @@ const App: React.FC = () => {
     setChatHistory(prev =>
       prev.map(msg => (msg.id === id ? { ...msg, content } : msg))
     );
+  };
+
+  const knowledgeBoardMap: Record<ModelType, string> = {
+    [ModelType.QIMEN]: 'qimen',
+    [ModelType.BAZI]: 'bazi',
+    [ModelType.ZIWEI]: 'ziweidoushu',
+    [ModelType.MEIHUA]: 'meihua',
+    [ModelType.LIUYAO]: 'liuyao',
   };
 
   // --- Reset when model changes ---
@@ -203,6 +212,7 @@ const App: React.FC = () => {
       let resultData: any = null;
       let prompt = "";
       let systemInstruction = "";
+      let knowledgeQuery = "";
 
       // --- API Calls & Prompt Gen ---
       switch (modelType) {
@@ -213,8 +223,23 @@ const App: React.FC = () => {
           break;
         case ModelType.BAZI:
           resultData = await fetchBazi(baseParams);
-          prompt = formatBaziPrompt(resultData);
-          systemInstruction = "你是资深八字命理师。请基于八字命盘，分析命造格局、性格、运势。语气温和客观。";
+          {
+            const panText = formatBaziPrompt(resultData);
+            prompt = "请开始分析。";
+            knowledgeQuery = panText;
+            systemInstruction = [
+            "这是某位提问者的八字排盘信息，请你据此进行推断：",
+            "",
+            panText,
+            "",
+            "请严格基于以上数据分析，不得臆测与杜撰。",
+            "主要用盲派的思想进行分析，分析顺序与要求：",
+            "1) 先判断日主强弱：通过分析时令（如地支土要分春夏秋冬）、藏干、干支生克制化与星运判断，不要用“五行个数”判断，也不要返回五行个数，因为这样容易误导初学者。",
+            "2) 再判断喜用神，判断喜用神的时候不要只拘泥于身强用克泄耗，身弱用帮助的刻板理论，而是要结合原八字全局的做功和干支关系进行分析，定位出八字原局中正向做功的天干或地支为用神（不一定只有一个），原局或者大运流年中够帮助用神的天干或地支为喜神，相反原局中反相做功的天干地支为忌神，原局或大运流年中损害喜用神的为仇神，在原局中没有起到作用的为闲神（闲神可以没有），从而得出确切且具体的天干地支喜用神（切记通过做功来判断，不要通过五行来判断，千万不要出现类似于“喜火所以天干喜见丙丁火，地支喜见巳午火”这种粗浅且不负责的说法！而是要出现类似于“巳火在全局起到伤官合杀的作用，所以巳火为用神，而亥水冲巳火，为忌神”的说法！）。",
+            "3) 然后不用太拘泥于身强深弱，重点结合盲派做功与干支关系细化具体事象（冲合刑害、合化、透藏等）。",
+            "4) 结合“神煞信息”作为补充参考简要分析（还是要以格局、做功和干支关系为重，神煞信息只作为辅助，但是神煞作为锦上添花的作用不能忽视，在分析的时候一定也要参考）：四柱神煞、吉神凶煞（年/月/日/时）、大运神煞的作用与触发条件。",
+          ].join('\n');
+          }
           break;
         case ModelType.ZIWEI:
           resultData = await fetchZiwei(baseParams);
@@ -253,9 +278,22 @@ const App: React.FC = () => {
         { id: modelId, role: 'model', content: '', timestamp: new Date() }
       ]);
 
+      const knowledgeQueryText = (() => {
+        if (knowledgeQuery) return knowledgeQuery;
+        if (modelType === ModelType.QIMEN) return question.trim();
+        return question.trim() ? question : prompt;
+      })();
+      const knowledge = useKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[modelType],
+            query: knowledgeQueryText,
+          }
+        : undefined;
+
       await sendMessageToDeepseekStream(prompt, (_delta, fullText) => {
         updateChatMessage(modelId, fullText);
-      });
+      }, knowledge);
 
     } catch (err: any) {
       console.error(err);
@@ -268,7 +306,8 @@ const App: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: inputMessage, timestamp: new Date() };
+    const outgoingMessage = inputMessage;
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: outgoingMessage, timestamp: new Date() };
     setChatHistory(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsTyping(true);
@@ -276,9 +315,17 @@ const App: React.FC = () => {
     try {
       const modelId = (Date.now() + 1).toString();
       setChatHistory(prev => [...prev, { id: modelId, role: 'model', content: '', timestamp: new Date() }]);
-      await sendMessageToDeepseekStream(inputMessage, (_delta, fullText) => {
+      const knowledge = useKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[modelType],
+            query: outgoingMessage,
+          }
+        : undefined;
+
+      await sendMessageToDeepseekStream(outgoingMessage, (_delta, fullText) => {
         updateChatMessage(modelId, fullText);
-      });
+      }, knowledge);
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
     } finally {
@@ -381,6 +428,22 @@ const App: React.FC = () => {
                     ))}
                   </div>
                </div>
+            </div>
+
+            <div className="mb-6 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+              <div>
+                <div className="text-sm font-bold text-stone-700">启用知识库</div>
+                <div className="text-xs text-stone-500">根据所选板块检索参考资料</div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={useKnowledge}
+                  onChange={(event) => setUseKnowledge(event.target.checked)}
+                  className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span>{useKnowledge ? '已开启' : '已关闭'}</span>
+              </label>
             </div>
 
             <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
