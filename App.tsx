@@ -77,7 +77,7 @@ const App: React.FC = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const [useKnowledge, setUseKnowledge] = useState(false);
+  const [useKnowledge, setUseKnowledge] = useState(true);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
 
@@ -477,8 +477,8 @@ const App: React.FC = () => {
             {supportsKnowledge && (
               <div className="mb-6 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
                 <div>
-                  <div className="text-sm font-bold text-stone-700">启用知识库</div>
-                  <div className="text-xs text-stone-500">根据所选板块检索参考资料</div>
+                  <div className="text-sm font-bold text-stone-700">参考古籍</div>
+                  <div className="text-xs text-stone-500">检索并参考知识库资料</div>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-stone-700">
                   <input
