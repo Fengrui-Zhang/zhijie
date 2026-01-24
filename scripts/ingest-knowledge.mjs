@@ -146,6 +146,13 @@ const ingest = async () => {
   const baseDir = process.cwd();
   const knowledgeDir = path.join(baseDir, 'data', 'knowledge', board);
   const indexPath = path.join(baseDir, 'data', 'index', `${board}.json`);
+  let existingIndex = null;
+  try {
+    const rawIndex = await fs.readFile(indexPath, 'utf8');
+    existingIndex = JSON.parse(rawIndex);
+  } catch {
+    existingIndex = null;
+  }
 
   const files = await listTxtFiles(knowledgeDir);
   if (files.length === 0) {
@@ -154,11 +161,22 @@ const ingest = async () => {
 
   const chunks = [];
   let fileCounter = 0;
+  if (Array.isArray(existingIndex?.chunks)) {
+    const maxCounter = existingIndex.chunks.reduce((acc, item) => {
+      if (!item?.id || typeof item.id !== 'string') return acc;
+      const match = item.id.match(new RegExp(`^${board}-(\\d+)-`));
+      const value = match ? Number(match[1]) : NaN;
+      return Number.isFinite(value) ? Math.max(acc, value) : acc;
+    }, -1);
+    fileCounter = maxCounter + 1;
+  }
 
   for (const filePath of files) {
     const raw = await fs.readFile(filePath, 'utf8');
     const fileChunks =
-      board === 'qimen' ? chunkByDelimiter(raw, '###') : chunkText(raw);
+      (board === 'qimen' || board === 'bazi')
+        ? chunkByDelimiter(raw, '###')
+        : chunkText(raw);
     const source = path.relative(knowledgeDir, filePath);
     fileChunks.forEach((text, chunkIndex) => {
       chunks.push({
@@ -185,12 +203,15 @@ const ingest = async () => {
   }
 
   const { model } = getEmbeddingConfig();
+  const existingChunks = Array.isArray(existingIndex?.chunks)
+    ? existingIndex.chunks
+    : [];
   const index = {
-    version: 1,
-    board,
-    model,
-    createdAt: new Date().toISOString(),
-    chunks: embeddings,
+    version: existingIndex?.version ?? 1,
+    board: existingIndex?.board ?? board,
+    model: existingIndex?.model ?? model,
+    createdAt: existingIndex?.createdAt ?? new Date().toISOString(),
+    chunks: existingChunks.concat(embeddings),
   };
 
   await fs.mkdir(path.dirname(indexPath), { recursive: true });

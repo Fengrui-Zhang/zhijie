@@ -78,6 +78,8 @@ const App: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(false);
+  const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
+  const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,6 +103,9 @@ const App: React.FC = () => {
   const handleModelChange = (type: ModelType) => {
     setModelType(type);
     handleReset();
+    if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
+      setUseKnowledge(false);
+    }
     // Set default time mode: Life reading (Bazi/Ziwei) usually requires custom birth time
     if (type === ModelType.BAZI || type === ModelType.ZIWEI) {
       setTimeMode('custom');
@@ -225,8 +230,11 @@ const App: React.FC = () => {
           resultData = await fetchBazi(baseParams);
           {
             const panText = formatBaziPrompt(resultData);
-            prompt = "请开始分析。";
-            knowledgeQuery = panText;
+            const trimmedQuestion = question.trim();
+            prompt = trimmedQuestion
+              ? `用户问题：${trimmedQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`
+              : "请开始分析全盘。";
+            knowledgeQuery = trimmedQuestion ? trimmedQuestion : panText;
             systemInstruction = [
             "这是某位提问者的八字排盘信息，请你据此进行推断：",
             "",
@@ -234,7 +242,7 @@ const App: React.FC = () => {
             "",
             "请严格基于以上数据分析，不得臆测与杜撰。",
             "主要用盲派的思想进行分析，分析顺序与要求：",
-            "1) 先判断日主强弱：通过分析时令（如地支土要分春夏秋冬）、藏干、干支生克制化与星运判断，不要用“五行个数”判断，也不要返回五行个数，因为这样容易误导初学者。",
+            "1) 先判断日主强弱：通过分析时令（如地支土要分春夏秋冬）、格局、配置、做功、藏干、干支特性与星运判断，不要用“五行个数”判断，也不要返回五行个数，因为这样容易误导初学者。示例：甲乙木生在辰月，辰虽为土，但辰土土性最弱且为春季，故帮扶甲乙木的力量较大。",
             "2) 再判断喜用神，判断喜用神的时候不要只拘泥于身强用克泄耗，身弱用帮助的刻板理论，而是要结合原八字全局的做功和干支关系进行分析，定位出八字原局中正向做功的天干或地支为用神（不一定只有一个），原局或者大运流年中够帮助用神的天干或地支为喜神，相反原局中反相做功的天干地支为忌神，原局或大运流年中损害喜用神的为仇神，在原局中没有起到作用的为闲神（闲神可以没有），从而得出确切且具体的天干地支喜用神（切记通过做功来判断，不要通过五行来判断，千万不要出现类似于“喜火所以天干喜见丙丁火，地支喜见巳午火”这种粗浅且不负责的说法！而是要出现类似于“巳火在全局起到伤官合杀的作用，所以巳火为用神，而亥水冲巳火，为忌神”的说法！）。",
             "3) 然后不用太拘泥于身强深弱，重点结合盲派做功与干支关系细化具体事象（冲合刑害、合化、透藏等）。",
             "4) 结合“神煞信息”作为补充参考简要分析（还是要以格局、做功和干支关系为重，神煞信息只作为辅助，但是神煞作为锦上添花的作用不能忽视，在分析的时候一定也要参考）：四柱神煞、吉神凶煞（年/月/日/时）、大运神煞的作用与触发条件。",
@@ -265,9 +273,12 @@ const App: React.FC = () => {
       await startQimenChat(systemInstruction);
 
       // Add user context
-      const userContent = (modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) 
-        ? `请分析我的命盘: ${baseParams.year}年${baseParams.month}月...` 
-        : `问题: ${question}`;
+      const trimmedQuestion = question.trim();
+      const userContent = modelType === ModelType.BAZI
+        ? `请分析我的命盘: ${baseParams.year}年${baseParams.month}月...${trimmedQuestion ? `\n问题: ${trimmedQuestion}` : ''}`
+        : modelType === ModelType.ZIWEI
+          ? `请分析我的命盘: ${baseParams.year}年${baseParams.month}月...`
+          : `问题: ${question}`;
 
       setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
       setIsTyping(true);
@@ -283,7 +294,7 @@ const App: React.FC = () => {
         if (modelType === ModelType.QIMEN) return question.trim();
         return question.trim() ? question : prompt;
       })();
-      const knowledge = useKnowledge
+      const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
             board: knowledgeBoardMap[modelType],
@@ -315,7 +326,7 @@ const App: React.FC = () => {
     try {
       const modelId = (Date.now() + 1).toString();
       setChatHistory(prev => [...prev, { id: modelId, role: 'model', content: '', timestamp: new Date() }]);
-      const knowledge = useKnowledge
+      const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
             board: knowledgeBoardMap[modelType],
@@ -351,11 +362,22 @@ const App: React.FC = () => {
      }
   };
 
+  const isNearShiChenBoundary = (value: string) => {
+    if (!value) return false;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return false;
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const isOddHour = hours % 2 === 1;
+    return isOddHour ? minutes <= 30 : minutes >= 30;
+  };
+
   // --- Render Helpers ---
   const isLifeReading = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
   // Only Bazi and Ziwei use location for True Solar Time
   const showLocation = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
+  const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
   return (
     <div className="min-h-screen pb-6 bg-[#fcfcfc] text-stone-800 font-serif">
@@ -387,19 +409,27 @@ const App: React.FC = () => {
                       [ModelType.QIMEN, '奇门遁甲'], 
                       [ModelType.MEIHUA, '梅花易数'],
                       [ModelType.LIUYAO, '六爻纳甲']
-                    ].map(([type, label]) => (
+                    ].map(([type, label]) => {
+                      const isRecommended = recommendedModels.has(type as ModelType);
+                      return (
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${
+                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${isRecommended ? 'relative ring-2 ring-amber-400/70' : ''} ${
                           modelType === type 
                             ? 'bg-stone-800 text-amber-500 border-stone-800 shadow-md transform -translate-y-0.5' 
                             : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-white hover:border-stone-300'
                         }`}
                       >
                         {label}
+                        {isRecommended && (
+                          <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
+                            强力推荐
+                          </span>
+                        )}
                       </button>
-                    ))}
+                    );
+                    })}
                   </div>
                </div>
 
@@ -413,41 +443,51 @@ const App: React.FC = () => {
                     {[
                       [ModelType.BAZI, '四柱八字'], 
                       [ModelType.ZIWEI, '紫微斗数']
-                    ].map(([type, label]) => (
+                    ].map(([type, label]) => {
+                      const isRecommended = recommendedModels.has(type as ModelType);
+                      return (
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${
+                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${isRecommended ? 'relative ring-2 ring-amber-400/70' : ''} ${
                           modelType === type 
                             ? 'bg-stone-800 text-amber-500 border-stone-800 shadow-md transform -translate-y-0.5' 
                             : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-white hover:border-stone-300'
                         }`}
                       >
                         {label}
+                        {isRecommended && (
+                          <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
+                            强力推荐
+                          </span>
+                        )}
                       </button>
-                    ))}
+                    );
+                    })}
                   </div>
                </div>
             </div>
 
-            <div className="mb-6 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
-              <div>
-                <div className="text-sm font-bold text-stone-700">启用知识库</div>
-                <div className="text-xs text-stone-500">根据所选板块检索参考资料</div>
+            {supportsKnowledge && (
+              <div className="mb-6 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+                <div>
+                  <div className="text-sm font-bold text-stone-700">启用知识库</div>
+                  <div className="text-xs text-stone-500">根据所选板块检索参考资料</div>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={useKnowledge}
+                    onChange={(event) => setUseKnowledge(event.target.checked)}
+                    className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>{useKnowledge ? '已开启' : '已关闭'}</span>
+                </label>
               </div>
-              <label className="flex items-center gap-2 text-sm text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={useKnowledge}
-                  onChange={(event) => setUseKnowledge(event.target.checked)}
-                  className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
-                />
-                <span>{useKnowledge ? '已开启' : '已关闭'}</span>
-              </label>
-            </div>
+            )}
 
             <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
-              {/* Question (Divination Only) */}
+              {/* Question (Divination) */}
               {!isLifeReading && (
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">所求何事</label>
@@ -455,6 +495,19 @@ const App: React.FC = () => {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder={modelType === ModelType.QIMEN ? "例如：这次面试能过吗？" : "例如：近期财运如何？"}
+                    className="w-full border border-stone-300 rounded-lg p-3 focus:ring-2 focus:ring-amber-500 outline-none min-h-[80px]"
+                  />
+                </div>
+              )}
+
+              {/* Question (Bazi Optional) */}
+              {modelType === ModelType.BAZI && (
+                <div>
+                  <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
+                  <textarea 
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder="例如：事业发展方向如何？"
                     className="w-full border border-stone-300 rounded-lg p-3 focus:ring-2 focus:ring-amber-500 outline-none min-h-[80px]"
                   />
                 </div>
@@ -511,6 +564,11 @@ const App: React.FC = () => {
                         onChange={(e) => setCustomDate(e.target.value)} 
                         className="w-full border border-stone-300 rounded p-2"
                       />
+                    )}
+                    {showSolarTimeReminder && (
+                      <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                        当前时间接近时辰交界（前后30分钟），建议开启真太阳时（选择地区）。
+                      </div>
                     )}
                     {timeMode === 'now' && !isLifeReading && (
                       <div className="text-stone-400 text-sm italic py-2">使用当前时间起卦</div>
