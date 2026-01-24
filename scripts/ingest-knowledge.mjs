@@ -142,16 +142,20 @@ const embedTexts = async (inputs) => {
 
 const ingest = async () => {
   await loadEnvFile(path.join(process.cwd(), '.env.local'));
-  const board = process.argv[2] || 'bazi';
+  const args = process.argv.slice(2);
+  const rewrite = args.includes('--rewrite') || args.includes('--overwrite');
+  const board = args.find(arg => !arg.startsWith('-')) || 'bazi';
   const baseDir = process.cwd();
   const knowledgeDir = path.join(baseDir, 'data', 'knowledge', board);
   const indexPath = path.join(baseDir, 'data', 'index', `${board}.json`);
   let existingIndex = null;
-  try {
-    const rawIndex = await fs.readFile(indexPath, 'utf8');
-    existingIndex = JSON.parse(rawIndex);
-  } catch {
-    existingIndex = null;
+  if (!rewrite) {
+    try {
+      const rawIndex = await fs.readFile(indexPath, 'utf8');
+      existingIndex = JSON.parse(rawIndex);
+    } catch {
+      existingIndex = null;
+    }
   }
 
   const files = await listTxtFiles(knowledgeDir);
@@ -171,12 +175,17 @@ const ingest = async () => {
     fileCounter = maxCounter + 1;
   }
 
+  const maxChars = Number(process.env.EMBEDDING_MAX_CHARS) || 2000;
+  const overlap = Number(process.env.EMBEDDING_OVERLAP) || 200;
+
   for (const filePath of files) {
     const raw = await fs.readFile(filePath, 'utf8');
     const fileChunks =
       (board === 'qimen' || board === 'bazi')
-        ? chunkByDelimiter(raw, '###')
-        : chunkText(raw);
+        ? chunkByDelimiter(raw, '###').flatMap(chunk =>
+            chunk.length > maxChars ? chunkText(chunk, maxChars, overlap) : [chunk]
+          )
+        : chunkText(raw, maxChars, overlap);
     const source = path.relative(knowledgeDir, filePath);
     fileChunks.forEach((text, chunkIndex) => {
       chunks.push({
