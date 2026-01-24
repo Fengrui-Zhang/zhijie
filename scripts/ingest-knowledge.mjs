@@ -63,6 +63,152 @@ const chunkByDelimiter = (text, delimiter) => {
     .filter(Boolean);
 };
 
+const normalizeEmbedding = (embedding) => {
+  let norm = 0;
+  for (const value of embedding) {
+    norm += value * value;
+  }
+  norm = Math.sqrt(norm);
+  if (!norm) return embedding;
+  return embedding.map(value => value / norm);
+};
+
+const extractIntro = (text, maxChars = 250) => {
+  const cleaned = text.replace(/\r\n/g, '\n').trim();
+  if (!cleaned) return '';
+  const [firstParagraph] = cleaned.split(/\n{2,}/);
+  return (firstParagraph || cleaned).trim().slice(0, maxChars);
+};
+
+const parseTopSections = (text, fallbackTitle) => {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const sections = [];
+  let currentTitle = null;
+  let buffer = [];
+
+  const flush = () => {
+    if (!currentTitle) return;
+    const body = buffer.join('\n').trim();
+    sections.push({ title: currentTitle, body });
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^###(?!#)\s+(.*)$/);
+    if (match) {
+      flush();
+      currentTitle = match[1].trim();
+      buffer = [];
+      continue;
+    }
+    if (currentTitle) {
+      buffer.push(line);
+    }
+  }
+
+  flush();
+
+  if (sections.length === 0) {
+    const cleaned = text.trim();
+    if (cleaned) {
+      sections.push({ title: fallbackTitle, body: cleaned });
+    }
+  }
+
+  return sections;
+};
+
+const parseSubSections = (text) => {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const sections = [];
+  let currentTitle = null;
+  let buffer = [];
+  let prelude = [];
+
+  const pushSection = (title, linesToJoin) => {
+    const body = linesToJoin.join('\n').trim();
+    if (body) {
+      sections.push({ title, body });
+    }
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^####\s+(.*)$/);
+    if (match) {
+      if (currentTitle !== null) {
+        pushSection(currentTitle, buffer);
+      } else if (prelude.length) {
+        pushSection(null, prelude);
+        prelude = [];
+      }
+      currentTitle = match[1].trim();
+      buffer = [];
+      continue;
+    }
+    if (currentTitle !== null) {
+      buffer.push(line);
+    } else {
+      prelude.push(line);
+    }
+  }
+
+  if (currentTitle !== null) {
+    pushSection(currentTitle, buffer);
+  } else if (prelude.length) {
+    pushSection(null, prelude);
+  }
+
+  return sections;
+};
+
+const chunkByParagraphs = (text, maxChars, overlap) => {
+  const paragraphs = text
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map(chunk => chunk.trim())
+    .filter(Boolean);
+
+  const chunks = [];
+  let current = '';
+
+  const pushCurrent = () => {
+    if (current) {
+      chunks.push(current.trim());
+      current = '';
+    }
+  };
+
+  for (const paragraph of paragraphs) {
+    if (!current) {
+      current = paragraph;
+      continue;
+    }
+    const candidate = `${current}\n\n${paragraph}`;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      continue;
+    }
+    pushCurrent();
+    if (paragraph.length > maxChars) {
+      chunks.push(...chunkText(paragraph, maxChars, overlap));
+    } else {
+      current = paragraph;
+    }
+  }
+
+  pushCurrent();
+
+  if (overlap > 0 && chunks.length > 1) {
+    return chunks.map((chunk, index) => {
+      if (index === 0) return chunk;
+      const prev = chunks[index - 1];
+      const tail = prev.slice(Math.max(0, prev.length - overlap));
+      return `${tail}\n${chunk}`.trim();
+    });
+  }
+
+  return chunks;
+};
+
 const chunkText = (text, maxChars = 800, overlap = 120) => {
   const cleaned = text
     .replace(/\r\n/g, '\n')
@@ -78,6 +224,14 @@ const chunkText = (text, maxChars = 800, overlap = 120) => {
     if (slice) chunks.push(slice);
   }
   return chunks;
+};
+
+const KEYWORD_REGEX = /学历|文凭|婚姻|财运|职业|行业|官运|疾病|健康|配偶|财星|官星|印星|用神/;
+
+const isMeaningfulChunk = (text) => {
+  const cleaned = text.replace(/\s+/g, '').trim();
+  if (cleaned.length >= 30) return true;
+  return KEYWORD_REGEX.test(cleaned);
 };
 
 const embedTexts = async (inputs) => {
@@ -177,23 +331,73 @@ const ingest = async () => {
 
   const maxChars = Number(process.env.EMBEDDING_MAX_CHARS) || 2000;
   const overlap = Number(process.env.EMBEDDING_OVERLAP) || 200;
+  const parentIntroMax = Number(process.env.EMBEDDING_PARENT_INTRO_MAX) || 250;
+  const childMaxChars = Number(process.env.EMBEDDING_CHILD_MAX_CHARS) || 900;
+  const childOverlap = Number(process.env.EMBEDDING_CHILD_OVERLAP) || 120;
 
   for (const filePath of files) {
     const raw = await fs.readFile(filePath, 'utf8');
-    const fileChunks =
-      (board === 'qimen' || board === 'bazi')
-        ? chunkByDelimiter(raw, '###').flatMap(chunk =>
-            chunk.length > maxChars ? chunkText(chunk, maxChars, overlap) : [chunk]
-          )
-        : chunkText(raw, maxChars, overlap);
     const source = path.relative(knowledgeDir, filePath);
-    fileChunks.forEach((text, chunkIndex) => {
+    const fileTitle = path.basename(filePath, path.extname(filePath));
+    const sections = parseTopSections(raw, fileTitle);
+    let order = 0;
+    let groupIndex = 0;
+
+    for (const section of sections) {
+      const docId = `${board}-${fileCounter}`;
+      const groupId = `${docId}-g-${groupIndex}`;
+      const parentId = `${groupId}-p`;
+      const intro = extractIntro(section.body, parentIntroMax);
+      const parentText = intro ? `${section.title}\n${intro}` : section.title;
+
       chunks.push({
-        id: `${board}-${fileCounter}-${chunkIndex}`,
-        text,
+        id: parentId,
+        text: parentText,
         source,
+        docId,
+        groupId,
+        parentId: null,
+        level: 0,
+        title: section.title,
+        order,
+        indexVersion: 2,
       });
-    });
+      order += 1;
+
+      const subSections = parseSubSections(section.body);
+      const childPieces = subSections.length > 0 ? subSections : [{ title: null, body: section.body }];
+
+      for (const sub of childPieces) {
+        const title = sub.title || section.title;
+        const body = sub.body.trim();
+        if (!body) continue;
+
+        const baseChunks =
+          body.length > childMaxChars
+            ? chunkByParagraphs(body, childMaxChars, childOverlap)
+            : [body];
+
+        for (const piece of baseChunks) {
+          const childText = sub.title ? `${sub.title}\n${piece}` : piece;
+          if (!isMeaningfulChunk(childText)) continue;
+          chunks.push({
+            id: `${groupId}-c-${order}`,
+            text: childText,
+            source,
+            docId,
+            groupId,
+            parentId,
+            level: 1,
+            title,
+            order,
+            indexVersion: 2,
+          });
+          order += 1;
+        }
+      }
+
+      groupIndex += 1;
+    }
     fileCounter += 1;
   }
 
@@ -206,17 +410,21 @@ const ingest = async () => {
     const batch = chunks.slice(i, i + batchSize);
     const batchEmbeddings = await embedTexts(batch.map(item => item.text));
     batchEmbeddings.forEach((embedding, idx) => {
-      embeddings.push({ ...batch[idx], embedding });
+      embeddings.push({ ...batch[idx], embedding: normalizeEmbedding(embedding) });
     });
     console.log(`Embedded ${Math.min(i + batchSize, chunks.length)} / ${chunks.length}`);
   }
 
   const { model } = getEmbeddingConfig();
-  const existingChunks = Array.isArray(existingIndex?.chunks)
-    ? existingIndex.chunks
-    : [];
+  const existingChunks =
+    !rewrite && Array.isArray(existingIndex?.chunks) && existingIndex?.version === 2
+      ? existingIndex.chunks
+      : [];
+  if (!rewrite && existingIndex?.version && existingIndex.version !== 2) {
+    console.warn('Existing index version mismatch. Rebuilding as version 2 without merging.');
+  }
   const index = {
-    version: existingIndex?.version ?? 1,
+    version: 2,
     board: existingIndex?.board ?? board,
     model: existingIndex?.model ?? model,
     createdAt: existingIndex?.createdAt ?? new Date().toISOString(),
