@@ -1189,6 +1189,38 @@ const App: React.FC = () => {
     ].join('\n');
   };
 
+  const buildKlinePromptStrict = (data: BaziResponse) => {
+    const panText = formatBaziPrompt(data);
+    const dayunLines = data.dayun_info.big.map((name, idx) => {
+      const start = data.dayun_info.big_start_year?.[idx];
+      const end = data.dayun_info.big_end_year?.[idx];
+      const yearList: string[] = [];
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        for (let y = start; y <= end; y += 1) {
+          yearList.push(`${y}(${getGanzhiYear(y)})`);
+        }
+      }
+      return `- ${name} ${start ?? '—'}-${end ?? '—'}: ${yearList.join('，')}`;
+    });
+
+    return [
+      "只输出严格JSON，不要解释，不要Markdown，不要空行。",
+      "禁止尾随逗号，只能使用英文双引号。",
+      "数值必须是0-10整数。",
+      "",
+      "【排盘信息】",
+      panText.trim(),
+      "",
+      "【大运与流年列表】",
+      dayunLines.join('\n'),
+      "",
+      "输出模板（字段名必须一致，长度必须满足）：",
+      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}]}",
+      "",
+      "dayun长度必须为7，liunian长度必须为70。",
+    ].join('\n');
+  };
+
   const parseKlineResult = (raw: string) => {
     const trimmed = raw.trim();
     const tryParse = (value: string) => JSON.parse(value) as KlineResult;
@@ -1290,9 +1322,15 @@ const App: React.FC = () => {
         try {
           parsed = parseKlineResult(sanitizeKlineJson(finalState.content));
         } catch {
-          const repairPrompt = buildKlineRepairPrompt(finalState.content);
-          const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
-          parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
+          try {
+            const repairPrompt = buildKlineRepairPrompt(finalState.content);
+            const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
+            parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
+          } catch {
+            const strictPrompt = buildKlinePromptStrict(chartData as BaziResponse);
+            const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, 'deepseek-chat');
+            parsed = parseKlineResult(sanitizeKlineJson(retryState.content));
+          }
         }
       }
       const normalized = normalizeKlineResult(parsed as KlineResult);
