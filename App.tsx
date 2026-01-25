@@ -938,7 +938,7 @@ const App: React.FC = () => {
             "7. 做功逻辑详解（说明使用了什么工具，制了什么东西，效率如何）。",
             "8. 富贵层次判定。",
             "",
-            "这是某位提问者的八字排盘信息，请你据此进行推断：",
+            "这是某位提问者的八字排盘信息，请你据此进行推断，注意大运流年及其对应的年龄千万不要错：",
             "",
             panText,
             currentTimeText,
@@ -1237,6 +1237,9 @@ const App: React.FC = () => {
       love: clampScore(scores.love),
       health: clampScore(scores.health),
     });
+    if (!Array.isArray(result.dayun) || !Array.isArray(result.liunian)) {
+      throw new Error('K线结果缺少必要数组字段');
+    }
     return {
       schema_version: 'kline_v1',
       dayun: result.dayun.slice(0, 7).map((item) => ({
