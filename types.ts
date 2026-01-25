@@ -50,6 +50,10 @@ export interface BaseParams {
 
 export interface QimenParams extends BaseParams {
   question: string;
+  zhen?: number;
+  ju_model?: number;
+  pan_model?: number;
+  fei_pan_model?: number;
 }
 
 // --- Qimen Types ---
@@ -99,7 +103,10 @@ export interface BaziResponse {
     jiaoyun: string;
     zhengge: string;
     zhen?: {
+      province?: string;
       city: string;
+      jingdu?: string;
+      weidu?: string;
       shicha: string;
     };
   };
@@ -108,15 +115,23 @@ export interface BaziResponse {
     tg_cg_god: string[]; // Ten Gods (Heavenly Stems)
     bazi: string[]; // [Year, Month, Day, Hour] Pillars
     dz_cg: string[]; // Hidden Stems
+    dz_cg_god?: string[]; // Hidden Stems Ten Gods
     day_cs: string[]; // 12 Life Stages
     na_yin: string[]; // Na Yin
+  };
+  start_info?: {
+    jishen?: string[];
+    xz?: string;
+    sx?: string;
   };
   dayun_info: {
     big_god: string[]; // Dayun Gods
     big: string[]; // Dayun Pillars
+    big_cs?: string[]; // Dayun long-life stages
     big_start_year: number[];
     big_end_year: number[];
     xu_sui: number[];
+    [key: string]: any;
   };
   detail_info: {
     sizhu: {
@@ -131,6 +146,10 @@ export interface BaziResponse {
       day: string;
       hour: string;
     };
+    dayunshensha?: {
+      tgdz: string;
+      shensha: string;
+    }[];
     zhuxing?: {
       day: string;
       [key: string]: any;

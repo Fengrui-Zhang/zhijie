@@ -48,11 +48,16 @@ export const sendMessageToDeepseek = async (
   return content;
 };
 
+type StreamState = {
+  reasoning: string;
+  content: string;
+};
+
 export const sendMessageToDeepseekStream = async (
   message: string,
-  onDelta: (delta: string, fullText: string) => void,
+  onDelta: (state: StreamState) => void,
   knowledge?: KnowledgeOptions
-): Promise<string> => {
+): Promise<StreamState> => {
   if (chatMessages.length === 0) {
     throw new Error('Chat session not initialized. Please start a reading first.');
   }
@@ -80,13 +85,14 @@ export const sendMessageToDeepseekStream = async (
     const data = await response.json();
     const content = data.content || '无法获取回复';
     chatMessages.push({ role: 'assistant', content });
-    return content;
+    return { reasoning: '', content };
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  let fullText = '';
+  let reasoningText = '';
+  let contentText = '';
 
   while (true) {
     const { value, done } = await reader.read();
@@ -105,13 +111,16 @@ export const sendMessageToDeepseekStream = async (
 
         try {
           const json = JSON.parse(payload);
-          const delta =
-            json.choices?.[0]?.delta?.content ??
-            json.choices?.[0]?.delta?.reasoning_content ??
-            '';
-          if (delta) {
-            fullText += delta;
-            onDelta(delta, fullText);
+          const reasoningDelta = json.choices?.[0]?.delta?.reasoning_content ?? '';
+          const contentDelta = json.choices?.[0]?.delta?.content ?? '';
+          if (reasoningDelta) {
+            reasoningText += reasoningDelta;
+          }
+          if (contentDelta) {
+            contentText += contentDelta;
+          }
+          if (reasoningDelta || contentDelta) {
+            onDelta({ reasoning: reasoningText, content: contentText });
           }
         } catch {
           // Ignore malformed SSE chunks.
@@ -120,12 +129,12 @@ export const sendMessageToDeepseekStream = async (
     }
   }
 
-  if (!fullText) {
-    fullText = '无法获取回复';
+  if (!reasoningText && !contentText) {
+    contentText = '无法获取回复';
   }
 
-  chatMessages.push({ role: 'assistant', content: fullText });
-  return fullText;
+  chatMessages.push({ role: 'assistant', content: contentText });
+  return { reasoning: reasoningText, content: contentText };
 };
 
 export const clearChatSession = () => {

@@ -43,7 +43,10 @@ async function fetchApi<T>(endpoint: string, params: Record<string, string>): Pr
 
 // --- 1. Qimen ---
 export const fetchQimen = async (params: QimenParams) => {
-  return fetchApi<QimenResponse>(ENDPOINTS[ModelType.QIMEN], {
+  const zhen = params.zhen ?? ((params.province && params.city) ? 1 : 2);
+  const juModel = params.ju_model ?? 1;
+
+  const requestPayload: Record<string, string> = {
     type: '1', // Chai Bu
     name: params.name || '匿名',
     sex: params.sex.toString(),
@@ -52,8 +55,22 @@ export const fetchQimen = async (params: QimenParams) => {
     day: params.day.toString(),
     hours: params.hours.toString(),
     minute: params.minute.toString(),
-    lang: 'zh-cn'
-  });
+    lang: 'zh-cn',
+    ju_model: juModel.toString(),
+    zhen: zhen.toString(),
+  };
+
+  if (params.province) requestPayload.province = params.province;
+  if (params.city) requestPayload.city = params.city;
+
+  if (params.pan_model !== undefined) {
+    requestPayload.pan_model = params.pan_model.toString();
+    if (params.pan_model === 0) {
+      requestPayload.fei_pan_model = (params.fei_pan_model ?? 1).toString();
+    }
+  }
+
+  return fetchApi<QimenResponse>(ENDPOINTS[ModelType.QIMEN], requestPayload);
 };
 
 // --- 2. Bazi ---
@@ -170,7 +187,16 @@ export const formatQimenPrompt = (data: QimenResponse, question: string) => {
 };
 
 export const formatBaziPrompt = (data: BaziResponse) => {
-  const { base_info, bazi_info, dayun_info, detail_info } = data;
+  const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
+  const shenshaInfo = detail_info?.shensha
+    ? `年柱: ${detail_info.shensha.year}\n  月柱: ${detail_info.shensha.month}\n  日柱: ${detail_info.shensha.day}\n  时柱: ${detail_info.shensha.hour}`
+    : '无';
+  const jishenInfo = start_info?.jishen && start_info.jishen.length > 0
+    ? `年柱: ${start_info.jishen[0] || '—'}\n  月柱: ${start_info.jishen[1] || '—'}\n  日柱: ${start_info.jishen[2] || '—'}\n  时柱: ${start_info.jishen[3] || '—'}`
+    : '无';
+  const dayunShenshaInfo = detail_info?.dayunshensha && detail_info.dayunshensha.length > 0
+    ? detail_info.dayunshensha.map((item) => `${item.tgdz}: ${item.shensha}`).join('；')
+    : '无';
   return `
   【八字命理排盘】
   姓名: ${base_info.name} (${base_info.sex})
@@ -179,13 +205,16 @@ export const formatBaziPrompt = (data: BaziResponse) => {
   八字: ${bazi_info.bazi.join(' ')}
   五行纳音: ${bazi_info.na_yin.join(' ')}
   格局: ${base_info.zhengge}
-  日主强弱: ${detail_info.zhuxing?.day || '未知'} (参考)
+  神煞:
+  四柱神煞:
+  ${shenshaInfo}
+  吉神凶煞:
+  ${jishenInfo}
+  大运神煞: ${dayunShenshaInfo}
   喜用神分析需AI自行推断。
 
   大运: ${dayun_info.big.join(' -> ')}
   起运: ${base_info.qiyun}
-
-  请以资深八字命理师的身份，分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。
   `;
 };
 

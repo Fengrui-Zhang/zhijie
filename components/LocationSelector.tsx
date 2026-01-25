@@ -7,9 +7,18 @@ interface Props {
   setProvince: (val: string) => void;
   city: string;
   setCity: (val: string) => void;
+  title?: string;
+  helperText?: string;
 }
 
-const LocationSelector: React.FC<Props> = ({ province, setProvince, city, setCity }) => {
+const LocationSelector: React.FC<Props> = ({
+  province,
+  setProvince,
+  city,
+  setCity,
+  title = '真太阳时校准',
+  helperText = '开启后可根据出生地经纬度校准排盘时间，提高精准度。',
+}) => {
   const [isEnabled, setIsEnabled] = useState(false);
   const provinces = Object.keys(CITIES_BY_PROVINCE);
   const availableCities = province ? CITIES_BY_PROVINCE[province] || [] : [];
@@ -38,7 +47,7 @@ const LocationSelector: React.FC<Props> = ({ province, setProvince, city, setCit
   return (
     <div className="bg-stone-50 p-4 rounded-lg border border-stone-100 transition-all duration-300">
       <div className="flex items-center justify-between mb-3">
-        <label className="text-xs text-stone-500 font-bold uppercase tracking-wider">真太阳时校准</label>
+        <label className="text-xs text-stone-500 font-bold uppercase tracking-wider">{title}</label>
         <div className="flex items-center gap-2">
            <span className={`text-xs ${isEnabled ? 'text-amber-600 font-bold' : 'text-stone-400'}`}>
              {isEnabled ? '已开启' : '未开启'}
@@ -83,7 +92,7 @@ const LocationSelector: React.FC<Props> = ({ province, setProvince, city, setCit
       )}
       {!isEnabled && (
         <div className="text-xs text-stone-400 italic">
-          开启后可根据出生地经纬度校准八字排盘时间，提高精准度。
+          {helperText}
         </div>
       )}
     </div>

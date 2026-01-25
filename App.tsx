@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import updates from './data/updates.json';
 
 // Services
 import { 
@@ -33,6 +34,35 @@ const Spinner = () => (
 const SendIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>);
 const TrashIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>);
 
+const THINKING_START = '[[THINKING]]';
+const THINKING_END = '[[/THINKING]]';
+const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
+
+const buildModelContent = (reasoning: string, answer: string) => {
+  if (reasoning.trim()) {
+    return `${THINKING_START}\n${reasoning}\n${THINKING_END}\n\n${answer}`;
+  }
+  return answer;
+};
+
+const parseModelContent = (content: string) => {
+  const start = content.indexOf(THINKING_START);
+  const end = content.indexOf(THINKING_END);
+  if (start !== -1 && end !== -1 && end > start) {
+    const reasoning = content.slice(start + THINKING_START.length, end).trim();
+    const answer = content.slice(end + THINKING_END.length).trim();
+    return { reasoning, answer };
+  }
+  return { reasoning: '', answer: content };
+};
+
+const appendDisclaimer = (text: string) => {
+  const trimmed = text.trim();
+  if (!trimmed) return DISCLAIMER_TEXT;
+  if (trimmed.endsWith(DISCLAIMER_TEXT)) return trimmed;
+  return `${trimmed}\n\n${DISCLAIMER_TEXT}`;
+};
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -53,6 +83,10 @@ const App: React.FC = () => {
   const [timeMode, setTimeMode] = useState<'now' | 'custom'>('now');
   const [customDate, setCustomDate] = useState('');
   const [birthYear, setBirthYear] = useState('');
+  const [qimenProEnabled, setQimenProEnabled] = useState(false);
+  const [qimenJuModel, setQimenJuModel] = useState(1);
+  const [qimenPanModel, setQimenPanModel] = useState(1);
+  const [qimenFeiPanModel, setQimenFeiPanModel] = useState(1);
   
   // Liuyao Specifics
   const [liuyaoMode, setLiuyaoMode] = useState<LiuyaoMode>(LiuyaoMode.AUTO);
@@ -78,6 +112,7 @@ const App: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
+  const [showUpdates, setShowUpdates] = useState(false);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
 
@@ -126,6 +161,10 @@ const App: React.FC = () => {
     setLyNum('');
     setLyNumUp('');
     setLyNumDown('');
+    setQimenProEnabled(false);
+    setQimenJuModel(1);
+    setQimenPanModel(1);
+    setQimenFeiPanModel(1);
     // Optionally keep name/city for UX
   };
 
@@ -218,11 +257,25 @@ const App: React.FC = () => {
       let prompt = "";
       let systemInstruction = "";
       let knowledgeQuery = "";
+      const defaultBaziQuestion = "请分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。";
+      const now = new Date();
+      const currentTimeText = `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
 
       // --- API Calls & Prompt Gen ---
       switch (modelType) {
         case ModelType.QIMEN:
-          resultData = await fetchQimen({ ...baseParams, question });
+          {
+            const qimenZhen = (province && city) ? 1 : 2;
+            const qimenParams = {
+              ...baseParams,
+              question,
+              zhen: qimenZhen,
+              ju_model: qimenProEnabled ? qimenJuModel : 1,
+              pan_model: qimenProEnabled ? qimenPanModel : undefined,
+              fei_pan_model: qimenProEnabled && qimenPanModel === 0 ? qimenFeiPanModel : undefined,
+            };
+            resultData = await fetchQimen(qimenParams);
+          }
           prompt = formatQimenPrompt(resultData, question);
           systemInstruction = "你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。";
           break;
@@ -231,17 +284,19 @@ const App: React.FC = () => {
           {
             const panText = formatBaziPrompt(resultData);
             const trimmedQuestion = question.trim();
+            const finalQuestion = trimmedQuestion || defaultBaziQuestion;
             prompt = trimmedQuestion
               ? `用户问题：${trimmedQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`
-              : "请开始分析全盘。";
-            knowledgeQuery = trimmedQuestion ? trimmedQuestion : panText;
+              : `用户问题：${finalQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`;
+            knowledgeQuery = trimmedQuestion ? trimmedQuestion : defaultBaziQuestion;
             systemInstruction = [
             "你是一位深谙段建业盲派命理体系的算命专家。你推命的核心逻辑是理法、象法、技法三位一体，重点在于观察八字如何通过做功来表述人生 。",
+            "如果知识库检索到强有力的证据，请保持专业判断，不要为了迎合用户情绪而轻易动摇观点；在适当位置可引用或提及知识库中的关键信息作为依据。",
             "Workflow:",
             "1. 建立坐标：宾主与体用 分清宾主：日、时为主位（代表我、我的家、我的工具）；年、月为宾位（代表他人的、外界的、我面对的环境） 。 定体用：将十神分为体（日主、印、禄、比劫，代表我自己或操纵的工具）和用（财、官，代表我的目的和追求）。食伤视情况而定，食神近体，伤官近用 。",
             "2. 核心分析：寻找做功方式 请根据以下逻辑分析八字的能量耗散与效率： 日干意向：日干有无合（合财/官）、有无生（生食伤），这是日干追求目标的体现 。 主位动作：日支是否参与刑、冲、克、穿、合、墓。若日支不做功，再看有无禄神和比劫做功 。 成党成势：分析干支是否成党，成功者往往有势，通过强方制掉弱方来做功 。 做功类型：判定是制用、化用、生用还是合用结构 。",
             "3. 层次判定：效率与干净度 富贵贫贱：制得干净、做功效率高者为大富贵；制不干净、能量内耗或废神多者为平庸 。 虚实取象：财星虚透主才华、口才而非钱财；官星虚透主名气而非权位 。",
-            "4. 细节推断：穿、破与墓库 穿（害）分析：重点观察子未、丑午、卯辰、酉戌等相穿，这代表防不胜防的伤害或穿倒（破坏性质） 。 墓库开闭：辰戌丑未是否逢冲刑，不冲为墓（死的），冲开为库（活的），库必须开才能发挥作用 。",
+            "4. 细节推断：穿、破与墓库 穿（害）分析：重点观察子未、丑午、卯辰、酉戌等相穿，这代表防不胜防的伤害或穿倒（破坏性质） 。 墓库开闭：辰戌丑未是否逢冲刑，不冲为墓（死的），冲开为库（活的），库必须开才能发挥作用 。日主坐下的印库或者比劫库不能被冲，财库和官库逢冲则开。",
             "5. 输出格式要求：",
             "6. 八字排盘及体用分析。",
             "7. 做功逻辑详解（说明使用了什么工具，制了什么东西，效率如何）。",
@@ -250,6 +305,7 @@ const App: React.FC = () => {
             "这是某位提问者的八字排盘信息，请你据此进行推断：",
             "",
             panText,
+            currentTimeText,
             "",
             "请严格基于以上数据分析，不得臆测与杜撰。",
           ].join('\n');
@@ -257,7 +313,7 @@ const App: React.FC = () => {
           break;
         case ModelType.ZIWEI:
           resultData = await fetchZiwei(baseParams);
-          prompt = formatZiweiPrompt(resultData);
+          prompt = `${formatZiweiPrompt(resultData)}\n${currentTimeText}`;
           systemInstruction = "你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。";
           break;
         case ModelType.MEIHUA:
@@ -308,9 +364,15 @@ const App: React.FC = () => {
           }
         : undefined;
 
-      await sendMessageToDeepseekStream(prompt, (_delta, fullText) => {
-        updateChatMessage(modelId, fullText);
-      }, knowledge);
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge
+      );
+      const finalAnswer = appendDisclaimer(finalState.content);
+      updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
 
     } catch (err: any) {
       console.error(err);
@@ -340,9 +402,15 @@ const App: React.FC = () => {
           }
         : undefined;
 
-      await sendMessageToDeepseekStream(outgoingMessage, (_delta, fullText) => {
-        updateChatMessage(modelId, fullText);
-      }, knowledge);
+      const finalState = await sendMessageToDeepseekStream(
+        outgoingMessage,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge
+      );
+      const finalAnswer = appendDisclaimer(finalState.content);
+      updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
     } finally {
@@ -381,7 +449,7 @@ const App: React.FC = () => {
   // --- Render Helpers ---
   const isLifeReading = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
   // Only Bazi and Ziwei use location for True Solar Time
-  const showLocation = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
+  const showLocation = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI || modelType === ModelType.QIMEN;
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
@@ -391,9 +459,52 @@ const App: React.FC = () => {
       <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-amber-700 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
-          <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
+            <button
+              type="button"
+              onClick={() => setShowUpdates(true)}
+              className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
+            >
+              新增功能
+            </button>
+          </div>
         </div>
       </header>
+
+      {showUpdates && (
+        <div
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowUpdates(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white shadow-xl border border-stone-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
+              <div>
+                <div className="text-sm font-bold text-stone-800">{updates.title}</div>
+                <div className="text-[11px] text-stone-500">更新于 {updates.updated_at}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUpdates(false)}
+                className="text-sm text-stone-400 hover:text-stone-600"
+              >
+                关闭
+              </button>
+            </div>
+            <div className="px-4 py-3 space-y-2 text-sm text-stone-700">
+              {updates.items.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-4xl mx-auto px-2 mt-6">
         {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">{error}</div>}
@@ -583,6 +694,75 @@ const App: React.FC = () => {
                 )}
               </div>
 
+              {modelType === ModelType.QIMEN && (
+                <div className="bg-stone-50 p-4 rounded-lg border border-stone-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-sm font-bold text-stone-700">专业版设置</div>
+                      <div className="text-xs text-stone-500">非专业人士请使用默认设置</div>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={qimenProEnabled}
+                        onChange={(event) => setQimenProEnabled(event.target.checked)}
+                        className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span>{qimenProEnabled ? '已开启' : '已关闭'}</span>
+                    </label>
+                  </div>
+
+                  {!qimenProEnabled && (
+                    <div className="text-xs text-stone-400 italic">
+                      默认设置：起局方法为置闰法，盘类型为转盘奇门。
+                    </div>
+                  )}
+
+                  {qimenProEnabled && (
+                    <div className="grid md:grid-cols-2 gap-4 animate-fade-in">
+                      <div>
+                        <label className="block text-xs text-stone-500 mb-1">起局方法</label>
+                        <select
+                          value={qimenJuModel}
+                          onChange={(e) => setQimenJuModel(parseInt(e.target.value, 10))}
+                          className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                        >
+                          <option value={0}>拆补法</option>
+                          <option value={1}>置闰法</option>
+                          <option value={2}>茅山道人法</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs text-stone-500 mb-1">盘类型</label>
+                        <select
+                          value={qimenPanModel}
+                          onChange={(e) => setQimenPanModel(parseInt(e.target.value, 10))}
+                          className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                        >
+                          <option value={0}>飞盘奇门</option>
+                          <option value={1}>转盘奇门</option>
+                        </select>
+                      </div>
+
+                      {qimenPanModel === 0 && (
+                        <div>
+                          <label className="block text-xs text-stone-500 mb-1">飞盘排法</label>
+                          <select
+                            value={qimenFeiPanModel}
+                            onChange={(e) => setQimenFeiPanModel(parseInt(e.target.value, 10))}
+                            className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                          >
+                            <option value={1}>全部顺排</option>
+                            <option value={2}>阴顺阳逆</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* --- LIU YAO SPECIFIC UI --- */}
               {modelType === ModelType.LIUYAO && (
                  <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100 mt-4">
@@ -731,15 +911,27 @@ const App: React.FC = () => {
                  <button onClick={() => setChatHistory([])} className="text-stone-400 hover:text-red-500"><TrashIcon /></button>
                </div>
                <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#f9fafb]">
-                 {chatHistory.map((msg) => (
+                 {chatHistory.map((msg) => {
+                   const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
+                   return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`max-w-[90%] rounded-lg p-4 shadow-sm ${msg.role === 'user' ? 'bg-stone-800 text-white' : 'bg-white border border-stone-100 text-stone-800'}`}>
+                        {msg.role === 'model' && parsed?.reasoning && (
+                          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+                            <div className="mb-1 font-semibold">思考过程</div>
+                            <div className="markdown-body text-xs leading-relaxed">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.reasoning}</ReactMarkdown>
+                            </div>
+                          </div>
+                        )}
                         <div className="markdown-body text-sm leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.role === 'model' && parsed ? parsed.answer : msg.content}
+                          </ReactMarkdown>
                         </div>
                      </div>
                    </div>
-                 ))}
+                 )})}
                  {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">大师正在思考...</div>}
                  <div ref={chatEndRef} />
                </div>
