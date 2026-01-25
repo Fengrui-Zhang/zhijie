@@ -90,6 +90,104 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const renderMarkdownToHtml = (text: string) => {
+  const lines = text.split(/\r?\n/);
+  let html = '';
+  let inCodeBlock = false;
+  let listType: 'ul' | 'ol' | null = null;
+
+  const closeList = () => {
+    if (listType) {
+      html += `</${listType}>`;
+      listType = null;
+    }
+  };
+
+  const inlineFormat = (value: string) =>
+    value
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+
+  for (const rawLine of lines) {
+    const line = rawLine ?? '';
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        html += '</code></pre>';
+        inCodeBlock = false;
+      } else {
+        closeList();
+        inCodeBlock = true;
+        html += '<pre class="code-block"><code>';
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      html += `${escapeHtml(line)}\n`;
+      continue;
+    }
+
+    if (!trimmed) {
+      closeList();
+      html += '<div class="gap"></div>';
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      closeList();
+      const level = headingMatch[1].length;
+      const content = inlineFormat(escapeHtml(headingMatch[2]));
+      html += `<h${level}>${content}</h${level}>`;
+      continue;
+    }
+
+    const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      closeList();
+      const content = inlineFormat(escapeHtml(quoteMatch[1]));
+      html += `<blockquote>${content}</blockquote>`;
+      continue;
+    }
+
+    const olMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+    if (olMatch) {
+      if (listType !== 'ol') {
+        closeList();
+        listType = 'ol';
+        html += '<ol>';
+      }
+      html += `<li>${inlineFormat(escapeHtml(olMatch[1]))}</li>`;
+      continue;
+    }
+
+    const ulMatch = trimmed.match(/^[-*]\s+(.*)$/);
+    if (ulMatch) {
+      if (listType !== 'ul') {
+        closeList();
+        listType = 'ul';
+        html += '<ul>';
+      }
+      html += `<li>${inlineFormat(escapeHtml(ulMatch[1]))}</li>`;
+      continue;
+    }
+
+    closeList();
+    html += `<p>${inlineFormat(escapeHtml(line))}</p>`;
+  }
+
+  closeList();
+  if (inCodeBlock) {
+    html += '</code></pre>';
+  }
+  return html;
+};
+
 const formatSizhuInfo = (sizhu?: {
   year_gan: string; year_zhi: string;
   month_gan: string; month_zhi: string;
@@ -364,8 +462,8 @@ const App: React.FC = () => {
       const reasoningText = msg.role === 'model' && parsed?.reasoning ? parsed.reasoning : '';
       const timeText = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', { hour12: false }) : '';
       const roleLabel = msg.role === 'user' ? '用户' : '大师';
-      const contentHtml = escapeHtml(displayText).replace(/\n/g, '<br/>');
-      const reasoningHtml = reasoningText ? escapeHtml(reasoningText).replace(/\n/g, '<br/>') : '';
+      const contentHtml = renderMarkdownToHtml(displayText);
+      const reasoningHtml = reasoningText ? renderMarkdownToHtml(reasoningText) : '';
 
       return `
         <div class="msg ${msg.role}">
@@ -501,6 +599,64 @@ const App: React.FC = () => {
             .msg-text {
               font-size: 14px;
               line-height: 1.65;
+            }
+            .msg-text p {
+              margin: 0 0 10px;
+            }
+            .msg-text p:last-child {
+              margin-bottom: 0;
+            }
+            .msg-text ul,
+            .msg-text ol {
+              margin: 0 0 10px 18px;
+              padding: 0;
+            }
+            .msg-text li {
+              margin-bottom: 6px;
+            }
+            .msg-text blockquote {
+              margin: 0 0 10px;
+              padding: 8px 12px;
+              border-left: 3px solid #f59e0b;
+              background: #fffbeb;
+              color: #92400e;
+            }
+            .msg-text code {
+              background: #f5f5f4;
+              border-radius: 6px;
+              padding: 2px 6px;
+              font-size: 12px;
+              font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            }
+            .msg-text .code-block {
+              margin: 0 0 12px;
+              padding: 12px;
+              border-radius: 10px;
+              background: #0f172a;
+              color: #e2e8f0;
+              overflow-x: auto;
+            }
+            .msg-text .code-block code {
+              background: transparent;
+              padding: 0;
+              color: inherit;
+              font-size: 12px;
+            }
+            .msg-text h1,
+            .msg-text h2,
+            .msg-text h3,
+            .msg-text h4,
+            .msg-text h5,
+            .msg-text h6 {
+              margin: 8px 0;
+              font-weight: 700;
+            }
+            .msg-text a {
+              color: #b45309;
+              text-decoration: underline;
+            }
+            .gap {
+              height: 8px;
             }
             .msg-reasoning {
               margin-bottom: 10px;
