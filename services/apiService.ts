@@ -197,6 +197,15 @@ export const formatBaziPrompt = (data: BaziResponse) => {
   const dayunShenshaInfo = detail_info?.dayunshensha && detail_info.dayunshensha.length > 0
     ? detail_info.dayunshensha.map((item) => `${item.tgdz}: ${item.shensha}`).join('；')
     : '无';
+  const dayunRanges = dayun_info?.big?.map((name, idx) => {
+    const start = dayun_info.big_start_year?.[idx];
+    const end = dayun_info.big_end_year?.[idx];
+    const age = dayun_info.xu_sui?.[idx];
+    const startText = start ?? '—';
+    const endText = end ?? '—';
+    const ageText = age ?? '—';
+    return `${name}（${startText}-${endText}，${ageText}岁起）`;
+  }) || [];
   return `
   【八字命理排盘】
   姓名: ${base_info.name} (${base_info.sex})
@@ -214,6 +223,7 @@ export const formatBaziPrompt = (data: BaziResponse) => {
   喜用神分析需AI自行推断。
 
   大运: ${dayun_info.big.join(' -> ')}
+  大运起止: ${dayunRanges.join('；')}
   起运: ${base_info.qiyun}
   `;
 };

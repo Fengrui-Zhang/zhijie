@@ -304,6 +304,13 @@ const App: React.FC = () => {
   const [klineSelected, setKlineSelected] = useState<KlineSelection>(null);
   const [klineProgress, setKlineProgress] = useState(0);
   const [klineYearProgress, setKlineYearProgress] = useState(0);
+  const [klineSeries, setKlineSeries] = useState({
+    overall: true,
+    wealth: false,
+    love: false,
+    career: false,
+    health: false,
+  });
   const [klinePos, setKlinePos] = useState<{ x: number; y: number } | null>(null);
   const klineDragRef = useRef<{
     offsetX: number;
@@ -938,7 +945,7 @@ const App: React.FC = () => {
             "7. 做功逻辑详解（说明使用了什么工具，制了什么东西，效率如何）。",
             "8. 富贵层次判定。",
             "",
-            "这是某位提问者的八字排盘信息，请你据此进行推断，注意大运流年及其对应的年龄千万不要错：",
+            "这是某位提问者的八字排盘信息，请你据此进行推断：",
             "",
             panText,
             currentTimeText,
@@ -1171,19 +1178,19 @@ const App: React.FC = () => {
       dayunLines.join('\n'),
       "",
       "评分要求：",
-      "1) 对每一个大运（共7步，从第一步大运开始依次到第七步）给出“财运/事业/爱情/健康”四项评分，基准分为8分，满分10分。",
-      "2) 对每一个流年（共70个）给出同样四项评分，基准分为8分，满分10分。",
+      "1) 对每一个大运（共7步，从第一步大运开始依次到第七步）给出“财运/事业/爱情/健康”四项评分，满分100分。",
+      "2) 对每一个流年（共70个）给出同样四项评分，满分100分。",
       "3) 先给大运打分，严格依据前文分析的做功逻辑（功神、废神、贼神、捕神）、干支关系等盲派理论。",
       "4) 再给流年打分，遵守：好大运里的好流年会更好；好大运里的坏流年也不会特别坏；正常大运里的好坏流年都正常；坏大运里的好流年也不会特别好；坏大运里的坏流年会更坏。",
-      "5) 总体打分在尊重事实的情况下，稍微宽松一些，给用户一定情绪价值。",
+      "5) 总体打分要尊重事实的情况，能看出起伏情况。",
       "6) 每一个大运/流年生成一个四字左右的主线tag，避免使用专业八字术语，使用通俗易懂的表达。",
       "7) 输出必须是严格JSON，必须能被JSON.parse解析。",
       "8) 按年份顺序输出liunian数组，逐年输出对象，不要省略或合并。",
       "9) 仅允许使用双引号，禁止尾随逗号。",
-      "10) 数字只能是0-10的整数。",
+      "10) 数字只能是0-100的整数。",
       "",
       "输出模板（字段名必须一致，数组长度必须严格满足）：",
-      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}]}",
+      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":78,\"career\":72,\"love\":65,\"health\":82},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":66,\"career\":68,\"love\":62,\"health\":75},\"tag\":\"稳中求进\"}]}",
       "",
       "请确保dayun长度为7，liunian长度为70，年份与大运范围一致。",
     ].join('\n');
@@ -1206,7 +1213,7 @@ const App: React.FC = () => {
     return [
       "只输出严格JSON，不要解释，不要Markdown，不要空行。",
       "禁止尾随逗号，只能使用英文双引号。",
-      "数值必须是0-10整数。",
+      "数值必须是0-100整数。",
       "",
       "【排盘信息】",
       panText.trim(),
@@ -1215,7 +1222,7 @@ const App: React.FC = () => {
       dayunLines.join('\n'),
       "",
       "输出模板（字段名必须一致，长度必须满足）：",
-      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}]}",
+      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":78,\"career\":72,\"love\":65,\"health\":82},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":66,\"career\":68,\"love\":62,\"health\":75},\"tag\":\"稳中求进\"}]}",
       "",
       "dayun长度必须为7，liunian长度必须为70。",
     ].join('\n');
@@ -1262,7 +1269,7 @@ const App: React.FC = () => {
   };
 
   const normalizeKlineResult = (result: KlineResult): KlineResult => {
-    const clampScore = (value: number) => Math.max(0, Math.min(10, Math.round(value)));
+    const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
     const normalizeScores = (scores: KlineScores): KlineScores => ({
       wealth: clampScore(scores.wealth),
       career: clampScore(scores.career),
@@ -1979,7 +1986,7 @@ const App: React.FC = () => {
                   <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-stone-700">
                     <div className="font-bold text-stone-800 mb-2">什么是“人生K线”？</div>
                     <div className="text-xs leading-relaxed text-stone-600">
-                      基于你的四柱八字盘和已完成的AI解读，进一步对八个大运与八十个流年进行“财运 / 事业 / 爱情 / 健康”评分与主线标签总结，并绘制人生运势曲线。
+                      基于你的四柱八字盘和已完成的AI解读，进一步对七步大运与七十个流年进行“财运 / 事业 / 爱情 / 健康”评分与主线标签总结，并绘制人生运势曲线。
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -2030,7 +2037,7 @@ const App: React.FC = () => {
               {klineStatus === 'ready' && klineResult && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-10）</div>
+                    <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-100）</div>
                     <div className="flex items-center gap-2 text-xs text-stone-500">
                       <span>缩放</span>
                       <input
@@ -2042,6 +2049,59 @@ const App: React.FC = () => {
                         onChange={(e) => setKlineZoom(parseFloat(e.target.value))}
                       />
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-stone-600">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={klineSeries.overall}
+                        onChange={(e) => setKlineSeries((prev) => ({ ...prev, overall: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-stone-700">总体趋势</span>
+                      <span className="inline-block h-2 w-6 rounded-full bg-amber-700"></span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={klineSeries.wealth}
+                        onChange={(e) => setKlineSeries((prev) => ({ ...prev, wealth: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-yellow-500 focus:ring-yellow-500"
+                      />
+                      <span>财富</span>
+                      <span className="inline-block h-2 w-6 rounded-full bg-yellow-500"></span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={klineSeries.love}
+                        onChange={(e) => setKlineSeries((prev) => ({ ...prev, love: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-pink-400 focus:ring-pink-400"
+                      />
+                      <span>感情</span>
+                      <span className="inline-block h-2 w-6 rounded-full bg-pink-400"></span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={klineSeries.career}
+                        onChange={(e) => setKlineSeries((prev) => ({ ...prev, career: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-blue-500 focus:ring-blue-500"
+                      />
+                      <span>事业</span>
+                      <span className="inline-block h-2 w-6 rounded-full bg-blue-500"></span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={klineSeries.health}
+                        onChange={(e) => setKlineSeries((prev) => ({ ...prev, health: e.target.checked }))}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
+                      />
+                      <span>健康</span>
+                      <span className="inline-block h-2 w-6 rounded-full bg-emerald-700"></span>
+                    </label>
                   </div>
 
                   {(() => {
@@ -2058,21 +2118,25 @@ const App: React.FC = () => {
                     const height = chartHeight + padding.top + padding.bottom;
                     const axisY = padding.top + chartHeight;
                     const yScale = (score: number) =>
-                      padding.top + (10 - Math.min(10, Math.max(0, score))) / 10 * chartHeight;
+                      padding.top + (100 - Math.min(100, Math.max(0, score))) / 100 * chartHeight;
                     const xScale = (year: number) =>
                       padding.left + (year - minYear) * yearWidth + yearWidth / 2;
-                    const linePoints = liunianSorted
-                      .map((item) => {
-                        const avg = scoreAverage(item.scores);
-                        return `${xScale(item.year)},${yScale(avg)}`;
-                      })
-                      .join(' ');
+                    const buildLinePoints = (getter: (scores: KlineScores) => number) =>
+                      liunianSorted
+                        .map((item) => `${xScale(item.year)},${yScale(getter(item.scores))}`)
+                        .join(' ');
+
+                    const linePoints = buildLinePoints(scoreAverage);
+                    const wealthPoints = buildLinePoints((s) => s.wealth);
+                    const lovePoints = buildLinePoints((s) => s.love);
+                    const careerPoints = buildLinePoints((s) => s.career);
+                    const healthPoints = buildLinePoints((s) => s.health);
                     return (
                       <div className="border border-stone-100 rounded-xl overflow-hidden">
                         <div className="overflow-x-auto">
                           <svg width={width} height={height} className="bg-white">
                             {/* Y axis grid */}
-                            {[0, 2, 4, 6, 8, 10].map((tick) => (
+                            {[0, 20, 40, 60, 80, 100].map((tick) => (
                               <g key={tick}>
                                 <line
                                   x1={padding.left}
@@ -2139,14 +2203,48 @@ const App: React.FC = () => {
                               );
                             })}
 
-                            {/* Liunian line */}
-                            <polyline
-                              points={linePoints}
-                              fill="none"
-                              stroke="#b45309"
-                              strokeWidth="2"
-                            />
-                            {liunianSorted.map((item, idx) => {
+                            {/* Liunian lines */}
+                            {klineSeries.wealth && (
+                              <polyline
+                                points={wealthPoints}
+                                fill="none"
+                                stroke="#f59e0b"
+                                strokeWidth="2"
+                              />
+                            )}
+                            {klineSeries.love && (
+                              <polyline
+                                points={lovePoints}
+                                fill="none"
+                                stroke="#f472b6"
+                                strokeWidth="2"
+                              />
+                            )}
+                            {klineSeries.career && (
+                              <polyline
+                                points={careerPoints}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth="2"
+                              />
+                            )}
+                            {klineSeries.health && (
+                              <polyline
+                                points={healthPoints}
+                                fill="none"
+                                stroke="#047857"
+                                strokeWidth="2"
+                              />
+                            )}
+                            {klineSeries.overall && (
+                              <polyline
+                                points={linePoints}
+                                fill="none"
+                                stroke="#b45309"
+                                strokeWidth="2.5"
+                              />
+                            )}
+                            {klineSeries.overall && liunianSorted.map((item, idx) => {
                               const avg = scoreAverage(item.scores);
                               const cx = xScale(item.year);
                               const cy = yScale(avg);
