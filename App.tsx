@@ -1123,7 +1123,7 @@ const App: React.FC = () => {
                         {label}
                         {isRecommended && (
                           <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
-                            强力推荐
+                            强力推荐【人生K线上新】
                           </span>
                         )}
                       </button>
