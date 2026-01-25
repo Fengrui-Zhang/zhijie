@@ -1204,6 +1204,31 @@ const App: React.FC = () => {
     }
   };
 
+  const sanitizeKlineJson = (raw: string) => {
+    let text = raw.trim();
+    const startIdx = text.indexOf('{');
+    const endIdx = text.lastIndexOf('}');
+    if (startIdx >= 0 && endIdx > startIdx) {
+      text = text.slice(startIdx, endIdx + 1);
+    }
+    text = text
+      .replace(/[，、]/g, ',')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, '"');
+    text = text.replace(/,\s*([}\]])/g, '$1');
+    text = text.replace(/:\s*([+-]?\d+)(\.\d+)?/g, (match) => match);
+    return text;
+  };
+
+  const buildKlineRepairPrompt = (raw: string) => {
+    return [
+      "你是JSON修复器，只能输出严格JSON，不得输出任何解释或多余字符。",
+      "请将以下文本修复为合法JSON，字段保持不变，数组长度不变，禁止新增字段：",
+      "",
+      raw,
+    ].join('\n');
+  };
+
   const normalizeKlineResult = (result: KlineResult): KlineResult => {
     const clampScore = (value: number) => Math.max(0, Math.min(10, Math.round(value)));
     const normalizeScores = (scores: KlineScores): KlineScores => ({
@@ -1255,8 +1280,19 @@ const App: React.FC = () => {
           setKlineProgress(Math.min(99, Math.round((count / 70) * 100)));
         }
       }, undefined, 'deepseek-chat');
-      const parsed = parseKlineResult(finalState.content);
-      const normalized = normalizeKlineResult(parsed);
+      let parsed: KlineResult | null = null;
+      try {
+        parsed = parseKlineResult(finalState.content);
+      } catch {
+        try {
+          parsed = parseKlineResult(sanitizeKlineJson(finalState.content));
+        } catch {
+          const repairPrompt = buildKlineRepairPrompt(finalState.content);
+          const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
+          parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
+        }
+      }
+      const normalized = normalizeKlineResult(parsed as KlineResult);
       setKlineResult(normalized);
       setKlineProgress(100);
       setKlineYearProgress(70);
