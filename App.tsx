@@ -14,7 +14,15 @@ import {
 import { startQimenChat, sendMessageToDeepseekStream, clearChatSession } from './services/deepseekService';
 
 // Types
-import { ModelType, LiuyaoMode, BaziResponse } from './types';
+import {
+  ModelType,
+  LiuyaoMode,
+  BaziResponse,
+  QimenResponse,
+  ZiweiResponse,
+  MeihuaResponse,
+  LiuyaoResponse,
+} from './types';
 
 // Components
 import QimenGrid from './components/QimenGrid';
@@ -81,6 +89,16 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+const formatSizhuInfo = (sizhu?: {
+  year_gan: string; year_zhi: string;
+  month_gan: string; month_zhi: string;
+  day_gan: string; day_zhi: string;
+  hour_gan: string; hour_zhi: string;
+}) => {
+  if (!sizhu) return '';
+  return `${sizhu.year_gan}${sizhu.year_zhi} ${sizhu.month_gan}${sizhu.month_zhi} ${sizhu.day_gan}${sizhu.day_zhi} ${sizhu.hour_gan}${sizhu.hour_zhi}`;
+};
 
 interface ChatMessage {
   id: string;
@@ -171,6 +189,7 @@ const App: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isKlineRunning, setIsKlineRunning] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
@@ -242,6 +261,81 @@ const App: React.FC = () => {
     );
   };
 
+  const buildChartInfoLines = () => {
+    if (!chartData) return [] as string[];
+    const lines: string[] = [];
+
+    if (modelType === ModelType.QIMEN) {
+      const data = chartData as QimenResponse;
+      lines.push(`公历：${data.gongli}`);
+      lines.push(`农历：${data.nongli}`);
+      const sizhuText = formatSizhuInfo(data.sizhu_info);
+      if (sizhuText) lines.push(`四柱：${sizhuText}`);
+      lines.push(`遁局：${data.dunju}`);
+      lines.push(`旬首：${data.xunshou}`);
+      if (data.zhifu_info?.zhifu_name) {
+        lines.push(`值符：${data.zhifu_info.zhifu_name}（落宫：${data.zhifu_info.zhifu_luogong}）`);
+      }
+      if (data.zhifu_info?.zhishi_name) {
+        lines.push(`值使：${data.zhifu_info.zhishi_name}（落宫：${data.zhifu_info.zhishi_luogong}）`);
+      }
+      return lines.filter(Boolean);
+    }
+
+    if (modelType === ModelType.BAZI) {
+      const data = chartData as BaziResponse;
+      lines.push(`公历：${data.base_info?.gongli ?? ''}`);
+      lines.push(`农历：${data.base_info?.nongli ?? ''}`);
+      if (data.bazi_info?.bazi?.length) {
+        lines.push(`四柱：${data.bazi_info.bazi.join(' ')}`);
+      }
+      if (data.base_info?.qiyun) lines.push(`起运：${data.base_info.qiyun}`);
+      if (data.base_info?.jiaoyun) lines.push(`交运：${data.base_info.jiaoyun}`);
+      return lines.filter(Boolean);
+    }
+
+    if (modelType === ModelType.ZIWEI) {
+      const data = chartData as ZiweiResponse;
+      lines.push(`公历：${data.base_info?.gongli ?? ''}`);
+      lines.push(`农历：${data.base_info?.nongli ?? ''}`);
+      lines.push(`命宫：${data.base_info?.minggong ?? ''}`);
+      lines.push(`身宫：${data.base_info?.shengong ?? ''}`);
+      lines.push(`命局：${data.base_info?.mingju ?? ''}`);
+      lines.push(`命主：${data.base_info?.mingzhu ?? ''}`);
+      lines.push(`身主：${data.base_info?.shenzhu ?? ''}`);
+      return lines.filter(Boolean);
+    }
+
+    if (modelType === ModelType.MEIHUA) {
+      const data = chartData as MeihuaResponse;
+      lines.push(`公历：${data.gongli}`);
+      lines.push(`农历：${data.nongli}`);
+      const sizhuText = formatSizhuInfo(data.sizhu_info);
+      if (sizhuText) lines.push(`四柱：${sizhuText}`);
+      if (data.gua_info?.bengua?.gua_name) lines.push(`本卦：${data.gua_info.bengua.gua_name}`);
+      if (data.has_biangua) lines.push(`有变卦：${data.has_biangua}`);
+      if (data.dongyao) lines.push(`动爻：${data.dongyao}`);
+      return lines.filter(Boolean);
+    }
+
+    if (modelType === ModelType.LIUYAO) {
+      const data = chartData as LiuyaoResponse;
+      lines.push(`公历：${data.gongli}`);
+      lines.push(`农历：${data.nongli}`);
+      if (data.nianming) lines.push(`年命：${data.nianming}`);
+      if (data.guashen) lines.push(`卦身：${data.guashen}`);
+      if (data.kongwang) lines.push(`空亡：${data.kongwang}`);
+      const sizhuText = formatSizhuInfo(data.sizhu_info);
+      if (sizhuText) lines.push(`四柱：${sizhuText}`);
+      if (data.gua_info?.bengua?.gua_name) lines.push(`本卦：${data.gua_info.bengua.gua_name}`);
+      if (data.has_biangua) lines.push(`有变卦：${data.has_biangua}`);
+      if (data.dongyao) lines.push(`动爻：${data.dongyao}`);
+      return lines.filter(Boolean);
+    }
+
+    return lines;
+  };
+
   const buildReportHtml = () => {
     const now = new Date();
     const nowText = now.toLocaleString('zh-CN', { hour12: false });
@@ -255,6 +349,7 @@ const App: React.FC = () => {
       modelType === ModelType.ZIWEI ? '紫薇' :
       modelType === ModelType.MEIHUA ? '梅花' : '六爻';
     const reportName = `元分 · 智解_${name?.trim() || '匿名'}_${modelShortLabel}_${dateStamp}.pdf`;
+    const chartInfoLines = buildChartInfoLines();
 
     const metaItems = [
       name ? `姓名：${name}` : '',
@@ -286,6 +381,12 @@ const App: React.FC = () => {
     }).join('');
 
     const metaHtml = metaItems.map(item => `<div class="meta-item">${escapeHtml(item)}</div>`).join('');
+    const chartInfoHtml = chartInfoLines.length
+      ? `<div class="chart-info">
+          <div class="chart-title">排盘信息</div>
+          <div class="chart-lines">${chartInfoLines.map(line => `<div class="chart-line">${escapeHtml(line)}</div>`).join('')}</div>
+        </div>`
+      : '';
 
     return `
       <!doctype html>
@@ -336,6 +437,33 @@ const App: React.FC = () => {
               border: 1px solid #fed7aa;
               padding: 8px 12px;
               border-radius: 10px;
+            }
+            .chart-info {
+              margin-top: 14px;
+              padding: 14px 16px;
+              background: #fff;
+              border-radius: 14px;
+              border: 1px solid #e7e5e4;
+            }
+            .chart-title {
+              font-weight: 700;
+              font-size: 13px;
+              color: #44403c;
+              margin-bottom: 8px;
+            }
+            .chart-lines {
+              display: grid;
+              gap: 6px;
+              font-size: 13px;
+              color: #57534e;
+            }
+            .chart-line {
+              padding-bottom: 6px;
+              border-bottom: 1px dashed #e7e5e4;
+            }
+            .chart-line:last-child {
+              border-bottom: none;
+              padding-bottom: 0;
             }
             .content {
               margin-top: 20px;
@@ -415,6 +543,7 @@ const App: React.FC = () => {
               <div class="subtitle">记录本次对话，便于随时回顾</div>
             </div>
             <div class="meta">${metaHtml}</div>
+            ${chartInfoHtml}
             <div class="content">${messagesHtml}</div>
             <div class="footer">${escapeHtml(DISCLAIMER_TEXT)}</div>
           </div>
@@ -873,8 +1002,8 @@ const App: React.FC = () => {
     });
 
     return [
-      "你是精通盲派八字的大师，现在需要作为“人生K线”评分引擎。",
-      "以下给出完整排盘信息与前序分析，请你严格依据前序分析中的做功逻辑、干支关系细节、体用宾主等标准进行评分。",
+      "你是输出JSON的引擎，只能输出一段严格JSON，不得输出任何解释、Markdown、标点或多余文字。",
+      "如果无法严格输出JSON，请输出空JSON：{}。",
       "",
       "【前序分析要点】",
       analysisText || '（无）',
@@ -886,27 +1015,21 @@ const App: React.FC = () => {
       dayunLines.join('\n'),
       "",
       "评分要求：",
-      "1) 对每一个大运（共8步，从第一步大运开始依次到第八步）给出“财运/事业/爱情/健康”四项评分，满分10分。",
-      "2) 对每一个流年（共80个）给出同样四项评分，满分10分。",
+      "1) 对每一个大运（共7步，从第一步大运开始依次到第七步）给出“财运/事业/爱情/健康”四项评分，基准分为8分，满分10分。",
+      "2) 对每一个流年（共70个）给出同样四项评分，基准分为8分，满分10分。",
       "3) 先给大运打分，严格依据前文分析的做功逻辑（功神、废神、贼神、捕神）、干支关系等盲派理论。",
       "4) 再给流年打分，遵守：好大运里的好流年会更好；好大运里的坏流年也不会特别坏；正常大运里的好坏流年都正常；坏大运里的好流年也不会特别好；坏大运里的坏流年会更坏。",
       "5) 总体打分在尊重事实的情况下，稍微宽松一些，给用户一定情绪价值。",
       "6) 每一个大运/流年生成一个四字左右的主线tag，避免使用专业八字术语，使用通俗易懂的表达。",
-      "7) 输出必须是严格JSON，不得包含Markdown，不得包含多余说明。",
+      "7) 输出必须是严格JSON，必须能被JSON.parse解析。",
       "8) 按年份顺序输出liunian数组，逐年输出对象，不要省略或合并。",
-      "9) 使用如下模板（字段名必须一致）：",
+      "9) 仅允许使用双引号，禁止尾随逗号。",
+      "10) 数字只能是0-10的整数。",
       "",
-      "{",
-      "  \"schema_version\": \"kline_v1\",",
-      "  \"dayun\": [",
-      "    {\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}",
-      "  ],",
-      "  \"liunian\": [",
-      "    {\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}",
-      "  ]",
-      "}",
+      "输出模板（字段名必须一致，数组长度必须严格满足）：",
+      "{\"schema_version\":\"kline_v1\",\"dayun\":[{\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}],\"liunian\":[{\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}]}",
       "",
-      "请确保dayun长度为8，liunian长度为80，年份与大运范围一致。",
+      "请确保dayun长度为7，liunian长度为70，年份与大运范围一致。",
     ].join('\n');
   };
 
@@ -925,6 +1048,29 @@ const App: React.FC = () => {
     }
   };
 
+  const normalizeKlineResult = (result: KlineResult): KlineResult => {
+    const clampScore = (value: number) => Math.max(0, Math.min(10, Math.round(value)));
+    const normalizeScores = (scores: KlineScores): KlineScores => ({
+      wealth: clampScore(scores.wealth),
+      career: clampScore(scores.career),
+      love: clampScore(scores.love),
+      health: clampScore(scores.health),
+    });
+    return {
+      schema_version: 'kline_v1',
+      dayun: result.dayun.slice(0, 7).map((item) => ({
+        ...item,
+        scores: normalizeScores(item.scores),
+        tag: (item.tag || '').slice(0, 8),
+      })),
+      liunian: result.liunian.slice(0, 70).map((item) => ({
+        ...item,
+        scores: normalizeScores(item.scores),
+        tag: (item.tag || '').slice(0, 8),
+      })),
+    };
+  };
+
   const persistKlineResult = (result: KlineResult) => {
     if (modelType !== ModelType.BAZI || !chartData) return;
     const key = getKlineStorageKey(chartData as BaziResponse);
@@ -935,6 +1081,7 @@ const App: React.FC = () => {
     if (modelType !== ModelType.BAZI || !chartData) return;
     if (klineStatus === 'analyzing') return;
     setKlineStatus('analyzing');
+    setIsKlineRunning(true);
     setKlineError('');
     setKlineSelected(null);
     setKlineProgress(0);
@@ -945,26 +1092,29 @@ const App: React.FC = () => {
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
-        const count = Math.min(80, years.size);
+        const count = Math.min(70, years.size);
         if (count !== klineYearProgressRef.current) {
           klineYearProgressRef.current = count;
           setKlineYearProgress(count);
-          setKlineProgress(Math.min(99, Math.round((count / 80) * 100)));
+          setKlineProgress(Math.min(99, Math.round((count / 70) * 100)));
         }
       }, undefined, 'deepseek-chat');
       const parsed = parseKlineResult(finalState.content);
-      setKlineResult(parsed);
+      const normalized = normalizeKlineResult(parsed);
+      setKlineResult(normalized);
       setKlineProgress(100);
-      setKlineYearProgress(80);
-      klineYearProgressRef.current = 80;
+      setKlineYearProgress(70);
+      klineYearProgressRef.current = 70;
       setKlineStatus('ready');
-      persistKlineResult(parsed);
+      persistKlineResult(normalized);
     } catch (err: any) {
       setKlineStatus('error');
       setKlineError(err.message || 'K线分析失败，请稍后重试');
       setKlineProgress(0);
       setKlineYearProgress(0);
       klineYearProgressRef.current = 0;
+    } finally {
+      setIsKlineRunning(false);
     }
   };
 
@@ -1525,11 +1675,11 @@ const App: React.FC = () => {
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                   placeholder="追问..." disabled={isTyping}
+                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : "追问..."} disabled={isTyping || isKlineRunning}
                    className="flex-1 border border-stone-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none"
                  />
-                 <button onClick={handleSendMessage} disabled={isTyping || !inputMessage.trim()} className="bg-stone-900 text-amber-500 p-2 rounded-lg hover:bg-stone-800"><SendIcon /></button>
-               </div>
+                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim()} className="bg-stone-900 text-amber-500 p-2 rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-stone-900"><SendIcon /></button>
+              </div>
             </div>
           </div>
         )}
@@ -1618,7 +1768,7 @@ const App: React.FC = () => {
                     AI正在分析，请勿退出界面……
                   </div>
                   <div className="text-xs text-stone-400">
-                    正在推演第 {Math.min(80, Math.max(0, klineYearProgress))} 年 / 80 年
+                    正在推演第 {Math.min(70, Math.max(0, klineYearProgress))} 年 / 70 年
                   </div>
                   <div className="w-full max-w-md h-2 rounded-full bg-stone-100 overflow-hidden">
                     <div
@@ -1626,7 +1776,7 @@ const App: React.FC = () => {
                       style={{ width: `${klineProgress}%` }}
                     />
                   </div>
-                  <div className="text-[11px] text-stone-400">大约 8 步大运 + 80 年流年</div>
+                  <div className="text-[11px] text-stone-400">大约 7 步大运 + 70 年流年</div>
                 </div>
               )}
 
@@ -1662,8 +1812,8 @@ const App: React.FC = () => {
                   </div>
 
                   {(() => {
-                    const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 80);
-                    const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 8);
+                    const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 70);
+                    const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 7);
                     const years = liunianSorted.map(item => item.year);
                     const minYear = Math.min(...years);
                     const maxYear = Math.max(...years);
