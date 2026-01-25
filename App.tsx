@@ -14,7 +14,7 @@ import {
 import { startQimenChat, sendMessageToDeepseekStream, clearChatSession } from './services/deepseekService';
 
 // Types
-import { ModelType, LiuyaoMode } from './types';
+import { ModelType, LiuyaoMode, BaziResponse } from './types';
 
 // Components
 import QimenGrid from './components/QimenGrid';
@@ -32,11 +32,13 @@ const Spinner = () => (
   </svg>
 );
 const SendIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>);
-const TrashIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>);
+const ReportIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25V6.75A2.25 2.25 0 0017.25 4.5H6.75A2.25 2.25 0 004.5 6.75v10.5A2.25 2.25 0 006.75 19.5h4.5m4.5-5.25v5.25m0 0l-2.25-2.25m2.25 2.25l2.25-2.25M8.25 9h7.5M8.25 12h4.5" /></svg>);
 
 const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
+const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
+const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -63,12 +65,71 @@ const appendDisclaimer = (text: string) => {
   return `${trimmed}\n\n${DISCLAIMER_TEXT}`;
 };
 
+const stripDisclaimer = (text: string) => {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  if (trimmed.endsWith(DISCLAIMER_TEXT)) {
+    return trimmed.slice(0, -DISCLAIMER_TEXT.length).trim();
+  }
+  return trimmed;
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
 }
+
+type KlineScores = {
+  wealth: number;
+  career: number;
+  love: number;
+  health: number;
+};
+
+type KlineDayunItem = {
+  name: string;
+  start_year: number;
+  end_year: number;
+  scores: KlineScores;
+  tag: string;
+};
+
+type KlineLiunianItem = {
+  year: number;
+  scores: KlineScores;
+  tag: string;
+};
+
+type KlineResult = {
+  schema_version: 'kline_v1';
+  dayun: KlineDayunItem[];
+  liunian: KlineLiunianItem[];
+};
+
+type KlineSelection =
+  | { kind: 'dayun'; start_year: number }
+  | { kind: 'liunian'; year: number }
+  | null;
+
+const STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
+const BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const getGanzhiYear = (year: number) => {
+  const baseYear = 1984; // 1984 is 甲子
+  const offset = ((year - baseYear) % 60 + 60) % 60;
+  const stem = STEMS[offset % 10];
+  const branch = BRANCHES[offset % 12];
+  return `${stem}${branch}`;
+};
 
 const App: React.FC = () => {
   // --- State ---
@@ -115,15 +176,289 @@ const App: React.FC = () => {
   const [showUpdates, setShowUpdates] = useState(false);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
+  const [klineUnlocked, setKlineUnlocked] = useState(false);
+  const [klineModalOpen, setKlineModalOpen] = useState(false);
+  const [klineStatus, setKlineStatus] = useState<'idle' | 'analyzing' | 'ready' | 'error'>('idle');
+  const [klineResult, setKlineResult] = useState<KlineResult | null>(null);
+  const [klineError, setKlineError] = useState('');
+  const [klineZoom, setKlineZoom] = useState(1);
+  const [klineSelected, setKlineSelected] = useState<KlineSelection>(null);
+  const [klineProgress, setKlineProgress] = useState(0);
+  const [klineYearProgress, setKlineYearProgress] = useState(0);
+  const [klinePos, setKlinePos] = useState<{ x: number; y: number } | null>(null);
+  const klineDragRef = useRef<{
+    offsetX: number;
+    offsetY: number;
+    moved: boolean;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const klineYearProgressRef = useRef(0);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
 
+  useEffect(() => {
+    if (modelType !== ModelType.BAZI || !chartData) return;
+    try {
+      const key = getKlineStorageKey(chartData as BaziResponse);
+      const cached = localStorage.getItem(key);
+      if (!cached) return;
+      const parsed = JSON.parse(cached) as KlineResult;
+      if (parsed?.schema_version === 'kline_v1') {
+        setKlineResult(parsed);
+        setKlineStatus('ready');
+        setKlineUnlocked(true);
+      }
+    } catch {
+      // Ignore cache errors
+    }
+  }, [modelType, chartData]);
+
+  useEffect(() => {
+    if (klineStatus !== 'analyzing') return;
+    setKlineProgress(0);
+    setKlineYearProgress(0);
+    klineYearProgressRef.current = 0;
+  }, [klineStatus]);
+
+  useEffect(() => {
+    if (modelType !== ModelType.BAZI || step !== 'chart') return;
+    if (klinePos) return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    setKlinePos({
+      x: Math.max(16, width - 120),
+      y: Math.max(120, Math.round(height * 0.55)),
+    });
+  }, [modelType, step, klinePos]);
+
   const updateChatMessage = (id: string, content: string) => {
     setChatHistory(prev =>
       prev.map(msg => (msg.id === id ? { ...msg, content } : msg))
     );
+  };
+
+  const buildReportHtml = () => {
+    const now = new Date();
+    const nowText = now.toLocaleString('zh-CN', { hour12: false });
+    const dateStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const modelLabel = modelType === ModelType.QIMEN ? '奇门排盘' :
+      modelType === ModelType.BAZI ? '八字命盘' :
+      modelType === ModelType.ZIWEI ? '紫微斗数' :
+      modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲';
+    const modelShortLabel = modelType === ModelType.QIMEN ? '奇门' :
+      modelType === ModelType.BAZI ? '八字' :
+      modelType === ModelType.ZIWEI ? '紫薇' :
+      modelType === ModelType.MEIHUA ? '梅花' : '六爻';
+    const reportName = `元分 · 智解_${name?.trim() || '匿名'}_${modelShortLabel}_${dateStamp}.pdf`;
+
+    const metaItems = [
+      name ? `姓名：${name}` : '',
+      question ? `提问：${question}` : '',
+      `模型：${modelLabel}`,
+      `生成时间：${nowText}`,
+    ].filter(Boolean);
+
+    const messagesHtml = chatHistory.map((msg, index) => {
+      const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
+      const displayText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
+      const reasoningText = msg.role === 'model' && parsed?.reasoning ? parsed.reasoning : '';
+      const timeText = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', { hour12: false }) : '';
+      const roleLabel = msg.role === 'user' ? '用户' : '大师';
+      const contentHtml = escapeHtml(displayText).replace(/\n/g, '<br/>');
+      const reasoningHtml = reasoningText ? escapeHtml(reasoningText).replace(/\n/g, '<br/>') : '';
+
+      return `
+        <div class="msg ${msg.role}">
+          <div class="msg-head">
+            <div class="msg-role">${roleLabel}</div>
+            <div class="msg-time">${escapeHtml(timeText)}</div>
+          </div>
+          ${reasoningHtml ? `<div class="msg-reasoning"><div class="tag">思考过程</div><div class="msg-text">${reasoningHtml}</div></div>` : ''}
+          <div class="msg-text">${contentHtml}</div>
+          <div class="msg-index">#${index + 1}</div>
+        </div>
+      `;
+    }).join('');
+
+    const metaHtml = metaItems.map(item => `<div class="meta-item">${escapeHtml(item)}</div>`).join('');
+
+    return `
+      <!doctype html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${escapeHtml(reportName)}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              font-family: "Songti SC", "Noto Serif SC", "STSong", serif;
+              color: #1c1917;
+              background: #f8f5ef;
+            }
+            .page {
+              padding: 32px 40px 56px;
+              max-width: 900px;
+              margin: 0 auto;
+            }
+            .header {
+              background: linear-gradient(135deg, #1c1917 0%, #292524 100%);
+              color: #fef3c7;
+              padding: 20px 24px;
+              border-radius: 16px;
+            }
+            .title {
+              font-size: 24px;
+              font-weight: 700;
+              letter-spacing: 1px;
+            }
+            .subtitle {
+              margin-top: 6px;
+              font-size: 12px;
+              opacity: 0.8;
+            }
+            .meta {
+              margin-top: 16px;
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+              gap: 8px 16px;
+              font-size: 13px;
+              color: #44403c;
+            }
+            .meta-item {
+              background: #fff7ed;
+              border: 1px solid #fed7aa;
+              padding: 8px 12px;
+              border-radius: 10px;
+            }
+            .content {
+              margin-top: 20px;
+              display: grid;
+              gap: 16px;
+            }
+            .msg {
+              background: #fff;
+              border-radius: 16px;
+              padding: 16px 18px;
+              border: 1px solid #e7e5e4;
+              position: relative;
+            }
+            .msg.user {
+              border-color: #a8a29e;
+              background: #1c1917;
+              color: #fef3c7;
+            }
+            .msg.user .msg-time,
+            .msg.user .msg-index {
+              color: #fcd34d;
+            }
+            .msg-head {
+              display: flex;
+              justify-content: space-between;
+              font-size: 12px;
+              margin-bottom: 8px;
+              color: #78716c;
+            }
+            .msg-role {
+              font-weight: 600;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .msg-text {
+              font-size: 14px;
+              line-height: 1.65;
+            }
+            .msg-reasoning {
+              margin-bottom: 10px;
+              padding: 10px 12px;
+              border-radius: 12px;
+              background: rgba(251, 191, 36, 0.15);
+              border: 1px solid rgba(251, 191, 36, 0.4);
+              color: #92400e;
+              font-size: 12px;
+            }
+            .tag {
+              font-weight: 700;
+              margin-bottom: 6px;
+            }
+            .msg-index {
+              position: absolute;
+              right: 16px;
+              bottom: 12px;
+              font-size: 11px;
+              color: #a8a29e;
+            }
+            .footer {
+              margin-top: 24px;
+              font-size: 12px;
+              color: #78716c;
+              text-align: center;
+            }
+            @media print {
+              body { background: #fff; }
+              .page { padding: 0; }
+              .header { border-radius: 0; }
+              .msg { break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="header">
+              <div class="title">大师解读报告</div>
+              <div class="subtitle">记录本次对话，便于随时回顾</div>
+            </div>
+            <div class="meta">${metaHtml}</div>
+            <div class="content">${messagesHtml}</div>
+            <div class="footer">${escapeHtml(DISCLAIMER_TEXT)}</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
+  const handleGenerateReport = () => {
+    if (!chatHistory.length) return;
+    const reportHtml = buildReportHtml();
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.right = '0';
+    frame.style.bottom = '0';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    frame.style.opacity = '0';
+    frame.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(frame);
+
+    const cleanup = () => {
+      window.setTimeout(() => {
+        frame.remove();
+      }, 1000);
+    };
+
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } finally {
+        cleanup();
+      }
+    };
+
+    if ('srcdoc' in frame) {
+      frame.srcdoc = reportHtml;
+    } else if (frame.contentWindow) {
+      frame.contentWindow.document.open();
+      frame.contentWindow.document.write(reportHtml);
+      frame.contentWindow.document.close();
+    }
   };
 
   const knowledgeBoardMap: Record<ModelType, string> = {
@@ -165,6 +500,18 @@ const App: React.FC = () => {
     setQimenJuModel(1);
     setQimenPanModel(1);
     setQimenFeiPanModel(1);
+    setBaziInitialAnalysis('');
+    setKlineUnlocked(false);
+    setKlineModalOpen(false);
+    setKlineStatus('idle');
+    setKlineResult(null);
+    setKlineError('');
+    setKlineSelected(null);
+    setKlineZoom(1);
+    setKlineProgress(0);
+    setKlineYearProgress(0);
+    klineYearProgressRef.current = 0;
+    setKlinePos(null);
     // Optionally keep name/city for UX
   };
 
@@ -373,6 +720,10 @@ const App: React.FC = () => {
       );
       const finalAnswer = appendDisclaimer(finalState.content);
       updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
+      if (modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
+        setKlineUnlocked(true);
+      }
 
     } catch (err: any) {
       console.error(err);
@@ -445,6 +796,203 @@ const App: React.FC = () => {
     const isOddHour = hours % 2 === 1;
     return isOddHour ? minutes <= 30 : minutes >= 30;
   };
+
+  const clampKlinePos = (x: number, y: number) => {
+    const size = 56;
+    const padding = 8;
+    const maxX = window.innerWidth - size - padding;
+    const maxY = window.innerHeight - size - padding;
+    return {
+      x: Math.min(Math.max(padding, x), Math.max(padding, maxX)),
+      y: Math.min(Math.max(padding, y), Math.max(padding, maxY)),
+    };
+  };
+
+  const handleKlinePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!klinePos) return;
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    klineDragRef.current = {
+      offsetX: event.clientX - klinePos.x,
+      offsetY: event.clientY - klinePos.y,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+  };
+
+  const handleKlinePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!klineDragRef.current) return;
+    const dx = Math.abs(event.clientX - klineDragRef.current.startX);
+    const dy = Math.abs(event.clientY - klineDragRef.current.startY);
+    const nextX = event.clientX - klineDragRef.current.offsetX;
+    const nextY = event.clientY - klineDragRef.current.offsetY;
+    const clamped = clampKlinePos(nextX, nextY);
+    setKlinePos(clamped);
+    if (dx > 3 || dy > 3) {
+      klineDragRef.current.moved = true;
+    }
+  };
+
+  const handleKlinePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!klineDragRef.current) return;
+    const moved = klineDragRef.current.moved;
+    klineDragRef.current = null;
+    const target = event.currentTarget;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+    if (!moved && !isTyping) {
+      handleOpenKline();
+    }
+  };
+
+  const getKlineStorageKey = (data: BaziResponse) => {
+    const base = data.base_info;
+    const bazi = data.bazi_info.bazi.join('');
+    const raw = `${base.name || '匿名'}-${base.gongli}-${bazi}`;
+    return `${KLINE_STORAGE_PREFIX}${encodeURIComponent(raw)}`;
+  };
+
+  const buildKlinePrompt = (data: BaziResponse, analysisText: string) => {
+    const panText = formatBaziPrompt(data);
+    const dayunLines = data.dayun_info.big.map((name, idx) => {
+      const start = data.dayun_info.big_start_year?.[idx];
+      const end = data.dayun_info.big_end_year?.[idx];
+      const yearList: string[] = [];
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        for (let y = start; y <= end; y += 1) {
+          yearList.push(`${y}(${getGanzhiYear(y)})`);
+        }
+      }
+      return `- ${name} ${start ?? '—'}-${end ?? '—'}: ${yearList.join('，')}`;
+    });
+
+    return [
+      "你是精通盲派八字的大师，现在需要作为“人生K线”评分引擎。",
+      "以下给出完整排盘信息与前序分析，请你严格依据前序分析中的做功逻辑、干支关系细节、体用宾主等标准进行评分。",
+      "",
+      "【前序分析要点】",
+      analysisText || '（无）',
+      "",
+      "【完整排盘信息】",
+      panText.trim(),
+      "",
+      "【大运与流年列表】",
+      dayunLines.join('\n'),
+      "",
+      "评分要求：",
+      "1) 对每一个大运（共8步，从第一步大运开始依次到第八步）给出“财运/事业/爱情/健康”四项评分，满分10分。",
+      "2) 对每一个流年（共80个）给出同样四项评分，满分10分。",
+      "3) 先给大运打分，严格依据前文分析的做功逻辑（功神、废神、贼神、捕神）、干支关系等盲派理论。",
+      "4) 再给流年打分，遵守：好大运里的好流年会更好；好大运里的坏流年也不会特别坏；正常大运里的好坏流年都正常；坏大运里的好流年也不会特别好；坏大运里的坏流年会更坏。",
+      "5) 总体打分在尊重事实的情况下，稍微宽松一些，给用户一定情绪价值。",
+      "6) 每一个大运/流年生成一个四字左右的主线tag，避免使用专业八字术语，使用通俗易懂的表达。",
+      "7) 输出必须是严格JSON，不得包含Markdown，不得包含多余说明。",
+      "8) 按年份顺序输出liunian数组，逐年输出对象，不要省略或合并。",
+      "9) 使用如下模板（字段名必须一致）：",
+      "",
+      "{",
+      "  \"schema_version\": \"kline_v1\",",
+      "  \"dayun\": [",
+      "    {\"name\":\"甲子\",\"start_year\":1990,\"end_year\":1999,\"scores\":{\"wealth\":7,\"career\":6,\"love\":5,\"health\":8},\"tag\":\"事业起势\"}",
+      "  ],",
+      "  \"liunian\": [",
+      "    {\"year\":1990,\"scores\":{\"wealth\":6,\"career\":6,\"love\":5,\"health\":7},\"tag\":\"稳中求进\"}",
+      "  ]",
+      "}",
+      "",
+      "请确保dayun长度为8，liunian长度为80，年份与大运范围一致。",
+    ].join('\n');
+  };
+
+  const parseKlineResult = (raw: string) => {
+    const trimmed = raw.trim();
+    const tryParse = (value: string) => JSON.parse(value) as KlineResult;
+    try {
+      return tryParse(trimmed);
+    } catch {
+      const startIdx = trimmed.indexOf('{');
+      const endIdx = trimmed.lastIndexOf('}');
+      if (startIdx >= 0 && endIdx > startIdx) {
+        return tryParse(trimmed.slice(startIdx, endIdx + 1));
+      }
+      throw new Error('无法解析AI返回的评分结果');
+    }
+  };
+
+  const persistKlineResult = (result: KlineResult) => {
+    if (modelType !== ModelType.BAZI || !chartData) return;
+    const key = getKlineStorageKey(chartData as BaziResponse);
+    localStorage.setItem(key, JSON.stringify(result));
+  };
+
+  const handleRunKline = async () => {
+    if (modelType !== ModelType.BAZI || !chartData) return;
+    if (klineStatus === 'analyzing') return;
+    setKlineStatus('analyzing');
+    setKlineError('');
+    setKlineSelected(null);
+    setKlineProgress(0);
+    setKlineYearProgress(0);
+    klineYearProgressRef.current = 0;
+    try {
+      const prompt = buildKlinePrompt(chartData as BaziResponse, baziInitialAnalysis);
+      const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
+        const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
+        const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
+        const count = Math.min(80, years.size);
+        if (count !== klineYearProgressRef.current) {
+          klineYearProgressRef.current = count;
+          setKlineYearProgress(count);
+          setKlineProgress(Math.min(99, Math.round((count / 80) * 100)));
+        }
+      }, undefined, 'deepseek-chat');
+      const parsed = parseKlineResult(finalState.content);
+      setKlineResult(parsed);
+      setKlineProgress(100);
+      setKlineYearProgress(80);
+      klineYearProgressRef.current = 80;
+      setKlineStatus('ready');
+      persistKlineResult(parsed);
+    } catch (err: any) {
+      setKlineStatus('error');
+      setKlineError(err.message || 'K线分析失败，请稍后重试');
+      setKlineProgress(0);
+      setKlineYearProgress(0);
+      klineYearProgressRef.current = 0;
+    }
+  };
+
+  const handleOpenKline = async () => {
+    setKlineModalOpen(true);
+  };
+
+  const handleSaveKline = () => {
+    if (!klineResult) return;
+    const filename = `kline-${Date.now()}.json`;
+    const blob = new Blob([JSON.stringify(klineResult, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopyText = async (text: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Ignore clipboard errors
+    }
+  };
+
+  const scoreAverage = (scores: KlineScores) =>
+    Math.round(((scores.wealth + scores.career + scores.love + scores.health) / 4) * 10) / 10;
 
   // --- Render Helpers ---
   const isLifeReading = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
@@ -908,14 +1456,48 @@ const App: React.FC = () => {
             <div className="bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden flex flex-col h-[600px]">
                <div className="bg-stone-100 px-4 py-3 border-b border-stone-200 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><span>🔮</span> 大师解读</h3>
-                 <button onClick={() => setChatHistory([])} className="text-stone-400 hover:text-red-500"><TrashIcon /></button>
+                 <button
+                   onClick={handleGenerateReport}
+                   disabled={!chatHistory.length || isTyping}
+                   title={
+                     !chatHistory.length
+                       ? '暂无对话内容'
+                       : isTyping
+                         ? 'AI 正在输出，请稍候'
+                         : '生成对话报告（可保存为 PDF）'
+                   }
+                   className={`flex items-center gap-2 text-sm font-medium ${
+                     !chatHistory.length || isTyping
+                       ? 'text-stone-300 cursor-not-allowed'
+                       : 'text-stone-500 hover:text-stone-800'
+                   }`}
+                 >
+                   <ReportIcon />
+                   生成报告
+                 </button>
                </div>
                <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#f9fafb]">
                  {chatHistory.map((msg) => {
                    const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
+                   const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`max-w-[90%] rounded-lg p-4 shadow-sm ${msg.role === 'user' ? 'bg-stone-800 text-white' : 'bg-white border border-stone-100 text-stone-800'}`}>
+                     <div className={`max-w-[90%] rounded-lg p-4 shadow-sm relative ${msg.role === 'user' ? 'bg-stone-800 text-white' : 'bg-white border border-stone-100 text-stone-800'}`}>
+                        {msg.role === 'model' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await handleCopyText(copyText);
+                              setCopiedMessageId(msg.id);
+                              window.setTimeout(() => {
+                                setCopiedMessageId((current) => (current === msg.id ? null : current));
+                              }, 1200);
+                            }}
+                            className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full border transition border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
+                          >
+                            {copiedMessageId === msg.id ? '已复制' : '复制'}
+                          </button>
+                        )}
                         {msg.role === 'model' && parsed?.reasoning && (
                           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
                             <div className="mb-1 font-semibold">思考过程</div>
@@ -948,6 +1530,318 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* K线浮球 */}
+      {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
+        <div className="fixed z-40 select-none" style={{ left: klinePos.x, top: klinePos.y }}>
+          <button
+            type="button"
+            onPointerDown={handleKlinePointerDown}
+            onPointerMove={handleKlinePointerMove}
+            onPointerUp={handleKlinePointerUp}
+            onPointerCancel={handleKlinePointerUp}
+            title={isTyping ? '请等待ai运行完毕' : '人生K线'}
+            disabled={isTyping}
+            className={`relative h-14 w-14 rounded-full border-2 font-bold transition cursor-grab active:cursor-grabbing ${
+              isTyping
+                ? 'bg-stone-200 text-stone-400 border-stone-200 cursor-not-allowed'
+                : 'bg-gradient-to-br from-yellow-200 via-amber-300 to-yellow-400 text-stone-900 border-yellow-100 shadow-2xl hover:scale-105'
+            }`}
+          >
+            <span className="absolute inset-0 rounded-full ring-2 ring-yellow-100/70 animate-pulse"></span>
+            <span className="relative z-10">K线</span>
+          </button>
+          {isTyping && (
+            <div className="mt-2 text-[10px] text-stone-400 text-center">请等待ai运行完毕</div>
+          )}
+        </div>
+      )}
+
+      {/* K线弹窗 */}
+      {klineModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-stone-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 bg-stone-50">
+              <div>
+                <div className="text-sm font-bold text-stone-800">人生K线</div>
+                <div className="text-[11px] text-stone-500">四柱八字运势曲线（仅供娱乐）</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {klineResult && (
+                  <button
+                    type="button"
+                    onClick={handleSaveKline}
+                    className="text-xs px-3 py-1 rounded-full border border-stone-200 text-stone-600 hover:text-stone-800 hover:border-stone-300"
+                  >
+                    保存到本地
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setKlineModalOpen(false)}
+                  className="text-xs px-3 py-1 rounded-full border border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5">
+              {klineStatus === 'idle' && !klineResult && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-stone-700">
+                    <div className="font-bold text-stone-800 mb-2">什么是“人生K线”？</div>
+                    <div className="text-xs leading-relaxed text-stone-600">
+                      基于你的四柱八字盘和已完成的AI解读，进一步对八个大运与八十个流年进行“财运 / 事业 / 爱情 / 健康”评分与主线标签总结，并绘制人生运势曲线。
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRunKline}
+                      className="text-xs px-4 py-2 rounded-full bg-stone-900 text-amber-400 hover:bg-stone-800"
+                    >
+                      推求K线
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {klineStatus === 'analyzing' && (
+                <div className="h-[360px] flex flex-col items-center justify-center text-stone-600 space-y-4">
+                  <div className="flex items-center gap-3 text-lg font-semibold">
+                    <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-600"></span>
+                    AI正在分析，请勿退出界面……
+                  </div>
+                  <div className="text-xs text-stone-400">
+                    正在推演第 {Math.min(80, Math.max(0, klineYearProgress))} 年 / 80 年
+                  </div>
+                  <div className="w-full max-w-md h-2 rounded-full bg-stone-100 overflow-hidden">
+                    <div
+                      className="h-2 bg-amber-400 transition-all"
+                      style={{ width: `${klineProgress}%` }}
+                    />
+                  </div>
+                  <div className="text-[11px] text-stone-400">大约 8 步大运 + 80 年流年</div>
+                </div>
+              )}
+
+              {klineStatus === 'error' && (
+                <div className="h-[360px] flex flex-col items-center justify-center text-red-600">
+                  <div className="text-sm font-semibold mb-2">K线分析失败</div>
+                  <div className="text-xs text-red-500">{klineError}</div>
+                  <button
+                    type="button"
+                    onClick={handleRunKline}
+                    className="mt-4 text-xs px-3 py-1 rounded-full border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                  >
+                    重新分析
+                  </button>
+                </div>
+              )}
+
+              {klineStatus === 'ready' && klineResult && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-10）</div>
+                    <div className="flex items-center gap-2 text-xs text-stone-500">
+                      <span>缩放</span>
+                      <input
+                        type="range"
+                        min={0.6}
+                        max={2}
+                        step={0.1}
+                        value={klineZoom}
+                        onChange={(e) => setKlineZoom(parseFloat(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 80);
+                    const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 8);
+                    const years = liunianSorted.map(item => item.year);
+                    const minYear = Math.min(...years);
+                    const maxYear = Math.max(...years);
+                    const totalYears = maxYear - minYear + 1;
+                    const yearWidth = 18 * klineZoom;
+                    const chartHeight = 240;
+                    const padding = { top: 20, right: 30, bottom: 34, left: 44 };
+                    const width = totalYears * yearWidth + padding.left + padding.right;
+                    const height = chartHeight + padding.top + padding.bottom;
+                    const axisY = padding.top + chartHeight;
+                    const yScale = (score: number) =>
+                      padding.top + (10 - Math.min(10, Math.max(0, score))) / 10 * chartHeight;
+                    const xScale = (year: number) =>
+                      padding.left + (year - minYear) * yearWidth + yearWidth / 2;
+                    const linePoints = liunianSorted
+                      .map((item) => {
+                        const avg = scoreAverage(item.scores);
+                        return `${xScale(item.year)},${yScale(avg)}`;
+                      })
+                      .join(' ');
+                    return (
+                      <div className="border border-stone-100 rounded-xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <svg width={width} height={height} className="bg-white">
+                            {/* Y axis grid */}
+                            {[0, 2, 4, 6, 8, 10].map((tick) => (
+                              <g key={tick}>
+                                <line
+                                  x1={padding.left}
+                                  y1={yScale(tick)}
+                                  x2={width - padding.right}
+                                  y2={yScale(tick)}
+                                  stroke="#f1f5f9"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x={padding.left - 8}
+                                  y={yScale(tick) + 4}
+                                  fontSize="10"
+                                  fill="#94a3b8"
+                                  textAnchor="end"
+                                >
+                                  {tick}
+                                </text>
+                              </g>
+                            ))}
+
+                            {/* X axis baseline */}
+                            <line
+                              x1={padding.left}
+                              y1={axisY}
+                              x2={width - padding.right}
+                              y2={axisY}
+                              stroke="#e2e8f0"
+                              strokeWidth="1"
+                            />
+
+                            {/* Dayun bars (behind line) */}
+                            {dayunSorted.map((item, idx) => {
+                              const startX = padding.left + (item.start_year - minYear) * yearWidth;
+                              const endX = padding.left + (item.end_year - minYear + 1) * yearWidth;
+                              const avg = scoreAverage(item.scores);
+                              const barTop = yScale(avg);
+                              const barHeight = padding.top + chartHeight - barTop;
+                              return (
+                                <g key={`${item.name}-${idx}`}>
+                                  <rect
+                                    x={startX}
+                                    y={barTop}
+                                    width={endX - startX}
+                                    height={barHeight}
+                                    fill="#fffbeb"
+                                    stroke="#fde68a"
+                                    strokeWidth="1"
+                                    opacity="0.95"
+                                    onClick={() => setKlineSelected({ kind: 'dayun', start_year: item.start_year })}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                  <text
+                                    x={(startX + endX) / 2}
+                                    y={barTop + barHeight / 2}
+                                    fontSize="11"
+                                    fontWeight="600"
+                                    fill="#92400e"
+                                    textAnchor="middle"
+                                  >
+                                    {item.tag}
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* Liunian line */}
+                            <polyline
+                              points={linePoints}
+                              fill="none"
+                              stroke="#b45309"
+                              strokeWidth="2"
+                            />
+                            {liunianSorted.map((item, idx) => {
+                              const avg = scoreAverage(item.scores);
+                              const cx = xScale(item.year);
+                              const cy = yScale(avg);
+                              return (
+                                <g key={`${item.year}-${idx}`}>
+                                  <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={3}
+                                    fill="#b45309"
+                                    onClick={() => setKlineSelected({ kind: 'liunian', year: item.year })}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                  <text
+                                    x={cx}
+                                    y={cy - 8}
+                                    fontSize="9"
+                                    fill="#92400e"
+                                    textAnchor="middle"
+                                    transform={`rotate(-45 ${cx} ${cy - 8})`}
+                                  >
+                                    {item.tag}
+                                  </text>
+                                </g>
+                              );
+                            })}
+
+                            {/* X axis labels */}
+                            {Array.from({ length: totalYears }, (_, idx) => {
+                              const year = minYear + idx;
+                              const x = padding.left + idx * yearWidth + yearWidth / 2;
+                              const showLabel = totalYears <= 40 || idx % 2 === 0;
+                              if (!showLabel) return null;
+                              return (
+                                <text
+                                  key={year}
+                                  x={x}
+                                  y={axisY + 12}
+                                  fontSize="9"
+                                  fill="#64748b"
+                                  textAnchor="end"
+                                  dominantBaseline="middle"
+                                  transform={`rotate(-45 ${x} ${axisY + 12})`}
+                                >
+                                  {year}
+                                </text>
+                              );
+                            })}
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="rounded-lg border border-stone-100 bg-stone-50 p-4 text-xs text-stone-600">
+                    {!klineSelected && <div>点击大运柱或流年点，可查看单项评分。</div>}
+                    {klineSelected && klineResult && (() => {
+                      const item = klineSelected.kind === 'dayun'
+                        ? klineResult.dayun.find((entry) => entry.start_year === klineSelected.start_year)
+                        : klineResult.liunian.find((entry) => entry.year === klineSelected.year);
+                      if (!item) return <div>未找到对应年份数据。</div>;
+                      const title = klineSelected.kind === 'dayun'
+                        ? `${(item as KlineDayunItem).name} ${(item as KlineDayunItem).start_year}-${(item as KlineDayunItem).end_year}`
+                        : `${(item as KlineLiunianItem).year} (${getGanzhiYear((item as KlineLiunianItem).year)})`;
+                      const scores = item.scores;
+                      return (
+                        <div className="space-y-1">
+                          <div className="text-sm font-bold text-stone-700">{title}</div>
+                          <div>主线：{item.tag}</div>
+                          <div>财运：{scores.wealth} / 事业：{scores.career} / 爱情：{scores.love} / 健康：{scores.health}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="text-[11px] text-stone-400 text-center">{KLINE_DEV_NOTE}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

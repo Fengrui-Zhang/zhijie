@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
   const stream = body.stream === true;
   const knowledge = body.knowledge as KnowledgeRequest | undefined;
+  const requestedModel = body.model === 'deepseek-chat' ? 'deepseek-chat' : 'deepseek-reasoner';
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'deepseek-reasoner',
+      model: requestedModel,
       messages: finalMessages,
       temperature,
       stream,

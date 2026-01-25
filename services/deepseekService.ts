@@ -53,10 +53,13 @@ type StreamState = {
   content: string;
 };
 
+type ChatModel = 'deepseek-reasoner' | 'deepseek-chat';
+
 export const sendMessageToDeepseekStream = async (
   message: string,
   onDelta: (state: StreamState) => void,
-  knowledge?: KnowledgeOptions
+  knowledge?: KnowledgeOptions,
+  model?: ChatModel
 ): Promise<StreamState> => {
   if (chatMessages.length === 0) {
     throw new Error('Chat session not initialized. Please start a reading first.');
@@ -73,6 +76,7 @@ export const sendMessageToDeepseekStream = async (
       messages: chatMessages,
       stream: true,
       knowledge,
+      model,
     }),
   });
 
