@@ -452,12 +452,16 @@ const App: React.FC = () => {
       }
     };
 
-    if ('srcdoc' in frame) {
-      frame.srcdoc = reportHtml;
-    } else if (frame.contentWindow) {
-      frame.contentWindow.document.open();
-      frame.contentWindow.document.write(reportHtml);
-      frame.contentWindow.document.close();
+    const iframe = frame as HTMLIFrameElement & { srcdoc?: string };
+    if (typeof iframe.srcdoc !== 'undefined') {
+      iframe.srcdoc = reportHtml;
+    } else {
+      const win = iframe.contentWindow;
+      if (win) {
+        win.document.open();
+        win.document.write(reportHtml);
+        win.document.close();
+      }
     }
   };
 
