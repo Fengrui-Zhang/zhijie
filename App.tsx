@@ -237,6 +237,8 @@ type KlineSelection =
   | { kind: 'liunian'; year: number }
   | null;
 
+type SeriesKey = 'overall' | 'wealth' | 'career' | 'love' | 'health';
+
 const STEMS = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
 const BRANCHES = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
 const getGanzhiYear = (year: number) => {
@@ -359,6 +361,14 @@ const App: React.FC = () => {
       y: Math.max(120, Math.round(height * 0.55)),
     });
   }, [modelType, step, klinePos]);
+
+  useEffect(() => {
+    if (!klineModalOpen) return;
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [klineModalOpen]);
 
   const updateChatMessage = (id: string, content: string) => {
     setChatHistory(prev =>
@@ -1953,9 +1963,9 @@ const App: React.FC = () => {
 
       {/* K线弹窗 */}
       {klineModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-5xl rounded-2xl bg-white shadow-2xl border border-stone-200 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 bg-stone-50">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-6xl max-h-[90vh] rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-stone-100 bg-stone-50/60">
               <div>
                 <div className="text-sm font-bold text-stone-800">人生K线</div>
                 <div className="text-[11px] text-stone-500">四柱八字运势曲线（仅供娱乐）</div>
@@ -1980,24 +1990,27 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-5">
+            <div className="p-6 overflow-y-auto">
               {klineStatus === 'idle' && !klineResult && (
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4 text-sm text-stone-700">
-                    <div className="font-bold text-stone-800 mb-2">什么是“人生K线”？</div>
-                    <div className="text-xs leading-relaxed text-stone-600">
-                      基于你的四柱八字盘和已完成的AI解读，进一步对七步大运与七十个流年进行“财运 / 事业 / 爱情 / 健康”评分与主线标签总结，并绘制人生运势曲线。
+                <div className="rounded-3xl border-2 border-dashed border-amber-100 bg-amber-50/50 h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-amber-100/70 text-amber-700 flex items-center justify-center">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3h18v18H3V3zm4 12l3-3 4 4 5-5" />
+                    </svg>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <div className="text-sm font-bold text-stone-700">什么是“人生K线”？</div>
+                    <div className="text-xs text-stone-500 max-w-md">
+                      基于你的四柱八字盘和已完成的AI解读，进一步对七步大运与七十个流年进行评分与主线标签总结，并绘制人生运势曲线。
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleRunKline}
-                      className="text-xs px-4 py-2 rounded-full bg-stone-900 text-amber-400 hover:bg-stone-800"
-                    >
-                      推求K线
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRunKline}
+                    className="text-xs px-4 py-2 rounded-full bg-stone-900 text-amber-400 hover:bg-stone-800"
+                  >
+                    推求K线
+                  </button>
                 </div>
               )}
 
@@ -2005,7 +2018,7 @@ const App: React.FC = () => {
                 <div className="h-[360px] flex flex-col items-center justify-center text-stone-600 space-y-4">
                   <div className="flex items-center gap-3 text-lg font-semibold">
                     <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-600"></span>
-                    AI正在分析，请勿退出界面……
+                    AI正在分析，请勿刷新界面……
                   </div>
                   <div className="text-xs text-stone-400">
                     正在推演第 {Math.min(70, Math.max(0, klineYearProgress))} 年 / 70 年
@@ -2016,7 +2029,7 @@ const App: React.FC = () => {
                       style={{ width: `${klineProgress}%` }}
                     />
                   </div>
-                  <div className="text-[11px] text-stone-400">大约 7 步大运 + 70 年流年</div>
+                  <div className="text-[11px] text-stone-400">分析时间约 3～5 分钟，卡顿属于正常现象，请耐心等待～</div>
                 </div>
               )}
 
@@ -2035,11 +2048,11 @@ const App: React.FC = () => {
               )}
 
               {klineStatus === 'ready' && klineResult && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-100 bg-stone-50/60 px-4 py-3">
                     <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-100）</div>
-                    <div className="flex items-center gap-2 text-xs text-stone-500">
-                      <span>缩放</span>
+                    <div className="flex items-center gap-3 text-xs text-stone-500">
+                      <span className="font-medium text-stone-600">缩放</span>
                       <input
                         type="range"
                         min={0.6}
@@ -2047,12 +2060,13 @@ const App: React.FC = () => {
                         step={0.1}
                         value={klineZoom}
                         onChange={(e) => setKlineZoom(parseFloat(e.target.value))}
+                        className="accent-amber-500"
                       />
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-stone-600">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.overall ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.overall}
@@ -2062,7 +2076,7 @@ const App: React.FC = () => {
                       <span className="text-stone-700">总体趋势</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-amber-700"></span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.wealth ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.wealth}
@@ -2072,7 +2086,7 @@ const App: React.FC = () => {
                       <span>财富</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-yellow-500"></span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.love ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.love}
@@ -2082,7 +2096,7 @@ const App: React.FC = () => {
                       <span>感情</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-pink-400"></span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.career ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.career}
@@ -2092,7 +2106,7 @@ const App: React.FC = () => {
                       <span>事业</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-blue-500"></span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.health ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.health}
@@ -2104,36 +2118,36 @@ const App: React.FC = () => {
                     </label>
                   </div>
 
-                  {(() => {
-                    const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 70);
-                    const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 7);
-                    const years = liunianSorted.map(item => item.year);
-                    const minYear = Math.min(...years);
-                    const maxYear = Math.max(...years);
-                    const totalYears = maxYear - minYear + 1;
-                    const yearWidth = 18 * klineZoom;
-                    const chartHeight = 240;
-                    const padding = { top: 20, right: 30, bottom: 34, left: 44 };
-                    const width = totalYears * yearWidth + padding.left + padding.right;
-                    const height = chartHeight + padding.top + padding.bottom;
-                    const axisY = padding.top + chartHeight;
-                    const yScale = (score: number) =>
-                      padding.top + (100 - Math.min(100, Math.max(0, score))) / 100 * chartHeight;
-                    const xScale = (year: number) =>
-                      padding.left + (year - minYear) * yearWidth + yearWidth / 2;
-                    const buildLinePoints = (getter: (scores: KlineScores) => number) =>
-                      liunianSorted
-                        .map((item) => `${xScale(item.year)},${yScale(getter(item.scores))}`)
-                        .join(' ');
+                  <div className="relative rounded-2xl border border-stone-100 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      {(() => {
+                        const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 70);
+                        const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 7);
+                        const years = liunianSorted.map(item => item.year);
+                        const minYear = Math.min(...years);
+                        const maxYear = Math.max(...years);
+                        const totalYears = maxYear - minYear + 1;
+                        const yearWidth = 18 * klineZoom;
+                        const chartHeight = 240;
+                        const padding = { top: 20, right: 30, bottom: 34, left: 44 };
+                        const width = totalYears * yearWidth + padding.left + padding.right;
+                        const height = chartHeight + padding.top + padding.bottom;
+                        const axisY = padding.top + chartHeight;
+                        const yScale = (score: number) =>
+                          padding.top + (100 - Math.min(100, Math.max(0, score))) / 100 * chartHeight;
+                        const xScale = (year: number) =>
+                          padding.left + (year - minYear) * yearWidth + yearWidth / 2;
+                        const buildLinePoints = (getter: (scores: KlineScores) => number) =>
+                          liunianSorted
+                            .map((item) => `${xScale(item.year)},${yScale(getter(item.scores))}`)
+                            .join(' ');
 
-                    const linePoints = buildLinePoints(scoreAverage);
-                    const wealthPoints = buildLinePoints((s) => s.wealth);
-                    const lovePoints = buildLinePoints((s) => s.love);
-                    const careerPoints = buildLinePoints((s) => s.career);
-                    const healthPoints = buildLinePoints((s) => s.health);
-                    return (
-                      <div className="border border-stone-100 rounded-xl overflow-hidden">
-                        <div className="overflow-x-auto">
+                        const linePoints = buildLinePoints(scoreAverage);
+                        const wealthPoints = buildLinePoints((s) => s.wealth);
+                        const lovePoints = buildLinePoints((s) => s.love);
+                        const careerPoints = buildLinePoints((s) => s.career);
+                        const healthPoints = buildLinePoints((s) => s.health);
+                        return (
                           <svg width={width} height={height} className="bg-white">
                             {/* Y axis grid */}
                             {[0, 20, 40, 60, 80, 100].map((tick) => (
@@ -2294,27 +2308,252 @@ const App: React.FC = () => {
                               );
                             })}
                           </svg>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                        );
+                      })()}
+                    </div>
+                  </div>
 
-                  <div className="rounded-lg border border-stone-100 bg-stone-50 p-4 text-xs text-stone-600">
-                    {!klineSelected && <div>点击大运柱或流年点，可查看单项评分。</div>}
+                  <div className="rounded-2xl border border-stone-100 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] p-4">
+                    {!klineSelected && (
+                      <div className="text-xs text-stone-500">点击大运柱或流年点，可查看单项评分。</div>
+                    )}
                     {klineSelected && klineResult && (() => {
-                      const item = klineSelected.kind === 'dayun'
+                      const selectedItem = klineSelected.kind === 'dayun'
                         ? klineResult.dayun.find((entry) => entry.start_year === klineSelected.start_year)
                         : klineResult.liunian.find((entry) => entry.year === klineSelected.year);
-                      if (!item) return <div>未找到对应年份数据。</div>;
-                      const title = klineSelected.kind === 'dayun'
-                        ? `${(item as KlineDayunItem).name} ${(item as KlineDayunItem).start_year}-${(item as KlineDayunItem).end_year}`
-                        : `${(item as KlineLiunianItem).year} (${getGanzhiYear((item as KlineLiunianItem).year)})`;
-                      const scores = item.scores;
+                      if (!selectedItem) return <div className="text-xs text-stone-500">未找到对应年份数据。</div>;
+
+                      const renderScoreOverview = (scores: KlineScores) => {
+                        const avg = scoreAverage(scores);
+                        return (
+                          <div className="relative rounded-2xl border border-stone-100 bg-stone-50 px-4 py-6">
+                            <div className="grid grid-cols-2 gap-6 text-center text-xs font-semibold">
+                              <div className="space-y-1">
+                                <div className="text-lg font-bold text-yellow-600">{scores.wealth}</div>
+                                <div className="text-yellow-600">财富</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-lg font-bold text-blue-600">{scores.career}</div>
+                                <div className="text-blue-600">事业</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-lg font-bold text-pink-500">{scores.love}</div>
+                                <div className="text-pink-500">感情</div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-lg font-bold text-emerald-600">{scores.health}</div>
+                                <div className="text-emerald-600">健康</div>
+                              </div>
+                            </div>
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <div className="h-20 w-20 rounded-full border-2 border-emerald-100 bg-white shadow-lg shadow-emerald-50 flex flex-col items-center justify-center">
+                                <div className="text-[10px] text-stone-400">平均分</div>
+                                <div className="text-lg font-bold text-emerald-700">{avg}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      if (klineSelected.kind === 'liunian') {
+                        const liunianItem = selectedItem as KlineLiunianItem;
+                        const relatedDayun = klineResult.dayun.find((entry) =>
+                          liunianItem.year >= entry.start_year && liunianItem.year <= entry.end_year
+                        );
+                        return (
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-bold text-stone-800">流年透视</div>
+                                  <div className="text-[11px] text-stone-500">YEARLY INSIGHT</div>
+                                </div>
+                                <div className="text-xl font-bold text-stone-800">
+                                  {liunianItem.year}
+                                </div>
+                              </div>
+                              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-sm font-bold text-stone-800">
+                                {liunianItem.tag}
+                              </div>
+                              {renderScoreOverview(liunianItem.scores)}
+                            </div>
+
+                            <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-bold text-stone-800">大运周期</div>
+                                  <div className="text-[11px] text-stone-500">DECADE CYCLE</div>
+                                </div>
+                                <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+                                  {relatedDayun ? relatedDayun.name : '未知'}
+                                </div>
+                              </div>
+                              {relatedDayun ? (
+                                <>
+                                  <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                      <div className="text-[10px] text-stone-500">大运关键词</div>
+                                      <div className="text-sm font-bold text-stone-800">{relatedDayun.tag}</div>
+                                    </div>
+                                    <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                      <div className="text-[10px] text-stone-500">周期跨度</div>
+                                      <div className="text-sm font-bold text-stone-800">
+                                        {relatedDayun.start_year} - {relatedDayun.end_year}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {renderScoreOverview(relatedDayun.scores)}
+                                </>
+                              ) : (
+                                <div className="text-xs text-stone-500">未找到对应大运。</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const dayunItem = selectedItem as KlineDayunItem;
+                      const trendYears = klineResult.liunian.filter((entry) =>
+                        entry.year >= dayunItem.start_year && entry.year <= dayunItem.end_year
+                      );
+                      const trendWidth = 420;
+                      const trendHeight = 160;
+                      const pad = { top: 16, right: 20, bottom: 24, left: 32 };
+                      const seriesList: Array<{ key: SeriesKey; color: string; getter: (s: KlineScores) => number }> = [
+                        { key: 'overall', color: '#b45309', getter: scoreAverage },
+                        { key: 'wealth', color: '#f59e0b', getter: (s) => s.wealth },
+                        { key: 'career', color: '#3b82f6', getter: (s) => s.career },
+                        { key: 'love', color: '#f472b6', getter: (s) => s.love },
+                        { key: 'health', color: '#047857', getter: (s) => s.health },
+                      ];
+                      const activeSeries = seriesList.filter((series) => klineSeries[series.key]);
+                      const fallbackSeries = activeSeries.length ? activeSeries : [seriesList[0]];
+                      const allValues = trendYears.flatMap((entry) =>
+                        fallbackSeries.map((series) => series.getter(entry.scores))
+                      );
+                      const rawMin = Math.min(...allValues);
+                      const rawMax = Math.max(...allValues);
+                      const range = Math.max(6, rawMax - rawMin);
+                      const trendMin = Math.floor((rawMin - range * 0.15) / 5) * 5;
+                      const trendMax = Math.ceil((rawMax + range * 0.15) / 5) * 5;
+                      const clampMin = Math.max(0, trendMin);
+                      const clampMax = Math.min(100, trendMax);
+                      const trendX = (idx: number) =>
+                        pad.left + (idx / Math.max(1, trendYears.length - 1)) * (trendWidth - pad.left - pad.right);
+                      const trendY = (value: number) => {
+                        const ratio = (value - clampMin) / Math.max(1, clampMax - clampMin);
+                        return pad.top + (1 - ratio) * (trendHeight - pad.top - pad.bottom);
+                      };
+                      const buildTrendLine = (getter: (s: KlineScores) => number) =>
+                        trendYears.map((entry, idx) => `${trendX(idx)},${trendY(getter(entry.scores))}`).join(' ');
+                      const yTicks = 4;
+                      const tickValues = Array.from({ length: yTicks + 1 }, (_, idx) =>
+                        Math.round(clampMin + ((clampMax - clampMin) * idx) / yTicks)
+                      );
+
                       return (
-                        <div className="space-y-1">
-                          <div className="text-sm font-bold text-stone-700">{title}</div>
-                          <div>主线：{item.tag}</div>
-                          <div>财运：{scores.wealth} / 事业：{scores.career} / 爱情：{scores.love} / 健康：{scores.health}</div>
+                        <div className="grid gap-4 lg:grid-cols-2">
+                          <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-bold text-stone-800">十年趋势细节</div>
+                                <div className="text-[11px] text-stone-500">DECADE TREND</div>
+                              </div>
+                              <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+                                {dayunItem.start_year}-{dayunItem.end_year}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-stone-100 bg-stone-50 p-3">
+                              <svg width="100%" height={trendHeight} viewBox={`0 0 ${trendWidth} ${trendHeight}`}>
+                                {tickValues.map((value) => (
+                                  <g key={`trend-tick-${value}`}>
+                                    <line
+                                      x1={pad.left}
+                                      y1={trendY(value)}
+                                      x2={trendWidth - pad.right}
+                                      y2={trendY(value)}
+                                      stroke="#e2e8f0"
+                                      strokeWidth="1"
+                                    />
+                                    <text
+                                      x={pad.left - 6}
+                                      y={trendY(value) + 4}
+                                      fontSize="9"
+                                      fill="#94a3b8"
+                                      textAnchor="end"
+                                    >
+                                      {value}
+                                    </text>
+                                  </g>
+                                ))}
+                                <line
+                                  x1={pad.left}
+                                  y1={trendHeight - pad.bottom}
+                                  x2={trendWidth - pad.right}
+                                  y2={trendHeight - pad.bottom}
+                                  stroke="#e2e8f0"
+                                  strokeWidth="1"
+                                />
+                                {trendYears.map((entry, idx) => (
+                                  <text
+                                    key={`trend-year-${entry.year}`}
+                                    x={trendX(idx)}
+                                    y={trendHeight - 6}
+                                    fontSize="8"
+                                    fill="#94a3b8"
+                                    textAnchor="middle"
+                                  >
+                                    {entry.year}
+                                  </text>
+                                ))}
+                                {fallbackSeries.map((series) => (
+                                  <polyline
+                                    key={`trend-line-${series.key}`}
+                                    points={buildTrendLine(series.getter)}
+                                    fill="none"
+                                    stroke={series.color}
+                                    strokeWidth={series.key === 'overall' ? 2.5 : 2}
+                                  />
+                                ))}
+                                {fallbackSeries.map((series) =>
+                                  trendYears.map((entry, idx) => (
+                                    <circle
+                                      key={`trend-point-${series.key}-${entry.year}`}
+                                      cx={trendX(idx)}
+                                      cy={trendY(series.getter(entry.scores))}
+                                      r={2.5}
+                                      fill={series.color}
+                                    />
+                                  ))
+                                )}
+                              </svg>
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-bold text-stone-800">大运周期</div>
+                                <div className="text-[11px] text-stone-500">DECADE CYCLE</div>
+                              </div>
+                              <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+                                {dayunItem.name}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                <div className="text-[10px] text-stone-500">大运关键词</div>
+                                <div className="text-sm font-bold text-stone-800">{dayunItem.tag}</div>
+                              </div>
+                              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                <div className="text-[10px] text-stone-500">周期跨度</div>
+                                <div className="text-sm font-bold text-stone-800">
+                                  {dayunItem.start_year} - {dayunItem.end_year}
+                                </div>
+                              </div>
+                            </div>
+                            {renderScoreOverview(dayunItem.scores)}
+                          </div>
                         </div>
                       );
                     })()}
