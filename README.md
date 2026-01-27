@@ -1,7 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # 项目简介
 
 这是一个占卜与命理一体化的专业分析应用，聚焦奇门遁甲与四柱八字两大核心板块，并通过专业排盘与定制提示词，为大语言模型提供高质量、可溯源的推断支撑。
@@ -44,7 +40,7 @@
 ![人生 K 线 - 结果](assets/images/k-line-result.png)
 
 ## Demo
-
+可运行Demo：
 `https://zhijie123.online/`
 
 ## 本地部署
@@ -56,3 +52,7 @@
    - `YUANFENJU_API_KEY=your_yuanfenju_api_key`
 3. Run the app:
    `npm run dev`
+
+缘份居API和deepseek API可访问官网：
+  `https://doc.yuanfenju.com/`
+  `https://www.deepseek.com/`
