@@ -22,10 +22,14 @@ const ENDPOINTS = {
  */
 async function fetchApi<T>(endpoint: string, params: Record<string, string>): Promise<T> {
   try {
+    const userKey =
+      typeof window !== 'undefined'
+        ? (localStorage.getItem('user-api:yuanfenju') || '').trim()
+        : '';
     const response = await fetch('/api/fortune', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint, params }),
+      body: JSON.stringify({ endpoint, params, apiKey: userKey || undefined }),
     });
 
     if (!response.ok) {

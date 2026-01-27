@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 const BASE_API = 'https://api.yuanfenju.com/index.php/v1';
 
 export async function POST(request: Request) {
-  const apiKey = process.env.YUANFENJU_API_KEY;
+  const body = await request.json();
+  const overrideKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
+  const apiKey = overrideKey || process.env.YUANFENJU_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Yuanfenju API key is missing.' },
@@ -11,7 +13,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
   const endpoint = body.endpoint as string | undefined;
   const params = body.params as Record<string, string> | undefined;
 

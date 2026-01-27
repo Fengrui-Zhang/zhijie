@@ -26,6 +26,11 @@ export const sendMessageToDeepseek = async (
 
   chatMessages.push({ role: 'user', content: message });
 
+  const userKey =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('user-api:deepseek') || '').trim()
+      : '';
+
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: {
@@ -34,6 +39,7 @@ export const sendMessageToDeepseek = async (
     body: JSON.stringify({
       messages: chatMessages,
       knowledge,
+      apiKey: userKey || undefined,
     }),
   });
 
@@ -67,6 +73,11 @@ export const sendMessageToDeepseekStream = async (
 
   chatMessages.push({ role: 'user', content: message });
 
+  const userKey =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('user-api:deepseek') || '').trim()
+      : '';
+
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: {
@@ -77,6 +88,7 @@ export const sendMessageToDeepseekStream = async (
       stream: true,
       knowledge,
       model,
+      apiKey: userKey || undefined,
     }),
   });
 
