@@ -43,13 +43,21 @@
 可运行Demo：
 `https://zhijie123.online/`
 
+可填写自己的API或者使用默认API（推荐使用自己的，默认API可能出现不够用的情况）
+![API 设置](assets/images/API.png)
+
 ## 本地部署
 
 1. Install dependencies:
    `npm install`
 2. Set environment variables in `.env.local`:
-   - `DEEPSEEK_API_KEY=your_deepseek_api_key`
-   - `YUANFENJU_API_KEY=your_yuanfenju_api_key`
+   - `DEEPSEEK_API_KEY="your_deepseek_api_key"`
+   - `YUANFENJU_API_KEY="your_yuanfenju_api_key"`
+   - `EMBEDDING_PROVIDER="dashscope"`
+   - `EMBEDDING_BASE_URL="https://dashscope.aliyuncs.com"`
+   - `EMBEDDING_MODEL="text-embedding-v3"`
+   - `EMBEDDING_API_KEY="your_qianwen_api_key"`
+   - `USE_HIER_KNOWLEDGE=true`
 3. Run the app:
    `npm run dev`
 
