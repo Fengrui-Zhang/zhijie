@@ -17,6 +17,8 @@
 
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
+| `DATABASE_URL` | 必填，Vercel Postgres 创建后从 `POSTGRES_URL` 复制 | postgresql://... |
+| `DIRECT_URL` | 必填，从 `POSTGRES_URL_NON_POOLING` 复制 | postgresql://... |
 | `NEXTAUTH_SECRET` | 必填，运行 `openssl rand -base64 32` 生成 | 随机字符串 |
 | `NEXTAUTH_URL` | 部署后域名 | `https://zhijie-xxx.vercel.app` |
 | `DEEPSEEK_API_KEY` | DeepSeek LLM | 你的 API Key |
@@ -29,23 +31,9 @@
 
 ## 三、数据库迁移
 
-**本地开发**：在 `.env` 中确保有 `DATABASE_URL` 和 `DIRECT_URL`（本地 PostgreSQL 两者可填相同连接串），然后执行：
+**自动迁移**：构建时会自动执行 `prisma migrate deploy`，只要 Vercel 中配置了 `DATABASE_URL` 和 `DIRECT_URL`，部署时就会创建表。
 
-```bash
-npx prisma migrate dev --name init
-```
-
-**Vercel 部署**：在本地执行（需先安装 Vercel CLI 并登录）：
-
-```bash
-npm i -g vercel
-vercel login
-vercel link
-vercel env pull .env.local
-npx prisma migrate deploy
-```
-
-若无法使用 Vercel CLI，可到 Vercel Dashboard → 项目 → **Storage** → Postgres 下载 `.env.local`，将 `POSTGRES_URL` 和 `POSTGRES_URL_NON_POOLING` 分别填入 `DATABASE_URL` 和 `DIRECT_URL` 到本地 `.env`，再执行 `npx prisma migrate deploy`。
+**手动迁移**（若自动迁移失败）：在本地执行 `vercel env pull .env.local` 拉取环境变量后，运行 `npx prisma migrate deploy`。
 
 ## 四、重新部署
 
