@@ -16,6 +16,19 @@ export const startQimenChat = async (systemInstruction: string) => {
   chatMessages = [{ role: 'system', content: systemInstruction }];
 };
 
+export const restoreChatSession = (
+  systemInstruction: string,
+  history: { role: 'user' | 'model'; content: string }[]
+) => {
+  chatMessages = [{ role: 'system', content: systemInstruction }];
+  for (const msg of history) {
+    chatMessages.push({
+      role: msg.role === 'model' ? 'assistant' : 'user',
+      content: msg.content,
+    });
+  }
+};
+
 export const sendMessageToDeepseek = async (
   message: string,
   knowledge?: KnowledgeOptions

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import AuthProvider from '../components/AuthProvider';
 
 import './globals.css';
 
@@ -18,7 +19,9 @@ export default function RootLayout({
       <head>
         <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

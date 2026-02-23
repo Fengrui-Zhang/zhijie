@@ -26,3 +26,9 @@ app/generated
 *.njsproj
 *.sln
 *.sw?
+
+/app/generated/prisma
+
+# Environment variables
+.env
+.env.local
