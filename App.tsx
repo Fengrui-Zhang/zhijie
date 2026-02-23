@@ -1705,7 +1705,6 @@ const App: React.FC = () => {
               访客模式
             </button>
           </div>
-          <p className="text-[10px] text-stone-400">访客数据不会保存，关闭浏览器后消失</p>
         </div>
       </div>
     );
