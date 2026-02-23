@@ -1,9 +1,10 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useSession, signOut } from 'next-auth/react';
 import updates from './data/updates.json';
 
 // Services
@@ -11,7 +12,11 @@ import {
   fetchQimen, fetchBazi, fetchZiwei, fetchMeihua, fetchLiuyao,
   formatQimenPrompt, formatBaziPrompt, formatZiweiPrompt, formatMeihuaPrompt, formatLiuyaoPrompt 
 } from './services/apiService';
-import { startQimenChat, sendMessageToDeepseekStream, clearChatSession } from './services/deepseekService';
+import { startQimenChat, sendMessageToDeepseekStream, clearChatSession, restoreChatSession } from './services/deepseekService';
+
+// Auth & Session Components
+import AuthForm from './components/AuthForm';
+import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
 
 // Types
 import {
@@ -251,7 +256,41 @@ const getGanzhiYear = (year: number) => {
   return `${stem}${branch}`;
 };
 
+const MODEL_LABELS: Record<string, string> = {
+  qimen: '奇门遁甲',
+  bazi: '四柱八字',
+  ziwei: '紫微斗数',
+  meihua: '梅花易数',
+  liuyao: '六爻纳甲',
+};
+
+const buildSystemInstruction = (mType: ModelType, cData: unknown): string => {
+  switch (mType) {
+    case ModelType.QIMEN:
+      return `你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。\n\n${formatQimenPrompt(cData as any, '')}`;
+    case ModelType.BAZI:
+      return `你是一位深谙段建业盲派命理体系的算命专家。\n\n${formatBaziPrompt(cData as any)}`;
+    case ModelType.ZIWEI:
+      return `你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。\n\n${formatZiweiPrompt(cData as any)}`;
+    case ModelType.MEIHUA:
+      return `你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。\n\n${formatMeihuaPrompt(cData as any, '')}`;
+    case ModelType.LIUYAO:
+      return `你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。\n\n${formatLiuyaoPrompt(cData as any, '')}`;
+    default:
+      return '';
+  }
+};
+
 const App: React.FC = () => {
+  const { data: authSession, status: authStatus } = useSession();
+  const isLoggedIn = authStatus === 'authenticated';
+  const [showAuth, setShowAuth] = useState(false);
+
+  // --- Persistence State ---
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   // --- State ---
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
   const [loading, setLoading] = useState(false);
@@ -382,6 +421,127 @@ const App: React.FC = () => {
       document.body.classList.remove('overflow-hidden');
     };
   }, [klineModalOpen]);
+
+  // --- Session Persistence ---
+  const fetchSessions = useCallback(async () => {
+    if (!isLoggedIn) return;
+    try {
+      const res = await fetch('/api/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        setSavedSessions(data);
+      }
+    } catch {
+      // silently ignore
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  const saveSessionToDb = async (
+    mType: string,
+    title: string,
+    chartParams: Record<string, unknown>,
+    cData: unknown
+  ): Promise<string | null> => {
+    if (!isLoggedIn) return null;
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelType: mType, title, chartParams, chartData: cData }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        fetchSessions();
+        return created.id as string;
+      }
+    } catch {
+      // silently ignore
+    }
+    return null;
+  };
+
+  const saveMessagesToDb = async (
+    sessionId: string | null,
+    messages: { role: string; content: string }[]
+  ) => {
+    if (!isLoggedIn || !sessionId || messages.length === 0) return;
+    try {
+      await fetch(`/api/sessions/${sessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages),
+      });
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      setSavedSessions(prev => prev.filter(s => s.id !== id));
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+        handleReset();
+      }
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const handleLoadSession = async (id: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      clearChatSession();
+      setActiveSessionId(id);
+      setModelType(data.modelType as ModelType);
+      setChartData(data.chartData);
+      setStep('chart');
+      setError('');
+
+      if (data.chartParams) {
+        const p = data.chartParams as Record<string, unknown>;
+        if (p.name) setName(p.name as string);
+        if (p.question) setQuestion(p.question as string);
+      }
+
+      const msgs: ChatMessage[] = (data.messages || []).map(
+        (m: { id: string; role: string; content: string; createdAt: string }) => ({
+          id: m.id,
+          role: m.role as 'user' | 'model',
+          content: m.content,
+          timestamp: new Date(m.createdAt),
+        })
+      );
+      setChatHistory(msgs);
+
+      if (msgs.length > 0) {
+        const systemInstruction = buildSystemInstruction(data.modelType as ModelType, data.chartData);
+        restoreChatSession(
+          systemInstruction,
+          msgs.map(m => ({ role: m.role, content: m.content }))
+        );
+      }
+
+      if (data.modelType === 'bazi' && data.chartData) {
+        const firstModelMsg = msgs.find(m => m.role === 'model');
+        if (firstModelMsg) {
+          const parsed = parseModelContent(firstModelMsg.content);
+          setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+          setKlineUnlocked(true);
+        }
+      }
+    } catch {
+      // silently ignore
+    }
+  };
 
   const updateChatMessage = (id: string, content: string) => {
     setChatHistory(prev =>
@@ -831,7 +991,7 @@ const App: React.FC = () => {
     setKlineYearProgress(0);
     klineYearProgressRef.current = 0;
     setKlinePos(null);
-    // Optionally keep name/city for UX
+    setActiveSessionId(null);
   };
 
   const handleCalculate = async () => {
@@ -1044,6 +1204,23 @@ const App: React.FC = () => {
         setKlineUnlocked(true);
       }
 
+      // --- Save session to DB ---
+      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
+      const newSessionId = await saveSessionToDb(
+        modelType,
+        sessionTitle,
+        { ...baseParams, question, timeMode } as Record<string, unknown>,
+        resultData
+      );
+      if (newSessionId) {
+        setActiveSessionId(newSessionId);
+        const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+        await saveMessagesToDb(newSessionId, [
+          { role: 'user', content: userContent },
+          { role: 'model', content: finalContent },
+        ]);
+      }
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Operation failed.");
@@ -1080,7 +1257,13 @@ const App: React.FC = () => {
         knowledge
       );
       const finalAnswer = appendDisclaimer(finalState.content);
-      updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      updateChatMessage(modelId, finalContent);
+
+      await saveMessagesToDb(activeSessionId, [
+        { role: 'user', content: outgoingMessage },
+        { role: 'model', content: finalContent },
+      ]);
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
     } finally {
@@ -1418,14 +1601,45 @@ const App: React.FC = () => {
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
+  if (showAuth && !isLoggedIn) {
+    return (
+      <AuthForm
+        onSuccess={() => { setShowAuth(false); fetchSessions(); }}
+        onSkip={() => setShowAuth(false)}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen pb-6 bg-[#fcfcfc] text-stone-800 font-serif">
+    <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-stone-800 font-serif">
       {/* Header */}
       <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-amber-700 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           <div className="flex items-center gap-2">
             <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
+
+            {isLoggedIn ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-stone-400">{authSession?.user?.name}</span>
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
+                >
+                  登出
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAuth(true)}
+                className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
+              >
+                登录 / 注册
+              </button>
+            )}
+
             <div className="relative">
               <button
                 type="button"
@@ -1533,7 +1747,33 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className="max-w-4xl mx-auto px-2 mt-6">
+      <div className="flex flex-1 overflow-hidden">
+        {isLoggedIn && (
+          <SessionSidebar
+            sessions={savedSessions}
+            activeSessionId={activeSessionId}
+            onSelect={handleLoadSession}
+            onDelete={handleDeleteSession}
+            onNewSession={handleReset}
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(prev => !prev)}
+          />
+        )}
+
+      <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full">
+        {!isLoggedIn && step === 'input' && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
+            <span>登录后可保存排盘记录与聊天历史</span>
+            <button
+              type="button"
+              onClick={() => setShowAuth(true)}
+              className="underline font-medium hover:text-amber-900"
+            >
+              立即登录
+            </button>
+          </div>
+        )}
+
         {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">{error}</div>}
 
         {/* Input Phase */}
@@ -2009,6 +2249,7 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+      </div>{/* end flex wrapper */}
 
       {/* K线浮球 */}
       {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
