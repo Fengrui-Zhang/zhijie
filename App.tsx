@@ -1072,6 +1072,10 @@ const App: React.FC = () => {
     setChartData(null);
     clearChatSession();
     setChatHistory([]);
+    if (!isLoggedIn) {
+      setGuestFollowUpCount(0);
+      localStorage.setItem('guestFollowUpCount', '0');
+    }
 
     try {
       // Date logic
@@ -1690,7 +1694,7 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 max-w-sm w-full text-center space-y-5">
           <div className="text-4xl">🔮</div>
           <h2 className="text-xl font-bold text-stone-800">元分 · 智解</h2>
-          <p className="text-sm text-stone-500">登录后享受完整功能与30次免费提问额度<br/>访客仅可排盘3次、追问1次</p>
+          <p className="text-sm text-stone-500">登录后享受完整功能与30次免费提问额度<br/>访客仅可排盘3次，每次排盘后可追问1次</p>
           <div className="space-y-3">
             <button
               type="button"
