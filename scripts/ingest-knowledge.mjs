@@ -238,22 +238,21 @@ const embedTexts = async (inputs) => {
   const { apiKey, baseUrl, model, provider } = getEmbeddingConfig();
 
   if (provider === 'dashscope') {
-    const response = await fetch(
-      `${baseUrl}/api/v1/services/embeddings/text-embedding/text-embedding`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          input: {
-            texts: inputs,
-          },
-        }),
-      }
-    );
+    const embedUrl = baseUrl.includes('compatible-mode')
+      ? `${baseUrl}/embeddings`
+      : `${baseUrl.replace(/\/$/, '')}/compatible-mode/v1/embeddings`;
+    const response = await fetch(embedUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: inputs,
+        encoding_format: 'float',
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -261,7 +260,7 @@ const embedTexts = async (inputs) => {
     }
 
     const data = await response.json();
-    const embeddings = data.output?.embeddings?.map(item => item.embedding);
+    const embeddings = data.data?.map(item => item.embedding);
 
     if (!embeddings || embeddings.length !== inputs.length) {
       throw new Error('Embedding response is invalid.');

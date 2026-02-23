@@ -7,7 +7,7 @@ type EmbeddingResponse = {
 
 const getEmbeddingConfig = () => {
   const apiKey = process.env.EMBEDDING_API_KEY || process.env.DEEPSEEK_API_KEY;
-  const baseUrl = process.env.EMBEDDING_BASE_URL || 'https://api.deepseek.com';
+  const baseUrl = (process.env.EMBEDDING_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
   const model = process.env.EMBEDDING_MODEL;
   const provider = (process.env.EMBEDDING_PROVIDER || 'openai').toLowerCase();
 
@@ -25,22 +25,21 @@ export const embedTexts = async (inputs: string[]): Promise<number[][]> => {
   const { apiKey, baseUrl, model, provider } = getEmbeddingConfig();
 
   if (provider === 'dashscope') {
-    const response = await fetch(
-      `${baseUrl}/api/v1/services/embeddings/text-embedding/text-embedding`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          input: {
-            texts: inputs,
-          },
-        }),
-      }
-    );
+    const embedUrl = baseUrl.includes('compatible-mode')
+      ? `${baseUrl}/embeddings`
+      : `${baseUrl.replace(/\/$/, '')}/compatible-mode/v1/embeddings`;
+    const response = await fetch(embedUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: inputs,
+        encoding_format: 'float',
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -48,9 +47,9 @@ export const embedTexts = async (inputs: string[]): Promise<number[][]> => {
     }
 
     const data = (await response.json()) as EmbeddingResponse;
-    const embeddings = data.output?.embeddings
-      ?.map(item => item.embedding)
-      .filter(Boolean) as number[][] | undefined;
+    const embeddings = data.data?.map(item => item.embedding).filter(Boolean) as
+      | number[][]
+      | undefined;
 
     if (!embeddings || embeddings.length !== inputs.length) {
       throw new Error('Embedding response is invalid.');

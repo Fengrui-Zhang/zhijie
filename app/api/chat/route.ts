@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      const chunks = await retrieveKnowledge(board, query, knowledge.topK, true);
+      const chunks = await retrieveKnowledge(board, query, knowledge.topK, false);
       const context = formatKnowledgeContext(chunks);
       if (context) {
         if (messages[0]?.role === 'system') {
@@ -82,9 +82,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Knowledge retrieval failed.';
-      return NextResponse.json({ error: message }, { status: 400 });
+      console.warn('[chat] Knowledge retrieval failed, proceeding without context:', error instanceof Error ? error.message : error);
     }
   }
 
