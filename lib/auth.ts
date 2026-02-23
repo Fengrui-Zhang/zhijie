@@ -1,9 +1,10 @@
-import NextAuth from 'next-auth';
+import NextAuth, { type NextAuthOptions } from 'next-auth';
+import { getServerSession } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
   providers: [
     Credentials({
       name: 'credentials',
@@ -27,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  session: { strategy: 'jwt' },
+  session: { strategy: 'jwt' as const },
   pages: {
     signIn: '/',
   },
@@ -45,4 +46,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-});
+};
+
+export const auth = () => getServerSession(authOptions);
