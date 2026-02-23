@@ -19,6 +19,7 @@ import AuthForm from './components/AuthForm';
 import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
 import AdminPanel from './components/AdminPanel';
 import AccountSettingsModal from './components/AccountSettingsModal';
+import UserMenuPopup from './components/UserMenuPopup';
 
 // Types
 import {
@@ -54,8 +55,6 @@ const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
-const USER_DEEPSEEK_KEY = 'user-api:deepseek';
-const USER_YUANFENJU_KEY = 'user-api:yuanfenju';
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -342,9 +341,7 @@ const App: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
-  const [showApiConfig, setShowApiConfig] = useState(false);
-  const [deepseekKey, setDeepseekKey] = useState('');
-  const [yuanfenjuKey, setYuanfenjuKey] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -413,14 +410,6 @@ const App: React.FC = () => {
       y: Math.max(120, Math.round(height * 0.55)),
     });
   }, [modelType, step, klinePos]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedDeepseek = localStorage.getItem(USER_DEEPSEEK_KEY) || '';
-    const savedYuanfenju = localStorage.getItem(USER_YUANFENJU_KEY) || '';
-    setDeepseekKey(savedDeepseek);
-    setYuanfenjuKey(savedYuanfenju);
-  }, []);
 
   useEffect(() => {
     if (!klineModalOpen) return;
@@ -1730,37 +1719,21 @@ const App: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           <div className="flex items-center gap-2">
             <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
-
+            <button
+              type="button"
+              onClick={() => setShowUpdates(true)}
+              className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
+            >
+              新增功能
+            </button>
             {isLoggedIn ? (
-              <div className="flex items-center gap-2">
-                {userQuota !== null && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300">额度 {userQuota}</span>
-                )}
-                <span className="text-[10px] text-stone-400">{authSession?.user?.name}</span>
-                {userRole === 'admin' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminPanel(true)}
-                    className="text-[10px] px-2 py-1 rounded border border-red-500/60 text-red-300 hover:text-red-200 hover:border-red-400 transition"
-                  >
-                    管理系统
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowAccountSettings(true)}
-                  className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
-                >
-                  账号
-                </button>
-                <button
-                  type="button"
-                  onClick={() => signOut()}
-                  className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
-                >
-                  登出
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowUserMenu(true)}
+                className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
+              >
+                {authSession?.user?.name || '用户'}
+              </button>
             ) : (
               <button
                 type="button"
@@ -1770,76 +1743,6 @@ const App: React.FC = () => {
                 登录 / 注册
               </button>
             )}
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowUpdates(true)}
-                className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
-              >
-                新增功能
-              </button>
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowApiConfig((prev) => !prev)}
-                className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-200 hover:text-white hover:border-stone-400 transition"
-              >
-                使用自己的API
-              </button>
-              {showApiConfig && (
-                <div className="absolute right-0 mt-2 w-64 rounded-xl border border-stone-200 bg-white text-stone-700 shadow-xl p-3 space-y-2 z-30">
-                  <div className="text-[11px] font-semibold text-stone-600">可选填写，留空默认使用环境变量</div>
-                  <label className="block text-[11px] font-medium text-stone-500">
-                    DEEPSEEK_API_KEY
-                    <input
-                      type="password"
-                      value={deepseekKey}
-                      onChange={(e) => setDeepseekKey(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-stone-200 px-2 py-1 text-xs text-stone-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
-                      placeholder="可选"
-                    />
-                  </label>
-                  <label className="block text-[11px] font-medium text-stone-500">
-                    YUANFENJU_API_KEY
-                    <input
-                      type="password"
-                      value={yuanfenjuKey}
-                      onChange={(e) => setYuanfenjuKey(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-stone-200 px-2 py-1 text-xs text-stone-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-200 outline-none"
-                      placeholder="可选"
-                    />
-                  </label>
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localStorage.removeItem(USER_DEEPSEEK_KEY);
-                        localStorage.removeItem(USER_YUANFENJU_KEY);
-                        setDeepseekKey('');
-                        setYuanfenjuKey('');
-                        setShowApiConfig(false);
-                      }}
-                      className="text-[11px] px-2 py-1 rounded border border-stone-200 text-stone-500 hover:text-stone-700"
-                    >
-                      清空
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localStorage.setItem(USER_DEEPSEEK_KEY, deepseekKey.trim());
-                        localStorage.setItem(USER_YUANFENJU_KEY, yuanfenjuKey.trim());
-                        setShowApiConfig(false);
-                      }}
-                      className="text-[11px] px-2 py-1 rounded border border-amber-500/70 text-amber-700 bg-amber-50 hover:bg-amber-100"
-                    >
-                      保存
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -1876,6 +1779,19 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showUserMenu && isLoggedIn && (
+        <UserMenuPopup
+          email={authSession?.user?.email}
+          name={authSession?.user?.name}
+          quota={userQuota}
+          isAdmin={userRole === 'admin'}
+          onClose={() => setShowUserMenu(false)}
+          onLogout={() => signOut()}
+          onOpenAdmin={() => setShowAdminPanel(true)}
+          onOpenDeleteAccount={() => setShowAccountSettings(true)}
+        />
       )}
 
       {showAccountSettings && isLoggedIn && (

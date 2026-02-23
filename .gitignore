@@ -32,4 +32,5 @@ app/generated
 # Environment variables
 .env
 .env.local
+.env.vercel
 .vercel

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { auth } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 
@@ -24,6 +25,13 @@ export async function PATCH(
 
   if (typeof body.quota === 'number') data.quota = body.quota;
   if (typeof body.role === 'string' && ['user', 'admin'].includes(body.role)) data.role = body.role;
+  if (typeof body.password === 'string' && body.password.trim()) {
+    const pwd = body.password.trim();
+    if (pwd.length < 6) {
+      return NextResponse.json({ error: '密码至少需要6位' }, { status: 400 });
+    }
+    data.password = await bcrypt.hash(pwd, 12);
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: '无有效字段' }, { status: 400 });

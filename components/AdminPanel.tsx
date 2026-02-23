@@ -12,6 +12,22 @@ interface UserRow {
   _count: { sessions: number };
 }
 
+interface SessionItem {
+  id: string;
+  modelType: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  _count: { messages: number };
+}
+
+interface MessageItem {
+  id: string;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
 interface Props {
   onBack: () => void;
 }
@@ -23,6 +39,16 @@ export default function AdminPanel({ onBack }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQuota, setEditQuota] = useState('');
   const [error, setError] = useState('');
+
+  const [detailUser, setDetailUser] = useState<UserRow | null>(null);
+  const [detailSessions, setDetailSessions] = useState<SessionItem[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -42,6 +68,52 @@ export default function AdminPanel({ onBack }: Props) {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
+  const fetchDetailSessions = useCallback(async (userId: string) => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/sessions`);
+      if (res.ok) {
+        setDetailSessions(await res.json());
+        setSelectedSessionId(null);
+        setMessages([]);
+      }
+    } catch {
+      setDetailSessions([]);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (sessionId: string) => {
+    setMessagesLoading(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/messages`);
+      if (res.ok) {
+        setMessages(await res.json());
+      } else {
+        setMessages([]);
+      }
+    } catch {
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (detailUser) {
+      fetchDetailSessions(detailUser.id);
+    }
+  }, [detailUser, fetchDetailSessions]);
+
+  useEffect(() => {
+    if (selectedSessionId) {
+      fetchMessages(selectedSessionId);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedSessionId, fetchMessages]);
+
   const handleUpdateQuota = async (id: string) => {
     const quota = parseInt(editQuota, 10);
     if (isNaN(quota) || quota < 0) return;
@@ -53,7 +125,42 @@ export default function AdminPanel({ onBack }: Props) {
       });
       if (res.ok) {
         setUsers(prev => prev.map(u => u.id === id ? { ...u, quota } : u));
+        if (detailUser?.id === id) setDetailUser(prev => prev ? { ...prev, quota } : null);
         setEditingId(null);
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleChangePassword = async (id: string) => {
+    const pwd = newPassword.trim();
+    if (pwd.length < 6) {
+      setPasswordError('密码至少需要6位');
+      return;
+    }
+    setPasswordError('');
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd }),
+      });
+      if (res.ok) {
+        setShowPasswordModal(false);
+        setNewPassword('');
+      } else {
+        const data = await res.json();
+        setPasswordError(data.error || '修改失败');
+      }
+    } catch {
+      setPasswordError('网络错误');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const res = await fetch(`/api/admin/messages/${messageId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
       }
     } catch { /* ignore */ }
   };
@@ -64,6 +171,7 @@ export default function AdminPanel({ onBack }: Props) {
       const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setUsers(prev => prev.filter(u => u.id !== id));
+        if (detailUser?.id === id) setDetailUser(null);
       }
     } catch { /* ignore */ }
   };
@@ -170,7 +278,14 @@ export default function AdminPanel({ onBack }: Props) {
                     <td className="px-3 py-2 text-stone-500 text-xs">
                       {new Date(user.createdAt).toLocaleDateString('zh-CN')}
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-3 py-2 text-center flex gap-2 justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setDetailUser(user)}
+                        className="text-xs text-amber-600 hover:text-amber-800"
+                      >
+                        详情
+                      </button>
                       {user.role !== 'admin' && (
                         <button
                           type="button"
@@ -188,6 +303,122 @@ export default function AdminPanel({ onBack }: Props) {
           </div>
         )}
       </main>
+
+      {detailUser && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => { setDetailUser(null); setShowPasswordModal(false); }}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl border border-stone-200 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-stone-800">用户详情</h3>
+              <button type="button" onClick={() => setDetailUser(null)} className="text-sm text-stone-400 hover:text-stone-600">关闭</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm mb-6">
+              <div><span className="text-stone-400">邮箱</span><span className="ml-2">{detailUser.email}</span></div>
+              <div><span className="text-stone-400">昵称</span><span className="ml-2">{detailUser.name}</span></div>
+              <div><span className="text-stone-400">角色</span>
+                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${detailUser.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-stone-100 text-stone-600'}`}>
+                  {detailUser.role === 'admin' ? '管理员' : '用户'}
+                </span>
+              </div>
+              <div><span className="text-stone-400">额度</span>
+                {editingId === detailUser.id ? (
+                  <span className="ml-2 flex items-center gap-1">
+                    <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className="w-16 border rounded px-1 text-xs" min={0} />
+                    <button type="button" onClick={() => handleUpdateQuota(detailUser.id)} className="text-xs text-green-600">✓</button>
+                    <button type="button" onClick={() => setEditingId(null)} className="text-xs text-stone-400">✕</button>
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => { setEditingId(detailUser.id); setEditQuota(String(detailUser.quota)); }} className="ml-2 text-amber-600 hover:text-amber-800">{detailUser.quota}</button>
+                )}
+              </div>
+              <div><span className="text-stone-400">密码</span>
+                <span className="ml-2 font-mono text-stone-400">********</span>
+                <button type="button" onClick={() => setShowPasswordModal(true)} className="ml-2 text-xs text-amber-600 hover:text-amber-800">修改密码</button>
+              </div>
+              <div><span className="text-stone-400">注册时间</span><span className="ml-2">{new Date(detailUser.createdAt).toLocaleString('zh-CN')}</span></div>
+            </div>
+
+            {showPasswordModal && (
+              <div className="mb-4 p-4 border border-amber-200 rounded-lg bg-amber-50">
+                <p className="text-xs text-stone-600 mb-2">输入新密码（至少6位）</p>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
+                  placeholder="新密码"
+                  className="w-full border border-stone-300 rounded px-3 py-1.5 text-sm mb-2"
+                />
+                {passwordError && <p className="text-xs text-red-600 mb-2">{passwordError}</p>}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setPasswordError(''); }} className="text-xs px-2 py-1 rounded border border-stone-300 text-stone-600">取消</button>
+                  <button type="button" onClick={() => handleChangePassword(detailUser.id)} className="text-xs px-2 py-1 rounded bg-amber-600 text-white">确认</button>
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-stone-100 pt-4">
+              <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">会话列表</h4>
+              {sessionsLoading ? (
+                <p className="text-xs text-stone-400">加载中...</p>
+              ) : detailSessions.length === 0 ? (
+                <p className="text-xs text-stone-400">暂无会话</p>
+              ) : (
+                <div className="space-y-1 mb-4">
+                  {detailSessions.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelectedSessionId(prev => prev === s.id ? null : s.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${selectedSessionId === s.id ? 'border-amber-500 bg-amber-50' : 'border-stone-200 hover:bg-stone-50'}`}
+                    >
+                      <span className="font-medium">{s.title}</span>
+                      <span className="text-stone-400 ml-2">({s.modelType})</span>
+                      <span className="text-stone-400 ml-2">{s._count.messages} 条消息</span>
+                      <span className="text-stone-400 ml-2">{new Date(s.createdAt).toLocaleString('zh-CN')}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedSessionId && (
+                <div className="border border-stone-200 rounded-lg p-3">
+                  <h5 className="text-xs font-bold text-stone-500 mb-2">对话消息</h5>
+                  {messagesLoading ? (
+                    <p className="text-xs text-stone-400">加载中...</p>
+                  ) : messages.length === 0 ? (
+                    <p className="text-xs text-stone-400">暂无消息</p>
+                  ) : (
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {messages.map(m => (
+                        <div key={m.id} className="flex gap-2 items-start border-b border-stone-100 pb-2 last:border-0">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-medium text-stone-500">{m.role === 'user' ? '用户' : m.role === 'assistant' ? 'AI' : '系统'}</span>
+                            <p className="text-xs text-stone-700 mt-0.5 break-words line-clamp-3">{m.content}</p>
+                            <span className="text-[10px] text-stone-400">{new Date(m.createdAt).toLocaleString('zh-CN')}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(m.id)}
+                            className="text-xs text-red-500 hover:text-red-700 flex-shrink-0"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

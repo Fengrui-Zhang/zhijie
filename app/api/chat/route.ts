@@ -27,8 +27,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const overrideKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-  const apiKey = overrideKey || process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: 'DeepSeek API key is missing.' },

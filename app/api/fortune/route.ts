@@ -4,8 +4,7 @@ const BASE_API = 'https://api.yuanfenju.com/index.php/v1';
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const overrideKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-  const apiKey = overrideKey || process.env.YUANFENJU_API_KEY;
+  const apiKey = process.env.YUANFENJU_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: 'Yuanfenju API key is missing.' },
