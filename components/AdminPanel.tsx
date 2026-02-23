@@ -54,6 +54,10 @@ export default function AdminPanel({ onBack }: Props) {
   const [addPassword, setAddPassword] = useState('');
   const [addError, setAddError] = useState('');
   const [addLoading, setAddLoading] = useState(false);
+  const [showAddPassword, setShowAddPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [plainPasswordCache, setPlainPasswordCache] = useState<Record<string, string>>({});
+  const [revealPasswordId, setRevealPasswordId] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -150,6 +154,7 @@ export default function AdminPanel({ onBack }: Props) {
         body: JSON.stringify({ password: pwd }),
       });
       if (res.ok) {
+        setPlainPasswordCache(prev => ({ ...prev, [id]: pwd }));
         setShowPasswordModal(false);
         setNewPassword('');
       } else {
@@ -192,7 +197,11 @@ export default function AdminPanel({ onBack }: Props) {
       });
       const data = await res.json();
       if (res.ok) {
-        setUsers(prev => [{ ...data, _count: { sessions: 0 } }, ...prev]);
+        const { plainPassword, ...userData } = data;
+        if (plainPassword) {
+          setPlainPasswordCache(prev => ({ ...prev, [data.id]: plainPassword }));
+        }
+        setUsers(prev => [{ ...userData, _count: { sessions: 0 } }, ...prev]);
         setAddName('');
         setAddEmail('');
         setAddPassword('');
@@ -203,6 +212,16 @@ export default function AdminPanel({ onBack }: Props) {
       setAddError('网络错误');
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleCopyAccount = async (user: UserRow) => {
+    const pwd = plainPasswordCache[user.id] || '';
+    const text = `用户名：${user.name}\n邮箱：${user.email}\n密码：${pwd}\n额度：${user.quota}`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setError('复制失败');
     }
   };
 
@@ -260,13 +279,23 @@ export default function AdminPanel({ onBack }: Props) {
               placeholder="邮箱"
               className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-40 focus:ring-2 focus:ring-amber-400 outline-none"
             />
-            <input
-              type="password"
-              value={addPassword}
-              onChange={(e) => { setAddPassword(e.target.value); setAddError(''); }}
-              placeholder="密码（至少6位）"
-              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-36 focus:ring-2 focus:ring-amber-400 outline-none"
-            />
+            <div className="relative inline-block">
+              <input
+                type={showAddPassword ? 'text' : 'password'}
+                value={addPassword}
+                onChange={(e) => { setAddPassword(e.target.value); setAddError(''); }}
+                placeholder="密码（至少6位）"
+                className="border border-stone-300 rounded-lg px-3 py-2 pr-8 text-sm w-36 focus:ring-2 focus:ring-amber-400 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAddPassword(!showAddPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 text-xs"
+                title={showAddPassword ? '隐藏密码' : '显示密码'}
+              >
+                {showAddPassword ? '隐藏' : '显示'}
+              </button>
+            </div>
             <button
               type="button"
               onClick={handleAddUser}
@@ -355,7 +384,7 @@ export default function AdminPanel({ onBack }: Props) {
                     <td className="px-3 py-2 text-stone-500 text-xs">
                       {new Date(user.createdAt).toLocaleDateString('zh-CN')}
                     </td>
-                    <td className="px-3 py-2 text-center flex gap-2 justify-center">
+                    <td className="px-3 py-2 text-center flex gap-2 justify-center items-center">
                       <button
                         type="button"
                         onClick={() => setDetailUser(user)}
@@ -364,13 +393,23 @@ export default function AdminPanel({ onBack }: Props) {
                         详情
                       </button>
                       {user.role !== 'admin' && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(user.id, user.email)}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          删除
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyAccount(user)}
+                            className="text-xs text-stone-500 hover:text-stone-700"
+                            title="复制账号信息"
+                          >
+                            复制
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user.id, user.email)}
+                            className="text-xs text-red-500 hover:text-red-700"
+                          >
+                            删除
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -384,7 +423,7 @@ export default function AdminPanel({ onBack }: Props) {
       {detailUser && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => { setDetailUser(null); setShowPasswordModal(false); }}
+          onClick={() => { setDetailUser(null); setShowPasswordModal(false); setRevealPasswordId(null); }}
         >
           <div
             className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl border border-stone-200 p-6"
@@ -392,7 +431,18 @@ export default function AdminPanel({ onBack }: Props) {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-stone-800">用户详情</h3>
-              <button type="button" onClick={() => setDetailUser(null)} className="text-sm text-stone-400 hover:text-stone-600">关闭</button>
+              <div className="flex gap-2">
+                {detailUser.role !== 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyAccount(detailUser)}
+                    className="text-xs px-2 py-1 rounded border border-stone-300 text-stone-600 hover:bg-stone-50"
+                  >
+                    复制账号信息
+                  </button>
+                )}
+                <button type="button" onClick={() => { setDetailUser(null); setRevealPasswordId(null); }} className="text-sm text-stone-400 hover:text-stone-600">关闭</button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm mb-6">
@@ -415,7 +465,23 @@ export default function AdminPanel({ onBack }: Props) {
                 )}
               </div>
               <div><span className="text-stone-400">密码</span>
-                <span className="ml-2 font-mono text-stone-400">********</span>
+                <span className="ml-2 font-mono text-stone-400">
+                  {detailUser && revealPasswordId === detailUser.id && plainPasswordCache[detailUser.id]
+                    ? plainPasswordCache[detailUser.id]
+                    : '********'}
+                </span>
+                {detailUser && plainPasswordCache[detailUser.id] ? (
+                  <button
+                    type="button"
+                    onClick={() => setRevealPasswordId(prev => prev === detailUser.id ? null : detailUser.id)}
+                    className="ml-2 text-xs text-amber-600 hover:text-amber-800"
+                    title={revealPasswordId === detailUser.id ? '隐藏密码' : '点击查看密码'}
+                  >
+                    {revealPasswordId === detailUser.id ? '隐藏' : '显示'}
+                  </button>
+                ) : (
+                  <span className="ml-1 text-xs text-stone-400">（修改密码后可查看）</span>
+                )}
                 <button type="button" onClick={() => setShowPasswordModal(true)} className="ml-2 text-xs text-amber-600 hover:text-amber-800">修改密码</button>
               </div>
               <div><span className="text-stone-400">注册时间</span><span className="ml-2">{new Date(detailUser.createdAt).toLocaleString('zh-CN')}</span></div>
@@ -424,13 +490,23 @@ export default function AdminPanel({ onBack }: Props) {
             {showPasswordModal && (
               <div className="mb-4 p-4 border border-amber-200 rounded-lg bg-amber-50">
                 <p className="text-xs text-stone-600 mb-2">输入新密码（至少6位）</p>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
-                  placeholder="新密码"
-                  className="w-full border border-stone-300 rounded px-3 py-1.5 text-sm mb-2"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
+                    placeholder="新密码"
+                    className="w-full border border-stone-300 rounded px-3 py-1.5 pr-16 text-sm mb-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-700 text-xs"
+                    title={showNewPassword ? '隐藏密码' : '显示密码'}
+                  >
+                    {showNewPassword ? '隐藏' : '显示'}
+                  </button>
+                </div>
                 {passwordError && <p className="text-xs text-red-600 mb-2">{passwordError}</p>}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setPasswordError(''); }} className="text-xs px-2 py-1 rounded border border-stone-300 text-stone-600">取消</button>

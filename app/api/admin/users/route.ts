@@ -61,5 +61,5 @@ export async function POST(request: Request) {
     select: { id: true, email: true, name: true, role: true, quota: true, createdAt: true },
   });
 
-  return NextResponse.json(user, { status: 201 });
+  return NextResponse.json({ ...user, plainPassword: password }, { status: 201 });
 }
