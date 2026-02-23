@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
+import { getRetentionCutoff } from '../../../lib/session-retention';
 
 export async function GET() {
   const session = await auth();
@@ -8,8 +9,12 @@ export async function GET() {
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
+  const cutoff = getRetentionCutoff();
   const sessions = await prisma.divinationSession.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      createdAt: { gte: cutoff },
+    },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
