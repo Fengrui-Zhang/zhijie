@@ -17,8 +17,8 @@ import { startQimenChat, sendMessageToDeepseekStream, clearChatSession, restoreC
 // Auth & Session Components
 import AuthForm from './components/AuthForm';
 import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
-import AdminPanel from './components/AdminPanel';
-import AccountSettingsModal from './components/AccountSettingsModal';
+import AdminPanel from '@/components/AdminPanel';
+import AccountSettingsModal from '@/components/AccountSettingsModal';
 import UserMenuPopup from './components/UserMenuPopup';
 import ChangePasswordModal from './components/ChangePasswordModal';
 
