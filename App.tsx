@@ -17,6 +17,8 @@ import { startQimenChat, sendMessageToDeepseekStream, clearChatSession, restoreC
 // Auth & Session Components
 import AuthForm from './components/AuthForm';
 import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
+import AdminPanel from './components/AdminPanel';
+import AccountSettingsModal from './components/AccountSettingsModal';
 
 // Types
 import {
@@ -282,9 +284,15 @@ const buildSystemInstruction = (mType: ModelType, cData: unknown): string => {
 };
 
 const App: React.FC = () => {
-  const { data: authSession, status: authStatus } = useSession();
+  const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
   const [showAuth, setShowAuth] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [userQuota, setUserQuota] = useState<number | null>(null);
+  const [guestFortuneCount, setGuestFortuneCount] = useState(0);
+  const [guestFollowUpCount, setGuestFollowUpCount] = useState(0);
 
   // --- Persistence State ---
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -439,6 +447,35 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      const dismissed = sessionStorage.getItem('welcomeDismissed');
+      if (!dismissed) setShowWelcome(true);
+    } else {
+      setShowWelcome(false);
+    }
+  }, [authStatus]);
+
+  useEffect(() => {
+    setGuestFortuneCount(parseInt(localStorage.getItem('guestFortuneCount') || '0', 10));
+    setGuestFollowUpCount(parseInt(localStorage.getItem('guestFollowUpCount') || '0', 10));
+  }, []);
+
+  const fetchUserProfile = useCallback(async () => {
+    if (!isLoggedIn) return;
+    try {
+      const res = await fetch('/api/user/profile');
+      if (res.ok) {
+        const data = await res.json();
+        setUserQuota(data.quota);
+      }
+    } catch { /* ignore */ }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [fetchUserProfile]);
 
   const saveSessionToDb = async (
     mType: string,
@@ -995,6 +1032,18 @@ const App: React.FC = () => {
   };
 
   const handleCalculate = async () => {
+    if (!isLoggedIn) {
+      if (guestFortuneCount >= 3) {
+        setError('');
+        setShowAuth(true);
+        return;
+      }
+    }
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
     // Validation
     const isDivination = [ModelType.QIMEN, ModelType.MEIHUA, ModelType.LIUYAO].includes(modelType);
     
@@ -1157,6 +1206,16 @@ const App: React.FC = () => {
       setChartData(resultData);
       setStep('chart');
 
+      // --- Save session to DB immediately (before AI streaming) ---
+      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
+      const newSessionId = await saveSessionToDb(
+        modelType,
+        sessionTitle,
+        { ...baseParams, question, timeMode } as Record<string, unknown>,
+        resultData
+      );
+      if (newSessionId) setActiveSessionId(newSessionId);
+
       // --- AI Chat Init ---
       await startQimenChat(systemInstruction);
 
@@ -1204,21 +1263,21 @@ const App: React.FC = () => {
         setKlineUnlocked(true);
       }
 
-      // --- Save session to DB ---
-      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
-      const newSessionId = await saveSessionToDb(
-        modelType,
-        sessionTitle,
-        { ...baseParams, question, timeMode } as Record<string, unknown>,
-        resultData
-      );
+      // --- Save messages to DB ---
       if (newSessionId) {
-        setActiveSessionId(newSessionId);
         const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
         await saveMessagesToDb(newSessionId, [
           { role: 'user', content: userContent },
           { role: 'model', content: finalContent },
         ]);
+      }
+
+      if (!isLoggedIn) {
+        const newCount = guestFortuneCount + 1;
+        localStorage.setItem('guestFortuneCount', String(newCount));
+        setGuestFortuneCount(newCount);
+      } else {
+        fetchUserProfile();
       }
 
     } catch (err: any) {
@@ -1232,6 +1291,16 @@ const App: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
+    if (!isLoggedIn) {
+      if (guestFollowUpCount >= 1) {
+        setShowAuth(true);
+        return;
+      }
+    }
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
     const outgoingMessage = inputMessage;
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: outgoingMessage, timestamp: new Date() };
     setChatHistory(prev => [...prev, userMsg]);
@@ -1264,6 +1333,14 @@ const App: React.FC = () => {
         { role: 'user', content: outgoingMessage },
         { role: 'model', content: finalContent },
       ]);
+
+      if (!isLoggedIn) {
+        const newCount = guestFollowUpCount + 1;
+        localStorage.setItem('guestFollowUpCount', String(newCount));
+        setGuestFollowUpCount(newCount);
+      } else {
+        fetchUserProfile();
+      }
     } catch (err) {
       setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
     } finally {
@@ -1601,12 +1678,47 @@ const App: React.FC = () => {
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
+  const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
+
+  if (showAdminPanel && isLoggedIn && userRole === 'admin') {
+    return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
+  }
+
   if (showAuth && !isLoggedIn) {
     return (
       <AuthForm
-        onSuccess={() => { setShowAuth(false); fetchSessions(); }}
+        onSuccess={() => { setShowAuth(false); fetchSessions(); fetchUserProfile(); }}
         onSkip={() => setShowAuth(false)}
       />
+    );
+  }
+
+  if (showWelcome && !isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 p-4">
+        <div className="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 max-w-sm w-full text-center space-y-5">
+          <div className="text-4xl">🔮</div>
+          <h2 className="text-xl font-bold text-stone-800">元分 · 智解</h2>
+          <p className="text-sm text-stone-500">登录后享受完整功能与30次免费提问额度<br/>访客仅可排盘3次、追问1次</p>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => { setShowWelcome(false); sessionStorage.setItem('welcomeDismissed', '1'); setShowAuth(true); }}
+              className="w-full py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 transition text-sm"
+            >
+              登录 / 注册
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowWelcome(false); sessionStorage.setItem('welcomeDismissed', '1'); }}
+              className="w-full py-2.5 rounded-lg border border-stone-300 text-stone-600 font-medium hover:bg-stone-50 transition text-sm"
+            >
+              访客模式
+            </button>
+          </div>
+          <p className="text-[10px] text-stone-400">访客数据不会保存，关闭浏览器后消失</p>
+        </div>
+      </div>
     );
   }
 
@@ -1621,7 +1733,26 @@ const App: React.FC = () => {
 
             {isLoggedIn ? (
               <div className="flex items-center gap-2">
+                {userQuota !== null && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300">额度 {userQuota}</span>
+                )}
                 <span className="text-[10px] text-stone-400">{authSession?.user?.name}</span>
+                {userRole === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(true)}
+                    className="text-[10px] px-2 py-1 rounded border border-red-500/60 text-red-300 hover:text-red-200 hover:border-red-400 transition"
+                  >
+                    管理系统
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowAccountSettings(true)}
+                  className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
+                >
+                  账号
+                </button>
                 <button
                   type="button"
                   onClick={() => signOut()}
@@ -1747,6 +1878,13 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {showAccountSettings && isLoggedIn && (
+        <AccountSettingsModal
+          onClose={() => setShowAccountSettings(false)}
+          onDeleted={() => { setShowAccountSettings(false); signOut(); }}
+        />
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {isLoggedIn && (
           <SessionSidebar
@@ -1763,14 +1901,19 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full">
         {!isLoggedIn && step === 'input' && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
-            <span>登录后可保存排盘记录与聊天历史</span>
+            <span>访客模式：排盘 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
-              className="underline font-medium hover:text-amber-900"
+              className="underline font-medium hover:text-amber-900 ml-auto"
             >
-              立即登录
+              登录获取更多额度
             </button>
+          </div>
+        )}
+        {isLoggedIn && userQuota !== null && userQuota <= 0 && step === 'input' && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 mb-4">
+            您的提问额度已用完，无法继续提问。
           </div>
         )}
 
@@ -2240,10 +2383,10 @@ const App: React.FC = () => {
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : "追问..."} disabled={isTyping || isKlineRunning}
+                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
                    className="flex-1 border border-stone-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none"
                  />
-                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim()} className="bg-stone-900 text-amber-500 p-2 rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-stone-900"><SendIcon /></button>
+                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="bg-stone-900 text-amber-500 p-2 rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-stone-900"><SendIcon /></button>
               </div>
             </div>
           </div>

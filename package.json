@@ -9,7 +9,11 @@
     "build": "(prisma migrate deploy || true) && next build",
     "start": "next start",
     "lint": "next lint",
-    "ingest:knowledge": "node scripts/ingest-knowledge.mjs"
+    "ingest:knowledge": "node scripts/ingest-knowledge.mjs",
+    "seed": "npx tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",

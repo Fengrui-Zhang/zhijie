@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { auth } from '../../../lib/auth';
+import { prisma } from '../../../lib/prisma';
 import { formatKnowledgeContext, retrieveKnowledge } from '../../../utils/knowledge';
 
 type ChatMessage = {
@@ -14,6 +16,16 @@ type KnowledgeRequest = {
 };
 
 export async function POST(request: Request) {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { quota: true } });
+    if (user && user.quota <= 0) {
+      return NextResponse.json({ error: '您的提问额度已用完' }, { status: 403 });
+    }
+  }
+
   const body = await request.json();
   const overrideKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
   const apiKey = overrideKey || process.env.DEEPSEEK_API_KEY;
@@ -94,6 +106,10 @@ export async function POST(request: Request) {
   if (!response.ok) {
     const errorText = await response.text();
     return NextResponse.json({ error: errorText }, { status: response.status });
+  }
+
+  if (userId) {
+    await prisma.user.update({ where: { id: userId }, data: { quota: { decrement: 1 } } });
   }
 
   if (stream) {
