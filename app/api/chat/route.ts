@@ -49,6 +49,7 @@ export async function POST(request: Request) {
   }
 
   let finalMessages = messages;
+  let knowledgeFailed = '';
   if (knowledge?.enabled) {
     const board = knowledge.board || 'bazi';
     const query =
@@ -82,7 +83,8 @@ export async function POST(request: Request) {
         }
       }
     } catch (error) {
-      console.warn('[chat] Knowledge retrieval failed, proceeding without context:', error instanceof Error ? error.message : error);
+      knowledgeFailed = error instanceof Error ? error.message : '知识库检索失败';
+      console.warn('[chat] Knowledge retrieval failed, proceeding without context:', knowledgeFailed);
     }
   }
 
@@ -110,17 +112,23 @@ export async function POST(request: Request) {
   }
 
   if (stream) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    };
+    if (knowledgeFailed) {
+      headers['X-Knowledge-Failed'] = encodeURIComponent(knowledgeFailed);
+    }
     return new Response(response.body, {
       status: response.status,
-      headers: {
-        'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache',
-      },
+      headers,
     });
   }
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content ?? '';
 
-  return NextResponse.json({ content });
+  const json: { content: string; knowledgeFailed?: string } = { content };
+  if (knowledgeFailed) json.knowledgeFailed = knowledgeFailed;
+  return NextResponse.json(json);
 }

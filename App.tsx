@@ -347,6 +347,7 @@ const App: React.FC = () => {
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
   const [klineUnlocked, setKlineUnlocked] = useState(false);
   const [klineModalOpen, setKlineModalOpen] = useState(false);
@@ -1020,6 +1021,7 @@ const App: React.FC = () => {
     klineYearProgressRef.current = 0;
     setKlinePos(null);
     setActiveSessionId(null);
+    setKnowledgeHint(null);
   };
 
   const handleCalculate = async () => {
@@ -1069,6 +1071,7 @@ const App: React.FC = () => {
 
     setLoading(true);
     setError('');
+    setKnowledgeHint(null);
     setChartData(null);
     clearChatSession();
     setChatHistory([]);
@@ -1251,6 +1254,9 @@ const App: React.FC = () => {
         },
         knowledge
       );
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
       const finalAnswer = appendDisclaimer(finalState.content);
       updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
       if (modelType === ModelType.BAZI) {
@@ -1320,6 +1326,9 @@ const App: React.FC = () => {
         },
         knowledge
       );
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       updateChatMessage(modelId, finalContent);
@@ -2280,6 +2289,12 @@ const App: React.FC = () => {
                  </button>
                </div>
                <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#f9fafb]">
+                 {knowledgeHint && (
+                   <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+                     <span>⚠️ 知识库检索失败，本次回答未使用参考资料。{knowledgeHint !== '知识库检索失败' && `（${knowledgeHint}）`}</span>
+                     <button type="button" onClick={() => setKnowledgeHint(null)} className="ml-auto text-amber-600 hover:text-amber-900 shrink-0">关闭</button>
+                   </div>
+                 )}
                  {chatHistory.map((msg) => {
                    const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
                    const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;

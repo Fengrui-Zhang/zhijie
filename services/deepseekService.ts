@@ -64,6 +64,7 @@ export const sendMessageToDeepseek = async (
 type StreamState = {
   reasoning: string;
   content: string;
+  knowledgeFailed?: string;
 };
 
 type ChatModel = 'deepseek-reasoner' | 'deepseek-chat';
@@ -98,11 +99,15 @@ export const sendMessageToDeepseekStream = async (
     throw new Error(errorText || 'Failed to reach DeepSeek API.');
   }
 
+  const knowledgeFailed = response.headers.get('X-Knowledge-Failed')
+    ? decodeURIComponent(response.headers.get('X-Knowledge-Failed')!)
+    : undefined;
+
   if (!response.body) {
     const data = await response.json();
     const content = data.content || '无法获取回复';
     chatMessages.push({ role: 'assistant', content });
-    return { reasoning: '', content };
+    return { reasoning: '', content, knowledgeFailed: data.knowledgeFailed ?? knowledgeFailed };
   }
 
   const reader = response.body.getReader();
@@ -151,7 +156,7 @@ export const sendMessageToDeepseekStream = async (
   }
 
   chatMessages.push({ role: 'assistant', content: contentText });
-  return { reasoning: reasoningText, content: contentText };
+  return { reasoning: reasoningText, content: contentText, knowledgeFailed };
 };
 
 export const clearChatSession = () => {
