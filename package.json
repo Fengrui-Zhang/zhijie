@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,16 +12,21 @@
     "ingest:knowledge": "node scripts/ingest-knowledge.mjs"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "bcryptjs": "^3.0.3",
     "next": "^15.3.0",
+    "next-auth": "^4.24.13",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-markdown": "9.0.1",
     "remark-gfm": "4.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "prisma": "^6.19.2",
     "typescript": "~5.8.2"
   }
 }
