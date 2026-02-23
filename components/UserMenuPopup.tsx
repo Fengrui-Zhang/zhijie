@@ -10,6 +10,7 @@ interface Props {
   onClose: () => void;
   onLogout: () => void;
   onOpenAdmin: () => void;
+  onOpenChangePassword: () => void;
   onOpenDeleteAccount: () => void;
 }
 
@@ -21,6 +22,7 @@ export default function UserMenuPopup({
   onClose,
   onLogout,
   onOpenAdmin,
+  onOpenChangePassword,
   onOpenDeleteAccount,
 }: Props) {
   return (
@@ -63,6 +65,16 @@ export default function UserMenuPopup({
               管理系统
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenChangePassword();
+            }}
+            className="w-full py-2 rounded-lg border border-stone-300 text-stone-600 text-sm hover:bg-stone-50 transition"
+          >
+            修改密码
+          </button>
           <button
             type="button"
             onClick={() => {

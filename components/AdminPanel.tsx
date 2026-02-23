@@ -49,6 +49,11 @@ export default function AdminPanel({ onBack }: Props) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [addName, setAddName] = useState('');
+  const [addEmail, setAddEmail] = useState('');
+  const [addPassword, setAddPassword] = useState('');
+  const [addError, setAddError] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -165,6 +170,42 @@ export default function AdminPanel({ onBack }: Props) {
     } catch { /* ignore */ }
   };
 
+  const handleAddUser = async () => {
+    const name = addName.trim();
+    const email = addEmail.trim();
+    const password = addPassword.trim();
+    if (!name || !email || !password) {
+      setAddError('请填写昵称、邮箱和密码');
+      return;
+    }
+    if (password.length < 6) {
+      setAddError('密码至少需要6位');
+      return;
+    }
+    setAddError('');
+    setAddLoading(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers(prev => [{ ...data, _count: { sessions: 0 } }, ...prev]);
+        setAddName('');
+        setAddEmail('');
+        setAddPassword('');
+      } else {
+        setAddError(data.error || '添加失败');
+      }
+    } catch {
+      setAddError('网络错误');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (id: string, email: string) => {
     if (!confirm(`确定删除用户 ${email}？此操作不可撤销。`)) return;
     try {
@@ -201,6 +242,42 @@ export default function AdminPanel({ onBack }: Props) {
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-4">{error}</div>}
+
+        <div className="mb-4 p-4 border border-stone-200 rounded-lg bg-white">
+          <h4 className="text-xs font-bold text-stone-500 uppercase mb-3">快速添加账号</h4>
+          <div className="flex flex-wrap gap-2 items-end">
+            <input
+              type="text"
+              value={addName}
+              onChange={(e) => { setAddName(e.target.value); setAddError(''); }}
+              placeholder="昵称"
+              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-28 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <input
+              type="email"
+              value={addEmail}
+              onChange={(e) => { setAddEmail(e.target.value); setAddError(''); }}
+              placeholder="邮箱"
+              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-40 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <input
+              type="password"
+              value={addPassword}
+              onChange={(e) => { setAddPassword(e.target.value); setAddError(''); }}
+              placeholder="密码（至少6位）"
+              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-36 focus:ring-2 focus:ring-amber-400 outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleAddUser}
+              disabled={addLoading}
+              className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-700 disabled:opacity-50"
+            >
+              {addLoading ? '添加中...' : '添加'}
+            </button>
+          </div>
+          {addError && <p className="text-xs text-red-600 mt-2">{addError}</p>}
+        </div>
 
         <div className="mb-4">
           <input

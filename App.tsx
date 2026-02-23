@@ -20,6 +20,7 @@ import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
 import AdminPanel from './components/AdminPanel';
 import AccountSettingsModal from './components/AccountSettingsModal';
 import UserMenuPopup from './components/UserMenuPopup';
+import ChangePasswordModal from './components/ChangePasswordModal';
 
 // Types
 import {
@@ -342,6 +343,7 @@ const App: React.FC = () => {
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -1789,7 +1791,15 @@ const App: React.FC = () => {
           onClose={() => setShowUserMenu(false)}
           onLogout={() => signOut()}
           onOpenAdmin={() => setShowAdminPanel(true)}
+          onOpenChangePassword={() => setShowChangePassword(true)}
           onOpenDeleteAccount={() => setShowAccountSettings(true)}
+        />
+      )}
+
+      {showChangePassword && isLoggedIn && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={() => setShowChangePassword(false)}
         />
       )}
 
