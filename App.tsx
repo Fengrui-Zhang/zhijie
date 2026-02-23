@@ -1830,7 +1830,7 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full">
         {!isLoggedIn && step === 'input' && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
-            <span>访客模式：排盘 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
+            <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
