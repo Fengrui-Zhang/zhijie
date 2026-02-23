@@ -1830,7 +1830,7 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full">
         {!isLoggedIn && step === 'input' && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
-            <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
+            <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
@@ -2226,6 +2226,18 @@ const App: React.FC = () => {
         {/* Result Phase */}
         {step === 'chart' && chartData && (
           <div className="animate-fade-in space-y-6">
+            {!isLoggedIn && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+                <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAuth(true)}
+                  className="underline font-medium hover:text-amber-900 ml-auto"
+                >
+                  登录获取更多额度
+                </button>
+              </div>
+            )}
             <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow border border-stone-200">
                <span className="font-bold text-stone-700">
                 {modelType === ModelType.QIMEN ? '奇门排盘' : 
