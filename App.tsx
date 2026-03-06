@@ -706,7 +706,6 @@ const App: React.FC = () => {
 
   const buildReportHtml = (chartMarkup = '', headAssetsHtml = '') => {
     const now = new Date();
-    const nowText = now.toLocaleString('zh-CN', { hour12: false });
     const dateStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const modelLabel = modelType === ModelType.QIMEN ? '奇门排盘' :
       modelType === ModelType.BAZI ? '八字命盘' :
@@ -718,13 +717,6 @@ const App: React.FC = () => {
       modelType === ModelType.MEIHUA ? '梅花' : '六爻';
     const reportName = `元分 · 智解_${name?.trim() || '匿名'}_${modelShortLabel}_${dateStamp}.pdf`;
     const chartInfoLines = buildChartInfoLines();
-
-    const metaItems = [
-      name ? `姓名：${name}` : '',
-      question ? `提问：${question}` : '',
-      `模型：${modelLabel}`,
-      `生成时间：${nowText}`,
-    ].filter(Boolean);
 
     const messagesHtml = chatHistory.map((msg, index) => {
       const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
@@ -748,17 +740,14 @@ const App: React.FC = () => {
       `;
     }).join('');
 
-    const metaHtml = metaItems.map(item => `<div class="meta-item">${escapeHtml(item)}</div>`).join('');
     const chartSnapshotHtml = chartMarkup
       ? `<div class="chart-preview">
-          <div class="chart-title">完整排盘</div>
-          <div class="chart-preview-note">以下内容直接复用当前排盘页面的完整 UI 结构。</div>
           <div class="chart-live">${chartMarkup}</div>
         </div>`
       : '';
-    const chartInfoHtml = chartInfoLines.length
+    const chartInfoHtml = !chartMarkup && chartInfoLines.length
       ? `<div class="chart-info">
-          <div class="chart-title">${chartMarkup ? '排盘摘要' : '排盘信息'}</div>
+          <div class="chart-title">排盘信息</div>
           <div class="chart-lines">${chartInfoLines.map(line => `<div class="chart-line">${escapeHtml(line)}</div>`).join('')}</div>
         </div>`
       : '';
@@ -801,20 +790,6 @@ const App: React.FC = () => {
               font-size: 12px;
               opacity: 0.8;
             }
-            .meta {
-              margin-top: 16px;
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-              gap: 8px 16px;
-              font-size: 13px;
-              color: #44403c;
-            }
-            .meta-item {
-              background: #fff7ed;
-              border: 1px solid #fed7aa;
-              padding: 8px 12px;
-              border-radius: 10px;
-            }
             .chart-info {
               margin-top: 14px;
               padding: 14px 16px;
@@ -828,12 +803,8 @@ const App: React.FC = () => {
               background: #fff;
               border-radius: 14px;
               border: 1px solid #e7e5e4;
-              break-inside: avoid;
-            }
-            .chart-preview-note {
-              margin-bottom: 10px;
-              font-size: 12px;
-              color: #78716c;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .chart-preview img {
               display: block;
@@ -845,6 +816,8 @@ const App: React.FC = () => {
             }
             .chart-live {
               overflow: visible;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .chart-live [data-report-ignore="true"] {
               display: none !important;
@@ -999,8 +972,22 @@ const App: React.FC = () => {
             }
             @media print {
               body { background: #fff; }
-              .page { padding: 0; }
+              .page { padding: 0; max-width: none; }
               .header { border-radius: 0; }
+              .chart-preview,
+              .chart-info,
+              .content {
+                margin-top: 12px;
+              }
+              .chart-preview {
+                break-inside: auto;
+                page-break-inside: auto;
+              }
+              .chart-live,
+              .chart-live > * {
+                break-inside: auto;
+                page-break-inside: auto;
+              }
               .msg { break-inside: avoid; }
             }
           </style>
@@ -1011,7 +998,6 @@ const App: React.FC = () => {
               <div class="title">大师解读报告</div>
               <div class="subtitle">记录本次对话，便于随时回顾</div>
             </div>
-            <div class="meta">${metaHtml}</div>
             ${chartSnapshotHtml}
             ${chartInfoHtml}
             <div class="content">${messagesHtml}</div>
