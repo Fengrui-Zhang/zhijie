@@ -212,147 +212,19 @@ const formatSizhuInfo = (sizhu?: {
   return `${sizhu.year_gan}${sizhu.year_zhi} ${sizhu.month_gan}${sizhu.month_zhi} ${sizhu.day_gan}${sizhu.day_zhi} ${sizhu.hour_gan}${sizhu.hour_zhi}`;
 };
 
-const waitForNextFrame = () =>
-  new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
+const buildReportHeadAssets = () =>
+  Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => node.outerHTML)
+    .join('\n');
 
-const loadImage = (src: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.decoding = 'sync';
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('排盘截图渲染失败'));
-    image.src = src;
-  });
-
-const copyComputedStyles = (source: Element, target: Element) => {
-  const computedStyle = window.getComputedStyle(source);
-  const targetStyle = (target as HTMLElement | SVGElement).style;
-
-  for (let index = 0; index < computedStyle.length; index += 1) {
-    const property = computedStyle[index];
-    targetStyle.setProperty(
-      property,
-      computedStyle.getPropertyValue(property),
-      computedStyle.getPropertyPriority(property)
-    );
-  }
-
-  if (source instanceof HTMLElement && target instanceof HTMLElement) {
-    const needsExpandX = source.scrollWidth > source.clientWidth + 1;
-    const needsExpandY = source.scrollHeight > source.clientHeight + 1;
-
-    if (needsExpandX) {
-      target.style.width = `${source.scrollWidth}px`;
-      target.style.minWidth = `${source.scrollWidth}px`;
-      target.style.maxWidth = 'none';
-      target.style.overflowX = 'visible';
-    }
-
-    if (needsExpandY) {
-      target.style.height = `${source.scrollHeight}px`;
-      target.style.minHeight = `${source.scrollHeight}px`;
-      target.style.maxHeight = 'none';
-      target.style.overflowY = 'visible';
-    }
-
-    if (needsExpandX || needsExpandY) {
-      target.style.overflow = 'visible';
-    }
-  }
-};
-
-const inlineCloneTree = (source: Node, target: Node) => {
-  if (source.nodeType === Node.ELEMENT_NODE && target.nodeType === Node.ELEMENT_NODE) {
-    copyComputedStyles(source as Element, target as Element);
-
-    if (source instanceof HTMLInputElement && target instanceof HTMLInputElement) {
-      target.value = source.value;
-      target.checked = source.checked;
-    }
-
-    if (source instanceof HTMLTextAreaElement && target instanceof HTMLTextAreaElement) {
-      target.value = source.value;
-    }
-
-    if (source instanceof HTMLSelectElement && target instanceof HTMLSelectElement) {
-      target.value = source.value;
-    }
-
-    if ((source as HTMLElement).dataset?.reportIgnore === 'true') {
-      target.parentNode?.removeChild(target);
-      return;
-    }
-  }
-
-  const sourceChildren = Array.from(source.childNodes);
-  const targetChildren = Array.from(target.childNodes);
-
-  for (let index = 0; index < sourceChildren.length; index += 1) {
-    const sourceChild = sourceChildren[index];
-    const targetChild = targetChildren[index];
-    if (!sourceChild || !targetChild) continue;
-    inlineCloneTree(sourceChild, targetChild);
-  }
-};
-
-const captureElementAsPng = async (element: HTMLElement) => {
-  if (document.fonts?.ready) {
-    try {
-      await document.fonts.ready;
-    } catch {
-      // Ignore font readiness failures and continue with fallback fonts.
-    }
-  }
-
-  await waitForNextFrame();
-
-  const rect = element.getBoundingClientRect();
-  const width = Math.ceil(Math.max(rect.width, element.scrollWidth, element.clientWidth));
-  const height = Math.ceil(Math.max(rect.height, element.scrollHeight, element.clientHeight));
+const buildReportChartMarkup = (element: HTMLElement) => {
   const clone = element.cloneNode(true) as HTMLElement;
-  inlineCloneTree(element, clone);
-  clone.style.margin = '0';
-  clone.style.transform = 'none';
-  clone.style.transformOrigin = 'top left';
-  clone.style.width = `${width}px`;
-  clone.style.height = `${height}px`;
-
-  const wrapper = document.createElement('div');
-  wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-  wrapper.style.width = `${width}px`;
-  wrapper.style.height = `${height}px`;
-  wrapper.style.background = '#ffffff';
-  wrapper.style.padding = '0';
-  wrapper.style.margin = '0';
-  wrapper.appendChild(clone);
-
-  const serialized = new XMLSerializer().serializeToString(wrapper);
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <rect width="100%" height="100%" fill="#ffffff" />
-      <foreignObject x="0" y="0" width="100%" height="100%">${serialized}</foreignObject>
-    </svg>
-  `;
-  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
-
-  try {
-    const image = await loadImage(svgUrl);
-    const scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
-    const context = canvas.getContext('2d');
-    if (!context) {
-      throw new Error('无法创建排盘截图画布');
-    }
-    context.scale(scale, scale);
-    context.drawImage(image, 0, 0, width, height);
-    return canvas.toDataURL('image/png');
-  } finally {
-    URL.revokeObjectURL(svgUrl);
-  }
+  clone.querySelectorAll('[data-report-ignore="true"]').forEach((node) => node.remove());
+  clone.querySelectorAll('button').forEach((button) => {
+    button.setAttribute('tabindex', '-1');
+    button.setAttribute('aria-hidden', 'true');
+  });
+  return clone.outerHTML;
 };
 
 interface ChatMessage {
@@ -832,7 +704,7 @@ const App: React.FC = () => {
     return lines;
   };
 
-  const buildReportHtml = (chartSnapshotDataUrl?: string) => {
+  const buildReportHtml = (chartMarkup = '', headAssetsHtml = '') => {
     const now = new Date();
     const nowText = now.toLocaleString('zh-CN', { hour12: false });
     const dateStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -877,16 +749,16 @@ const App: React.FC = () => {
     }).join('');
 
     const metaHtml = metaItems.map(item => `<div class="meta-item">${escapeHtml(item)}</div>`).join('');
-    const chartSnapshotHtml = chartSnapshotDataUrl
+    const chartSnapshotHtml = chartMarkup
       ? `<div class="chart-preview">
-          <div class="chart-title">排盘原图</div>
-          <div class="chart-preview-note">以下内容按当前排盘页面的实际 UI 原样保存。</div>
-          <img src="${chartSnapshotDataUrl}" alt="排盘原图" />
+          <div class="chart-title">完整排盘</div>
+          <div class="chart-preview-note">以下内容直接复用当前排盘页面的完整 UI 结构。</div>
+          <div class="chart-live">${chartMarkup}</div>
         </div>`
       : '';
     const chartInfoHtml = chartInfoLines.length
       ? `<div class="chart-info">
-          <div class="chart-title">${chartSnapshotDataUrl ? '排盘摘要' : '排盘信息'}</div>
+          <div class="chart-title">${chartMarkup ? '排盘摘要' : '排盘信息'}</div>
           <div class="chart-lines">${chartInfoLines.map(line => `<div class="chart-line">${escapeHtml(line)}</div>`).join('')}</div>
         </div>`
       : '';
@@ -897,7 +769,9 @@ const App: React.FC = () => {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <base href="${escapeHtml(window.location.href)}" />
           <title>${escapeHtml(reportName)}</title>
+          ${headAssetsHtml}
           <style>
             * { box-sizing: border-box; }
             body {
@@ -968,6 +842,19 @@ const App: React.FC = () => {
               border-radius: 12px;
               border: 1px solid #e7e5e4;
               background: #fff;
+            }
+            .chart-live {
+              overflow: visible;
+            }
+            .chart-live [data-report-ignore="true"] {
+              display: none !important;
+            }
+            .chart-live button {
+              pointer-events: none !important;
+            }
+            .chart-live > * {
+              margin-left: 0 !important;
+              margin-right: 0 !important;
             }
             .chart-title {
               font-weight: 700;
@@ -1140,16 +1027,18 @@ const App: React.FC = () => {
     setIsGeneratingReport(true);
 
     try {
-      let chartSnapshotDataUrl = '';
+      let chartMarkup = '';
+      let headAssetsHtml = '';
       if (reportChartRef.current) {
         try {
-          chartSnapshotDataUrl = await captureElementAsPng(reportChartRef.current);
-        } catch (captureError) {
-          console.error('Failed to capture chart preview for report:', captureError);
+          chartMarkup = buildReportChartMarkup(reportChartRef.current);
+          headAssetsHtml = buildReportHeadAssets();
+        } catch (chartBuildError) {
+          console.error('Failed to build live chart markup for report:', chartBuildError);
         }
       }
 
-      const reportHtml = buildReportHtml(chartSnapshotDataUrl);
+      const reportHtml = buildReportHtml(chartMarkup, headAssetsHtml);
       const frame = document.createElement('iframe');
       frame.style.position = 'fixed';
       frame.style.right = '0';
