@@ -97,6 +97,7 @@ export const fetchZiwei = async (params: BaseParams) => {
   const isZhen = (params.province && params.city) ? '1' : '0';
 
   return fetchApi<ZiweiResponse>(ENDPOINTS[ModelType.ZIWEI], {
+    type: '1',
     name: params.name || '匿名',
     sex: params.sex.toString(),
     year: params.year.toString(),
