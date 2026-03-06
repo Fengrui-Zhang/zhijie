@@ -207,6 +207,149 @@ const formatSizhuInfo = (sizhu?: {
   return `${sizhu.year_gan}${sizhu.year_zhi} ${sizhu.month_gan}${sizhu.month_zhi} ${sizhu.day_gan}${sizhu.day_zhi} ${sizhu.hour_gan}${sizhu.hour_zhi}`;
 };
 
+const waitForNextFrame = () =>
+  new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'sync';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('排盘截图渲染失败'));
+    image.src = src;
+  });
+
+const copyComputedStyles = (source: Element, target: Element) => {
+  const computedStyle = window.getComputedStyle(source);
+  const targetStyle = (target as HTMLElement | SVGElement).style;
+
+  for (let index = 0; index < computedStyle.length; index += 1) {
+    const property = computedStyle[index];
+    targetStyle.setProperty(
+      property,
+      computedStyle.getPropertyValue(property),
+      computedStyle.getPropertyPriority(property)
+    );
+  }
+
+  if (source instanceof HTMLElement && target instanceof HTMLElement) {
+    const needsExpandX = source.scrollWidth > source.clientWidth + 1;
+    const needsExpandY = source.scrollHeight > source.clientHeight + 1;
+
+    if (needsExpandX) {
+      target.style.width = `${source.scrollWidth}px`;
+      target.style.minWidth = `${source.scrollWidth}px`;
+      target.style.maxWidth = 'none';
+      target.style.overflowX = 'visible';
+    }
+
+    if (needsExpandY) {
+      target.style.height = `${source.scrollHeight}px`;
+      target.style.minHeight = `${source.scrollHeight}px`;
+      target.style.maxHeight = 'none';
+      target.style.overflowY = 'visible';
+    }
+
+    if (needsExpandX || needsExpandY) {
+      target.style.overflow = 'visible';
+    }
+  }
+};
+
+const inlineCloneTree = (source: Node, target: Node) => {
+  if (source.nodeType === Node.ELEMENT_NODE && target.nodeType === Node.ELEMENT_NODE) {
+    copyComputedStyles(source as Element, target as Element);
+
+    if (source instanceof HTMLInputElement && target instanceof HTMLInputElement) {
+      target.value = source.value;
+      target.checked = source.checked;
+    }
+
+    if (source instanceof HTMLTextAreaElement && target instanceof HTMLTextAreaElement) {
+      target.value = source.value;
+    }
+
+    if (source instanceof HTMLSelectElement && target instanceof HTMLSelectElement) {
+      target.value = source.value;
+    }
+
+    if ((source as HTMLElement).dataset?.reportIgnore === 'true') {
+      target.parentNode?.removeChild(target);
+      return;
+    }
+  }
+
+  const sourceChildren = Array.from(source.childNodes);
+  const targetChildren = Array.from(target.childNodes);
+
+  for (let index = 0; index < sourceChildren.length; index += 1) {
+    const sourceChild = sourceChildren[index];
+    const targetChild = targetChildren[index];
+    if (!sourceChild || !targetChild) continue;
+    inlineCloneTree(sourceChild, targetChild);
+  }
+};
+
+const captureElementAsPng = async (element: HTMLElement) => {
+  if (document.fonts?.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // Ignore font readiness failures and continue with fallback fonts.
+    }
+  }
+
+  await waitForNextFrame();
+
+  const rect = element.getBoundingClientRect();
+  const width = Math.ceil(Math.max(rect.width, element.scrollWidth, element.clientWidth));
+  const height = Math.ceil(Math.max(rect.height, element.scrollHeight, element.clientHeight));
+  const clone = element.cloneNode(true) as HTMLElement;
+  inlineCloneTree(element, clone);
+  clone.style.margin = '0';
+  clone.style.transform = 'none';
+  clone.style.transformOrigin = 'top left';
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+
+  const wrapper = document.createElement('div');
+  wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  wrapper.style.width = `${width}px`;
+  wrapper.style.height = `${height}px`;
+  wrapper.style.background = '#ffffff';
+  wrapper.style.padding = '0';
+  wrapper.style.margin = '0';
+  wrapper.appendChild(clone);
+
+  const serialized = new XMLSerializer().serializeToString(wrapper);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      <foreignObject x="0" y="0" width="100%" height="100%">${serialized}</foreignObject>
+    </svg>
+  `;
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+
+  try {
+    const image = await loadImage(svgUrl);
+    const scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    const context = canvas.getContext('2d');
+    if (!context) {
+      throw new Error('无法创建排盘截图画布');
+    }
+    context.scale(scale, scale);
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+};
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -338,8 +481,10 @@ const App: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isKlineRunning, setIsKlineRunning] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const reportChartRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -653,7 +798,7 @@ const App: React.FC = () => {
     return lines;
   };
 
-  const buildReportHtml = () => {
+  const buildReportHtml = (chartSnapshotDataUrl?: string) => {
     const now = new Date();
     const nowText = now.toLocaleString('zh-CN', { hour12: false });
     const dateStamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -698,9 +843,16 @@ const App: React.FC = () => {
     }).join('');
 
     const metaHtml = metaItems.map(item => `<div class="meta-item">${escapeHtml(item)}</div>`).join('');
+    const chartSnapshotHtml = chartSnapshotDataUrl
+      ? `<div class="chart-preview">
+          <div class="chart-title">排盘原图</div>
+          <div class="chart-preview-note">以下内容按当前排盘页面的实际 UI 原样保存。</div>
+          <img src="${chartSnapshotDataUrl}" alt="排盘原图" />
+        </div>`
+      : '';
     const chartInfoHtml = chartInfoLines.length
       ? `<div class="chart-info">
-          <div class="chart-title">排盘信息</div>
+          <div class="chart-title">${chartSnapshotDataUrl ? '排盘摘要' : '排盘信息'}</div>
           <div class="chart-lines">${chartInfoLines.map(line => `<div class="chart-line">${escapeHtml(line)}</div>`).join('')}</div>
         </div>`
       : '';
@@ -761,6 +913,27 @@ const App: React.FC = () => {
               background: #fff;
               border-radius: 14px;
               border: 1px solid #e7e5e4;
+            }
+            .chart-preview {
+              margin-top: 14px;
+              padding: 14px 16px;
+              background: #fff;
+              border-radius: 14px;
+              border: 1px solid #e7e5e4;
+              break-inside: avoid;
+            }
+            .chart-preview-note {
+              margin-bottom: 10px;
+              font-size: 12px;
+              color: #78716c;
+            }
+            .chart-preview img {
+              display: block;
+              width: 100%;
+              height: auto;
+              border-radius: 12px;
+              border: 1px solid #e7e5e4;
+              background: #fff;
             }
             .chart-title {
               font-weight: 700;
@@ -918,6 +1091,7 @@ const App: React.FC = () => {
               <div class="subtitle">记录本次对话，便于随时回顾</div>
             </div>
             <div class="meta">${metaHtml}</div>
+            ${chartSnapshotHtml}
             ${chartInfoHtml}
             <div class="content">${messagesHtml}</div>
             <div class="footer">${escapeHtml(DISCLAIMER_TEXT)}</div>
@@ -927,45 +1101,71 @@ const App: React.FC = () => {
     `;
   };
 
-  const handleGenerateReport = () => {
-    if (!chatHistory.length) return;
-    const reportHtml = buildReportHtml();
-    const frame = document.createElement('iframe');
-    frame.style.position = 'fixed';
-    frame.style.right = '0';
-    frame.style.bottom = '0';
-    frame.style.width = '0';
-    frame.style.height = '0';
-    frame.style.border = '0';
-    frame.style.opacity = '0';
-    frame.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(frame);
+  const handleGenerateReport = async () => {
+    if (!chatHistory.length || isGeneratingReport) return;
+    setIsGeneratingReport(true);
 
-    const cleanup = () => {
+    try {
+      let chartSnapshotDataUrl = '';
+      if (reportChartRef.current) {
+        try {
+          chartSnapshotDataUrl = await captureElementAsPng(reportChartRef.current);
+        } catch (captureError) {
+          console.error('Failed to capture chart preview for report:', captureError);
+        }
+      }
+
+      const reportHtml = buildReportHtml(chartSnapshotDataUrl);
+      const frame = document.createElement('iframe');
+      frame.style.position = 'fixed';
+      frame.style.right = '0';
+      frame.style.bottom = '0';
+      frame.style.width = '0';
+      frame.style.height = '0';
+      frame.style.border = '0';
+      frame.style.opacity = '0';
+      frame.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(frame);
+
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        window.setTimeout(() => {
+          frame.remove();
+          setIsGeneratingReport(false);
+        }, 1000);
+      };
+
+      frame.onload = () => {
+        try {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+        } finally {
+          cleanup();
+        }
+      };
+
       window.setTimeout(() => {
-        frame.remove();
-      }, 1000);
-    };
-
-    frame.onload = () => {
-      try {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
-      } finally {
         cleanup();
-      }
-    };
+      }, 4000);
 
-    const iframe = frame as HTMLIFrameElement & { srcdoc?: string };
-    if (typeof iframe.srcdoc !== 'undefined') {
-      iframe.srcdoc = reportHtml;
-    } else {
-      const win = iframe.contentWindow;
-      if (win) {
-        win.document.open();
-        win.document.write(reportHtml);
-        win.document.close();
+      const iframe = frame as HTMLIFrameElement & { srcdoc?: string };
+      if (typeof iframe.srcdoc !== 'undefined') {
+        iframe.srcdoc = reportHtml;
+      } else {
+        const win = iframe.contentWindow;
+        if (win) {
+          win.document.open();
+          win.document.write(reportHtml);
+          win.document.close();
+        } else {
+          cleanup();
+        }
       }
+    } catch (reportError) {
+      console.error('Failed to generate report:', reportError);
+      setIsGeneratingReport(false);
     }
   };
 
@@ -2247,22 +2447,24 @@ const App: React.FC = () => {
                 </button>
               </div>
             )}
-            <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow border border-stone-200">
-               <span className="font-bold text-stone-700">
-                {modelType === ModelType.QIMEN ? '奇门排盘' : 
-                 modelType === ModelType.BAZI ? '八字命盘' : 
-                 modelType === ModelType.ZIWEI ? '紫微斗数' : 
-                 modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲'}
-               </span>
-               <button onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">重置 / 返回</button>
-            </div>
+            <div ref={reportChartRef} className="space-y-4">
+              <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow border border-stone-200">
+                 <span className="font-bold text-stone-700">
+                  {modelType === ModelType.QIMEN ? '奇门排盘' : 
+                   modelType === ModelType.BAZI ? '八字命盘' : 
+                   modelType === ModelType.ZIWEI ? '紫微斗数' : 
+                   modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲'}
+                 </span>
+                 <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">重置 / 返回</button>
+              </div>
 
-            {/* Visualization Components */}
-            {modelType === ModelType.QIMEN && <QimenGrid data={chartData} />}
-            {modelType === ModelType.BAZI && <BaziGrid data={chartData} />}
-            {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
-            {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
-            {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+              {/* Visualization Components */}
+              {modelType === ModelType.QIMEN && <QimenGrid data={chartData} />}
+              {modelType === ModelType.BAZI && <BaziGrid data={chartData} />}
+              {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
+              {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
+              {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+            </div>
 
             {/* Chat */}
             <div className="bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden flex flex-col h-[600px]">
@@ -2270,22 +2472,24 @@ const App: React.FC = () => {
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><span>🔮</span> 大师解读</h3>
                  <button
                    onClick={handleGenerateReport}
-                   disabled={!chatHistory.length || isTyping}
+                   disabled={!chatHistory.length || isTyping || isGeneratingReport}
                    title={
                      !chatHistory.length
                        ? '暂无对话内容'
                        : isTyping
                          ? 'AI 正在输出，请稍候'
-                         : '生成对话报告（可保存为 PDF）'
+                         : isGeneratingReport
+                           ? '正在生成排盘截图，请稍候'
+                           : '生成对话报告（可保存为 PDF）'
                    }
                    className={`flex items-center gap-2 text-sm font-medium ${
-                     !chatHistory.length || isTyping
+                     !chatHistory.length || isTyping || isGeneratingReport
                        ? 'text-stone-300 cursor-not-allowed'
                        : 'text-stone-500 hover:text-stone-800'
                    }`}
                  >
                    <ReportIcon />
-                   生成报告
+                   {isGeneratingReport ? '生成中...' : '生成报告'}
                  </button>
                </div>
                <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#f9fafb]">
