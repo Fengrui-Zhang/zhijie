@@ -35,6 +35,12 @@ interface SessionSidebarProps {
   onToggle: () => void;
 }
 
+const SessionIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
+    <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v5.5A2.25 2.25 0 0 0 3.25 14h2.63l2.66 2.28a.75.75 0 0 0 1.24-.57V14h7.02A2.25 2.25 0 0 0 19 11.75v-5.5A2.25 2.25 0 0 0 16.75 4H3.25Zm1.5 3.25a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Zm0 3.5a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5H5.5a.75.75 0 0 1-.75-.75Z" />
+  </svg>
+);
+
 function groupByDate(sessions: SessionItem[]) {
   const groups: Record<string, SessionItem[]> = {};
   const now = new Date();
@@ -76,12 +82,11 @@ export default function SessionSidebar({
       <div className="w-10 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col items-center pt-3">
         <button
           onClick={onToggle}
-          className="p-2 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
+          className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
           title="展开侧边栏"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5A.75.75 0 012 10z" clipRule="evenodd" />
-          </svg>
+          <SessionIcon className="w-4 h-4" />
+          <span className="text-[10px] leading-none">会话</span>
         </button>
       </div>
     );

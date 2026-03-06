@@ -50,6 +50,11 @@ const Spinner = () => (
 );
 const SendIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>);
 const ReportIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25V6.75A2.25 2.25 0 0017.25 4.5H6.75A2.25 2.25 0 004.5 6.75v10.5A2.25 2.25 0 006.75 19.5h4.5m4.5-5.25v5.25m0 0l-2.25-2.25m2.25 2.25l2.25-2.25M8.25 9h7.5M8.25 12h4.5" /></svg>);
+const SessionIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
+    <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v5.5A2.25 2.25 0 0 0 3.25 14h2.63l2.66 2.28a.75.75 0 0 0 1.24-.57V14h7.02A2.25 2.25 0 0 0 19 11.75v-5.5A2.25 2.25 0 0 0 16.75 4H3.25Zm1.5 3.25a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Zm0 3.5a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5H5.5a.75.75 0 0 1-.75-.75Z" />
+  </svg>
+);
 
 const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
@@ -441,6 +446,7 @@ const App: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // --- State ---
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
@@ -523,6 +529,34 @@ const App: React.FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const syncViewport = (matches: boolean) => {
+      if (!matches) {
+        setMobileSidebarOpen(false);
+      }
+    };
+
+    syncViewport(mediaQuery.matches);
+    const handleChange = (event: MediaQueryListEvent) => syncViewport(event.matches);
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [mobileSidebarOpen]);
 
   useEffect(() => {
     if (modelType !== ModelType.BAZI || !chartData) return;
@@ -1930,9 +1964,22 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-amber-700 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
-          <div className="flex items-center gap-2">
-            <div className="text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
+          <div className="flex items-center gap-3">
+            {isLoggedIn && (
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="md:hidden inline-flex items-center gap-1 rounded-lg border border-stone-700/80 bg-stone-800/80 px-2.5 py-1.5 text-[11px] text-stone-200 hover:border-stone-500 hover:text-white transition"
+                title="打开会话列表"
+              >
+                <SessionIcon className="w-4 h-4" />
+                <span>会话</span>
+              </button>
+            )}
+            <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
+          </div>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <div className="hidden sm:block text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
             <button
               type="button"
               onClick={() => setShowUpdates(true)}
@@ -2023,17 +2070,52 @@ const App: React.FC = () => {
         />
       )}
 
+      {isLoggedIn && (
+        <div
+          className={`md:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${mobileSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          aria-hidden={!mobileSidebarOpen}
+        >
+          <div
+            className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div
+            className={`absolute inset-y-0 left-0 w-[82vw] max-w-[320px] transform transition-transform duration-300 ease-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          >
+            <SessionSidebar
+              sessions={savedSessions}
+              activeSessionId={activeSessionId}
+              onSelect={(id) => {
+                setMobileSidebarOpen(false);
+                handleLoadSession(id);
+              }}
+              onDelete={(id) => {
+                handleDeleteSession(id);
+              }}
+              onNewSession={() => {
+                setMobileSidebarOpen(false);
+                handleReset();
+              }}
+              collapsed={false}
+              onToggle={() => setMobileSidebarOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         {isLoggedIn && (
-          <SessionSidebar
-            sessions={savedSessions}
-            activeSessionId={activeSessionId}
-            onSelect={handleLoadSession}
-            onDelete={handleDeleteSession}
-            onNewSession={handleReset}
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(prev => !prev)}
-          />
+          <div className="hidden md:flex h-full">
+            <SessionSidebar
+              sessions={savedSessions}
+              activeSessionId={activeSessionId}
+              onSelect={handleLoadSession}
+              onDelete={handleDeleteSession}
+              onNewSession={handleReset}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(prev => !prev)}
+            />
+          </div>
         )}
 
       <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full">
