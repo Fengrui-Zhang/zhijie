@@ -995,8 +995,7 @@ const App: React.FC = () => {
         <body>
           <div class="page">
             <div class="header">
-              <div class="title">大师解读报告</div>
-              <div class="subtitle">记录本次对话，便于随时回顾</div>
+              <div class="title">解读报告</div>
             </div>
             ${chartSnapshotHtml}
             ${chartInfoHtml}
