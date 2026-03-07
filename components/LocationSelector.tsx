@@ -59,15 +59,15 @@ const LocationSelector: React.FC<Props> = ({
 
   return (
     <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5 transition-all duration-300">
-      <div className="flex items-center justify-between mb-3">
-        <div>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <div className="text-sm font-bold text-stone-700">{title}</div>
           <div className="text-xs text-stone-500">{helperText}</div>
         </div>
         <button
           type="button"
           onClick={() => handleToggle(!isEnabled)}
-          className="inline-flex items-center gap-2 text-sm text-stone-700 cursor-pointer"
+          className="inline-flex min-w-[108px] items-center justify-end gap-2 self-end whitespace-nowrap rounded-full px-1 py-1 text-sm text-stone-700 transition-colors sm:self-auto"
           aria-pressed={isEnabled}
         >
           {indicator}
