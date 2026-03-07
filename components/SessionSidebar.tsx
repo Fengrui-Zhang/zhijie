@@ -79,14 +79,13 @@ export default function SessionSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-14 h-[calc(100vh-112px)] min-h-0 flex-shrink-0 rounded-2xl border border-white/70 bg-white/58 backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.12)] flex flex-col items-center pt-4">
+      <div className="h-12 w-12 rounded-2xl border border-white/70 bg-white/62 backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.16)]">
         <button
           onClick={onToggle}
-          className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-white/70 text-stone-600 transition-colors"
+          className="flex h-full w-full items-center justify-center rounded-2xl hover:bg-white/75 text-stone-600 transition-colors"
           title="展开侧边栏"
         >
-          <SessionIcon className="w-4 h-4" />
-          <span className="text-[10px] leading-none">会话</span>
+          <SessionIcon className="w-5 h-5" />
         </button>
       </div>
     );

@@ -1979,7 +1979,7 @@ const App: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {isLoggedIn && (
-          <div className="hidden md:flex h-full min-h-0 self-start sticky top-[96px] pl-3 pr-2 pb-3">
+          <div className="hidden md:block fixed left-3 top-[106px] z-10">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
@@ -1992,7 +1992,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-      <main className="flex-1 max-w-4xl mx-auto px-2 mt-6 pb-6 overflow-y-auto w-full min-h-0">
+      <main className={`flex-1 max-w-4xl px-2 mt-6 pb-6 overflow-y-auto w-full min-h-0 transition-[margin] duration-300 ${isLoggedIn ? (sidebarCollapsed ? 'md:ml-[92px] md:mr-6' : 'md:ml-[320px] md:mr-6') : 'mx-auto'}`}>
         {!isLoggedIn && step === 'input' && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
             <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
