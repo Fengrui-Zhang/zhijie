@@ -950,17 +950,17 @@ const App: React.FC = () => {
               margin-top: 16px;
             }
             .msg {
-              background: #fff;
-              border-radius: 16px;
-              padding: 16px 18px;
-              border: 1px solid #e7e5e4;
-              position: relative;
+              background: transparent;
+              border: none;
+              border-left: 3px solid #d6d3d1;
+              border-radius: 0;
+              padding: 12px 0 10px 14px;
               break-inside: auto;
               page-break-inside: auto;
             }
             .msg.user {
-              border-color: #f3d7a1;
-              background: #fffaf0;
+              border-left-color: #f3d7a1;
+              background: transparent;
               color: #44403c;
               break-inside: auto;
               page-break-inside: auto;
@@ -973,7 +973,7 @@ const App: React.FC = () => {
               display: flex;
               justify-content: space-between;
               font-size: 12px;
-              margin-bottom: 8px;
+              margin-bottom: 6px;
               color: #78716c;
               break-inside: avoid;
               page-break-inside: avoid;
@@ -1069,10 +1069,10 @@ const App: React.FC = () => {
             }
             .msg-reasoning {
               margin-bottom: 10px;
-              padding: 10px 12px;
-              border-radius: 12px;
-              background: rgba(251, 191, 36, 0.15);
-              border: 1px solid rgba(251, 191, 36, 0.4);
+              padding: 8px 10px;
+              border-radius: 0;
+              background: #fffbeb;
+              border-left: 3px solid rgba(251, 191, 36, 0.8);
               color: #92400e;
               font-size: 12px;
               break-inside: avoid;
@@ -1083,9 +1083,10 @@ const App: React.FC = () => {
               margin-bottom: 6px;
             }
             .msg-index {
-              position: absolute;
-              right: 16px;
-              bottom: 12px;
+              position: static;
+              display: block;
+              margin-top: 10px;
+              text-align: right;
               font-size: 11px;
               color: #a8a29e;
             }
@@ -1116,16 +1117,16 @@ const App: React.FC = () => {
               .msg {
                 break-inside: auto;
                 page-break-inside: auto;
+                border-radius: 0;
+                background: transparent;
+                box-shadow: none;
               }
               .msg.user {
                 break-inside: auto;
                 page-break-inside: auto;
               }
               .msg-index {
-                position: static;
-                display: block;
                 margin-top: 10px;
-                text-align: right;
               }
             }
           </style>
