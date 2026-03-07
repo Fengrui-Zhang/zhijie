@@ -19,18 +19,9 @@ interface NoteSidebarProps {
   mobile?: boolean;
 }
 
-const SAVE_LABELS: Record<SaveState, string> = {
-  idle: '自动保存到云端',
-  loading: '正在加载笔记',
-  saving: '保存中...',
-  saved: '已保存',
-  error: '保存失败',
-};
-
 export default function NoteSidebar({
   content,
   onChange,
-  saveState,
   collapsed,
   onToggle,
   mobile = false,
@@ -75,23 +66,6 @@ export default function NoteSidebar({
             </svg>
           )}
         </button>
-      </div>
-
-      <div className="border-b border-stone-200/60 px-4 py-3 text-xs text-stone-500">
-        <div className="flex items-center justify-between gap-3">
-          <span>草稿本，跨设备同步</span>
-          <span
-            className={`rounded-full px-2 py-0.5 ${
-              saveState === 'error'
-                ? 'bg-red-50 text-red-600'
-                : saveState === 'saved'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-white/70 text-stone-500'
-            }`}
-          >
-            {SAVE_LABELS[saveState]}
-          </span>
-        </div>
       </div>
 
       <div className="flex-1 min-h-0 p-3">
