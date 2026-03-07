@@ -40,7 +40,7 @@ const GuaCard = ({ title, gua }: { title: string, gua: GuaDetails }) => {
   const nameColor = getWuxingColor(gua.gua_name);
 
   return (
-    <div className="flex flex-col items-center bg-white p-4 rounded shadow-sm border border-stone-200 min-w-[100px]">
+    <div className="glass-panel-soft flex flex-col items-center p-4 rounded-[24px] min-w-[100px]">
       <div className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-2">{title}</div>
       <HexagramSymbol mark={gua.gua_mark} />
       <div className={`font-bold text-lg mt-2 ${nameColor}`}>{gua.gua_name}</div>
@@ -58,7 +58,7 @@ const MeihuaGrid: React.FC<Props> = ({ data }) => {
   return (
     <div className="w-full max-w-2xl mx-auto my-6">
        {/* Four Pillars Visualization for Meihua */}
-       <div className="grid grid-cols-4 gap-2 mb-6 bg-stone-50 p-3 rounded text-center">
+       <div className="glass-panel-soft grid grid-cols-4 gap-2 mb-6 p-3 rounded-[24px] text-center">
          {['year', 'month', 'day', 'hour'].map((t, i) => {
             const k = t as keyof typeof sizhu_info;
             // The API for Meihua returns flattened sizhu_info keys like year_gan, year_zhi
@@ -84,7 +84,7 @@ const MeihuaGrid: React.FC<Props> = ({ data }) => {
           <GuaCard title="变卦" gua={gua_info.biangua} />
        </div>
        
-       <div className="mt-6 bg-stone-50 p-4 rounded text-sm text-stone-600 border border-stone-100 text-center">
+       <div className="glass-panel-soft mt-6 p-4 rounded-[24px] text-sm text-stone-600 border border-white/60 text-center">
          <span className="font-bold">动爻: </span> {dongyao ? `${dongyao}爻动` : '无动爻'}
          <div className="mt-2 text-xs text-stone-500">
            {gua_info.bengua.gua_description.gua_juece}

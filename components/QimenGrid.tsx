@@ -32,6 +32,14 @@ PALACE_BY_NUMBER[0] = '中';
 
 const LIST_INDEX_MAP = ['坎', '艮', '震', '巽', '离', '坤', '兑', '乾', '中'];
 
+const getCornerClass = (index: number) => {
+  if (index === 0) return 'rounded-tl-[23px]';
+  if (index === 2) return 'rounded-tr-[23px]';
+  if (index === 6) return 'rounded-bl-[23px]';
+  if (index === 8) return 'rounded-br-[23px]';
+  return '';
+};
+
 const QimenGrid: React.FC<Props> = ({ data }) => {
   
   const gridCells = useMemo(() => {
@@ -118,8 +126,8 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
 
   return (
     <div className="w-full max-w-4xl mx-auto my-6 select-none">
-      <div className="rounded-2xl border border-stone-200 bg-white shadow-lg">
-        <div className="px-5 py-4 border-b border-stone-200">
+      <div className="glass-panel rounded-[30px] overflow-hidden">
+        <div className="glass-panel-soft px-5 py-4 border-b border-white/50">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4 text-stone-800">
               {pillars.map((pillar) => (
@@ -142,10 +150,11 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
         </div>
 
         <div className="p-4">
-          <div className="grid grid-cols-3 gap-0 border border-stone-800 bg-stone-800">
+          <div className="grid grid-cols-3 gap-[1px] rounded-[24px] border border-white/60 bg-stone-500/40 overflow-hidden shadow-[0_18px_40px_rgba(28,25,23,0.08)]">
             {gridCells.map((cell, idx) => {
               const pData = cell.data;
-              if (!pData) return <div key={idx} className="bg-white min-h-[170px]"></div>;
+              const cornerClass = getCornerClass(idx);
+              if (!pData) return <div key={idx} className={`glass-panel-soft min-h-[170px] ${cornerClass}`}></div>;
 
               const isKong = pData.is_kongwang == 1 || pData.is_kongwang == '1';
               const isMa = pData.is_maxing == 1 || pData.is_maxing == '1';
@@ -164,7 +173,7 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
               return (
                 <div
                   key={idx}
-                  className="relative bg-white min-h-[170px] border border-stone-800 px-2 py-2 font-['STKaiti','KaiTi','Songti_SC','serif'] text-stone-900"
+                  className={`relative glass-panel-soft min-h-[170px] px-2 py-2 font-['STKaiti','KaiTi','Songti_SC','serif'] text-stone-900 ${cornerClass}`}
                 >
                   <div className="absolute left-2 top-2 text-xs text-stone-400">
                     <span className={`font-semibold ${palaceColor}`}>
@@ -210,7 +219,7 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
                   </div>
 
                   {isKong && (
-                    <div className="absolute top-2 right-2 translate-y-6 rounded-full border border-stone-300 bg-white px-1 text-[10px] text-stone-400">
+                    <div className="absolute top-2 right-2 translate-y-6 rounded-full border border-stone-300/70 bg-white/70 px-1 text-[10px] text-stone-400 backdrop-blur-md">
                       空
                     </div>
                   )}

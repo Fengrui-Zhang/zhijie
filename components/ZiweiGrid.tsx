@@ -18,7 +18,7 @@ const PalaceCard = ({ p }: { p: ZiweiPalace }) => {
   // We'll just show the main ones for simplicity in this grid.
 
   return (
-    <div className="border border-stone-200 bg-white p-2 text-xs flex flex-col h-[120px] justify-between relative shadow-sm hover:shadow-md transition-shadow">
+    <div className="glass-panel-soft p-2 text-xs flex flex-col h-[120px] justify-between relative rounded-[20px] hover:shadow-[0_18px_34px_rgba(28,25,23,0.1)] transition-shadow">
       
       {/* Stars Section */}
       <div className="flex flex-col gap-0.5">
@@ -33,9 +33,9 @@ const PalaceCard = ({ p }: { p: ZiweiPalace }) => {
       </div>
 
       {/* Footer Info */}
-      <div className="border-t border-stone-100 pt-1 mt-1">
+      <div className="border-t border-white/50 pt-1 mt-1">
         <div className="flex justify-between items-end">
-           <span className="font-bold text-sm text-red-800 bg-red-50 px-1 rounded">{p.minggong}</span>
+           <span className="font-bold text-sm text-red-800 bg-red-50/75 px-1.5 py-0.5 rounded-lg border border-red-100/80">{p.minggong}</span>
            <span className="font-mono text-stone-400 text-lg leading-none opacity-30 absolute bottom-1 right-1">{p.yinshou?.charAt(1)}</span>
         </div>
         <div className="flex justify-between text-[10px] text-stone-400 mt-0.5">
@@ -65,12 +65,12 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
   
   return (
     <div className="w-full max-w-3xl mx-auto my-6">
-      <div className="bg-purple-50 p-3 rounded mb-4 text-center border border-purple-100">
+      <div className="glass-panel-soft p-3 rounded-[24px] mb-4 text-center border border-white/60">
          <h3 className="font-bold text-purple-900">{base_info.name} - {base_info.mingju}</h3>
          <p className="text-xs text-purple-700">命宫: {base_info.minggong} | 身宫: {base_info.shengong} | 命主: {base_info.mingzhu}</p>
       </div>
       
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-2 bg-stone-100 p-2 rounded">
+      <div className="glass-panel grid grid-cols-3 md:grid-cols-4 gap-2 p-3 rounded-[28px]">
          {palaces.map((p, idx) => (
            <PalaceCard key={idx} p={p} />
          ))}

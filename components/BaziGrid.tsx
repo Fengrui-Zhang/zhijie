@@ -121,7 +121,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto my-5 bg-white p-3 md:p-4 rounded-xl shadow-sm border border-stone-200">
+    <div className="glass-panel w-full max-w-3xl mx-auto my-5 p-3 md:p-4 rounded-[30px]">
       <div className="text-center mb-3">
         <h3 className="text-lg font-bold text-stone-800">{base_info.name} ({base_info.sex})</h3>
         <p className="text-xs text-stone-500">{base_info.nongli}</p>
@@ -132,22 +132,22 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
       </div>
 
       {/* Four Pillars (Compact Grid) */}
-      <div className="border border-stone-200 rounded-lg overflow-hidden mb-3">
-        <div className="grid grid-cols-5 text-[11px] text-stone-400 bg-stone-50 border-b border-stone-200">
+      <div className="glass-panel-soft border border-white/60 rounded-[24px] overflow-hidden mb-3">
+        <div className="grid grid-cols-5 text-[11px] text-stone-400 bg-white/45 border-b border-white/60">
           <div className="px-2 py-1.5">四柱</div>
           {pillars.map((p) => (
             <div key={p.key} className="px-2 py-1.5 text-center">{p.label}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-5 border-b border-stone-100">
+        <div className="grid grid-cols-5 border-b border-white/50">
           <div className="px-2 py-1.5 text-[11px] text-stone-400">主星</div>
           {pillars.map((p) => (
             <div key={p.key} className="px-2 py-1.5 text-xs text-center text-stone-700">{p.tgGod}</div>
           ))}
         </div>
 
-        <div className="grid grid-cols-5 border-b border-stone-100">
+        <div className="grid grid-cols-5 border-b border-white/50">
           <div className="px-2 py-2 text-[11px] text-stone-400">天干</div>
           {pillars.map((p) => {
             const gan = p.bazi.charAt(0);
@@ -159,7 +159,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
           })}
         </div>
 
-        <div className="grid grid-cols-5 border-b border-stone-100">
+        <div className="grid grid-cols-5 border-b border-white/50">
           <div className="px-2 py-2 text-[11px] text-stone-400">地支</div>
           {pillars.map((p) => {
             const zhi = p.bazi.charAt(1);
@@ -171,7 +171,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
           })}
         </div>
 
-        <div className="grid grid-cols-5 border-b border-stone-100">
+        <div className="grid grid-cols-5 border-b border-white/50">
           <div className="px-2 py-2 text-[11px] text-stone-400">藏干</div>
           {pillars.map((p) => (
             <div key={p.key} className="px-2 py-2 text-center">
@@ -192,7 +192,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
       </div>
 
       {pillarShensha && (
-        <div className="border-t border-stone-100 pt-3 mb-3">
+        <div className="border-t border-white/50 pt-3 mb-3">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-bold text-stone-700">神煞</div>
             <button
@@ -225,9 +225,9 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
       )}
 
       {/* Dayun */}
-      <div className="border-t border-stone-100 pt-4">
+      <div className="border-t border-white/50 pt-4">
         <div className="text-sm font-bold text-stone-700 mb-2">大运</div>
-        <div className="flex overflow-x-auto gap-2 pb-2">
+        <div className="glass-scrollbar flex overflow-x-auto gap-2 pb-2">
           {dayun_info.big.map((dy, idx) => {
              const gan = dy.charAt(0);
              const zhi = dy.charAt(1);
@@ -237,7 +237,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
                  key={idx}
                  type="button"
                  onClick={() => setExpandedDayunIdx(expandedDayunIdx === idx ? null : idx)}
-                 className={`flex flex-col items-center min-w-[70px] p-2 rounded border transition ${expandedDayunIdx === idx ? 'bg-amber-50 border-amber-200' : 'bg-stone-50 border-stone-100 hover:bg-stone-100'}`}
+                 className={`flex flex-col items-center min-w-[70px] p-2 rounded-2xl border transition backdrop-blur-md ${expandedDayunIdx === idx ? 'bg-amber-50/80 border-amber-200/90 shadow-[0_10px_24px_rgba(245,158,11,0.12)]' : 'bg-white/40 border-white/60 hover:bg-white/70'}`}
                >
                   <div className="text-sm font-semibold flex gap-0.5">
                     <span className={getWuxingColor(gan)}>{gan}</span>
@@ -256,7 +256,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         </div>
 
         {(hasYearsInfo || expandedDayunIdx !== null) && expandedDayunIdx !== null && (
-          <div className="mt-3 rounded-lg border border-stone-100 bg-stone-50 p-3">
+          <div className="glass-panel-soft mt-3 rounded-[24px] border border-white/60 p-3">
             <div className="text-xs font-bold text-stone-700 mb-2">
               大运 {dayun_info.big[expandedDayunIdx]}（{dayun_info.big_start_year[expandedDayunIdx]} - {dayun_info.big_end_year[expandedDayunIdx]}）
             </div>
@@ -275,7 +275,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
                 return (
                   <div
                     key={`${expandedDayunIdx}-${index}`}
-                    className="flex flex-col items-center gap-0.5 min-w-[46px] px-2 py-1 rounded bg-white border border-stone-200"
+                    className="flex flex-col items-center gap-0.5 min-w-[46px] px-2 py-1 rounded-xl bg-white/60 border border-white/70 backdrop-blur-md"
                   >
                     <div className="flex items-center gap-1">
                       <div className={`text-sm font-semibold ${getWuxingColor(gan)}`}>{gan}</div>

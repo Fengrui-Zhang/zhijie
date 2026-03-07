@@ -23,7 +23,7 @@ const YaoLine = ({
   const bianColor = getWuxingColor(bianLiuqin);
 
   return (
-    <div className="flex items-center gap-0 h-10 border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors px-2">
+    <div className="flex items-center gap-0 h-10 border-b border-white/50 last:border-0 hover:bg-white/45 transition-colors px-2">
        {/* 1. Liushen (Six Gods) - Fixed width, always rendered to maintain structure */}
        <div className="w-12 shrink-0 text-xs text-stone-500 font-bold text-center">
           {liushen || ''}
@@ -55,8 +55,8 @@ const YaoLine = ({
 
        {/* 5. Shi/Ying Marker */}
        <div className="w-10 shrink-0 flex justify-center">
-          {isShi && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded font-bold">世</span>}
-          {isYing && <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded font-bold">应</span>}
+          {isShi && <span className="text-[10px] bg-red-100/75 text-red-600 px-1 rounded font-bold border border-red-100/80">世</span>}
+          {isYing && <span className="text-[10px] bg-blue-50/75 text-blue-600 px-1 rounded font-bold border border-blue-100/80">应</span>}
        </div>
 
        {/* 6. Transformation Indicator */}
@@ -120,13 +120,13 @@ const LiuyaoGrid: React.FC<Props> = ({ data }) => {
   });
 
   return (
-    <div className="w-full max-w-4xl mx-auto my-6 bg-white p-6 rounded-xl shadow-lg border border-stone-200 overflow-x-auto">
+    <div className="glass-panel glass-scrollbar w-full max-w-4xl mx-auto my-6 p-6 rounded-[30px] overflow-x-auto">
       
       {/* Header Info */}
-      <div className="flex flex-wrap justify-between items-center mb-6 bg-stone-50 p-3 rounded-lg text-sm text-stone-600 border border-stone-100">
+      <div className="glass-panel-soft flex flex-wrap justify-between items-center mb-6 p-3 rounded-[24px] text-sm text-stone-600 border border-white/60">
          <div className="flex gap-6">
             <span className="font-serif font-bold text-stone-800">{sizhu_info.year_gan}{sizhu_info.year_zhi}年 {sizhu_info.month_gan}{sizhu_info.month_zhi}月 {sizhu_info.day_gan}{sizhu_info.day_zhi}日</span>
-            <span className="font-bold text-red-700 bg-red-50 px-2 rounded">旬空: {kongwang}</span>
+            <span className="font-bold text-red-700 bg-red-50/75 px-2 rounded border border-red-100/80">旬空: {kongwang}</span>
          </div>
          <div className="flex gap-4 text-xs font-semibold">
             <span className="text-blue-700">驿马:{shensha_info.yima}</span>
@@ -152,8 +152,8 @@ const LiuyaoGrid: React.FC<Props> = ({ data }) => {
       </div>
 
       {/* Hexagram Lines Container */}
-      <div className="border border-stone-200 rounded-lg overflow-hidden bg-white mb-6 min-w-[600px]">
-         <div className="bg-stone-50 flex text-[10px] font-bold text-stone-400 py-1 px-2 border-b border-stone-200">
+      <div className="glass-panel-soft border border-white/60 rounded-[24px] overflow-hidden mb-6 min-w-[600px]">
+         <div className="bg-white/45 flex text-[10px] font-bold text-stone-400 py-1 px-2 border-b border-white/60">
             <div className="w-12 text-center">六神</div>
             <div className="w-20 text-right pr-2">伏神</div>
             <div className="w-28 text-center">本卦爻象</div>
@@ -180,7 +180,7 @@ const LiuyaoGrid: React.FC<Props> = ({ data }) => {
          ))}
       </div>
 
-      <div className="mt-4 text-sm text-stone-600 bg-amber-50 p-4 rounded-lg border border-amber-100">
+      <div className="glass-panel-soft mt-4 text-sm text-stone-600 bg-amber-50/65 p-4 rounded-[24px] border border-amber-100/80">
          <div className="font-bold text-amber-900 mb-2 flex items-center gap-2">
             <span className="text-lg">📜</span> 卦辞详情:
          </div>

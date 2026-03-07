@@ -27,11 +27,11 @@ export default function UserMenuPopup({
 }: Props) {
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/28 backdrop-blur-sm px-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-stone-200 p-6 space-y-4"
+        className="glass-panel w-full max-w-sm rounded-[28px] p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -52,7 +52,7 @@ export default function UserMenuPopup({
           </div>
         </div>
 
-        <div className="border-t border-stone-100 pt-4 space-y-2">
+        <div className="border-t border-white/50 pt-4 space-y-2">
           {isAdmin && (
             <button
               type="button"
@@ -60,7 +60,7 @@ export default function UserMenuPopup({
                 onClose();
                 onOpenAdmin();
               }}
-              className="w-full py-2 rounded-lg border border-red-500/60 text-red-600 text-sm hover:bg-red-50 transition"
+              className="glass-chip w-full py-2.5 rounded-2xl border border-red-300/70 text-red-600 text-sm hover:bg-red-50/70 transition"
             >
               管理系统
             </button>
@@ -71,7 +71,7 @@ export default function UserMenuPopup({
               onClose();
               onOpenChangePassword();
             }}
-            className="w-full py-2 rounded-lg border border-stone-300 text-stone-600 text-sm hover:bg-stone-50 transition"
+            className="glass-chip w-full py-2.5 rounded-2xl text-stone-600 text-sm hover:bg-white/70 transition"
           >
             修改密码
           </button>
@@ -81,7 +81,7 @@ export default function UserMenuPopup({
               onClose();
               onLogout();
             }}
-            className="w-full py-2 rounded-lg border border-stone-300 text-stone-600 text-sm hover:bg-stone-50 transition"
+            className="glass-chip w-full py-2.5 rounded-2xl text-stone-600 text-sm hover:bg-white/70 transition"
           >
             退出账号
           </button>
@@ -91,7 +91,7 @@ export default function UserMenuPopup({
               onClose();
               onOpenDeleteAccount();
             }}
-            className="w-full py-2 rounded-lg border border-red-300 text-red-600 text-sm hover:bg-red-50 transition"
+            className="glass-chip w-full py-2.5 rounded-2xl border border-red-300/70 text-red-600 text-sm hover:bg-red-50/70 transition"
           >
             注销账号
           </button>

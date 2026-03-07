@@ -55,6 +55,14 @@ const SessionIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
     <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v5.5A2.25 2.25 0 0 0 3.25 14h2.63l2.66 2.28a.75.75 0 0 0 1.24-.57V14h7.02A2.25 2.25 0 0 0 19 11.75v-5.5A2.25 2.25 0 0 0 16.75 4H3.25Zm1.5 3.25a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Zm0 3.5a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5H5.5a.75.75 0 0 1-.75-.75Z" />
   </svg>
 );
+const TaijiIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <circle cx="12" cy="12" r="9" fill="#111827" />
+    <path d="M12 3a9 9 0 0 1 0 18c2.9 0 5.25-2.01 5.25-4.5S14.9 12 12 12s-5.25-2.01-5.25-4.5S9.1 3 12 3Z" fill="#F6EAD8" />
+    <circle cx="12" cy="7.5" r="1.4" fill="#111827" />
+    <circle cx="12" cy="16.5" r="1.4" fill="#F6EAD8" />
+  </svg>
+);
 
 const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
@@ -1834,9 +1842,9 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#fcfcfc] text-stone-800 font-serif">
+    <div className="app-shell min-h-screen flex flex-col text-stone-800 font-serif">
       {/* Header */}
-      <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-amber-700 sticky top-0 z-20">
+      <header className="glass-topbar text-stone-100 py-4 px-4 border-b border-amber-500/40 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             {isLoggedIn && (
@@ -1994,7 +2002,7 @@ const App: React.FC = () => {
 
       <main className={`flex-1 max-w-4xl px-2 mt-6 pb-6 overflow-y-auto w-full min-h-0 transition-[margin] duration-300 ${isLoggedIn ? 'md:ml-[320px] md:mr-6' : 'mx-auto'}`}>
         {!isLoggedIn && step === 'input' && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 mb-4 flex items-center gap-2">
+          <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
             <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
             <button
               type="button"
@@ -2006,26 +2014,31 @@ const App: React.FC = () => {
           </div>
         )}
         {isLoggedIn && userQuota !== null && userQuota <= 0 && step === 'input' && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2 mb-4">
+          <div className="glass-banner bg-red-50/70 border border-red-200/80 text-red-700 text-xs rounded-2xl px-4 py-3 mb-4">
             您的提问额度已用完，无法继续提问。
           </div>
         )}
 
-        {error && <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">{error}</div>}
+        {error && <div className="glass-banner bg-red-50/72 border border-red-200/80 text-red-700 p-4 mb-6 rounded-2xl">{error}</div>}
 
         {/* Input Phase */}
         {step === 'input' && (
-          <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-stone-200">
+          <div className="glass-panel p-6 md:p-8 rounded-[32px]">
             
             {/* Categorized Model Selector */}
             <div className="mb-8 space-y-4">
                {/* 1. Divination Group */}
-               <div>
-                  <div className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <span>🔮 占卜预测</span>
-                    <span className="font-normal normal-case text-stone-300">- 求测具体事项吉凶 </span>
+               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
+                  <div className="mb-2.5 flex items-center gap-2.5">
+                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl">
+                      <TaijiIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">占卜预测</div>
+                      <div className="text-[13px] text-stone-400">求测具体事项吉凶</div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2.5 md:grid-cols-3">
                     {[
                       [ModelType.QIMEN, '奇门遁甲'], 
                       [ModelType.MEIHUA, '梅花易数'],
@@ -2036,15 +2049,17 @@ const App: React.FC = () => {
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${isRecommended ? 'relative ring-2 ring-amber-400/70' : ''} ${
+                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
                           modelType === type 
-                            ? 'bg-stone-800 text-amber-500 border-stone-800 shadow-md transform -translate-y-0.5' 
-                            : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-white hover:border-stone-300'
+                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
+                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
                         }`}
                       >
+                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${modelType === type ? 'bg-white/50' : 'bg-white/80'}`}></span>
+                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${modelType === type ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
                         {label}
                         {isRecommended && (
-                          <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
+                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
                             强力推荐
                           </span>
                         )}
@@ -2055,12 +2070,15 @@ const App: React.FC = () => {
                </div>
 
                {/* 2. Destiny Group */}
-               <div>
-                  <div className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <span>📜 命理运势</span>
-                    <span className="font-normal normal-case text-stone-300">- 观测人生大运趋势 </span>
+               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
+                  <div className="mb-2.5 flex items-center gap-2.5">
+                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base">📜</div>
+                    <div>
+                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">命理运势</div>
+                      <div className="text-[13px] text-stone-400">观测人生大运趋势</div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2.5 md:grid-cols-2">
                     {[
                       [ModelType.BAZI, '四柱八字（盲派）'], 
                       [ModelType.ZIWEI, '紫微斗数']
@@ -2070,15 +2088,17 @@ const App: React.FC = () => {
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
-                        className={`flex-1 py-3 text-sm font-bold rounded-lg border transition-all ${isRecommended ? 'relative ring-2 ring-amber-400/70' : ''} ${
+                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
                           modelType === type 
-                            ? 'bg-stone-800 text-amber-500 border-stone-800 shadow-md transform -translate-y-0.5' 
-                            : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-white hover:border-stone-300'
+                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
+                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
                         }`}
                       >
+                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${modelType === type ? 'bg-white/50' : 'bg-white/80'}`}></span>
+                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${modelType === type ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
                         {label}
                         {isRecommended && (
-                          <span className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow">
+                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
                             强力推荐【人生K线上新】
                           </span>
                         )}
@@ -2090,20 +2110,42 @@ const App: React.FC = () => {
             </div>
 
             {supportsKnowledge && (
-              <div className="mb-6 flex items-center justify-between rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
-                <div>
-                  <div className="text-sm font-bold text-stone-700">参考古籍</div>
-                  <div className="text-xs text-stone-500">检索并参考知识库资料</div>
+              <div className="glass-panel-soft mb-6 flex items-center justify-between rounded-[22px] px-3.5 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
+                    册
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">参考古籍</div>
+                    <div className="text-xs text-stone-500">检索并参考知识库资料</div>
+                  </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-stone-700">
-                  <input
-                    type="checkbox"
-                    checked={useKnowledge}
-                    onChange={(event) => setUseKnowledge(event.target.checked)}
-                    className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span>{useKnowledge ? '已开启' : '已关闭'}</span>
-                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={useKnowledge}
+                  onClick={() => setUseKnowledge((prev) => !prev)}
+                  className={`inline-flex h-11 min-w-[126px] items-center gap-3 rounded-full border px-3 py-1.5 transition-all ${
+                    useKnowledge
+                      ? 'glass-panel-dark border-transparent text-amber-200'
+                      : 'glass-chip text-stone-600'
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
+                      useKnowledge
+                        ? 'border-amber-300/80 bg-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_0_24px_rgba(251,191,36,0.42)]'
+                        : 'border-stone-300/90 bg-white/30'
+                    }`}
+                  >
+                    <span
+                      className={`h-3 w-3 rounded-full transition-all ${
+                        useKnowledge ? 'bg-white/95' : 'bg-transparent'
+                      }`}
+                    />
+                  </span>
+                  <span className="min-w-[52px] text-right text-sm font-medium leading-none">{useKnowledge ? '已开启' : '已关闭'}</span>
+                </button>
               </div>
             )}
 
@@ -2116,7 +2158,7 @@ const App: React.FC = () => {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder={modelType === ModelType.QIMEN ? "例如：这次面试能过吗？" : "例如：近期财运如何？"}
-                    className="w-full border border-stone-300 rounded-lg p-3 focus:ring-2 focus:ring-amber-500 outline-none min-h-[80px]"
+                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[80px]"
                   />
                 </div>
               )}
@@ -2129,7 +2171,7 @@ const App: React.FC = () => {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder="例如：事业发展方向如何？"
-                    className="w-full border border-stone-300 rounded-lg p-3 focus:ring-2 focus:ring-amber-500 outline-none min-h-[80px]"
+                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[80px]"
                   />
                 </div>
               )}
@@ -2138,7 +2180,7 @@ const App: React.FC = () => {
               {isLifeReading && (
                  <div>
                    <label className="block text-stone-700 font-bold mb-2">姓名 (可选)</label>
-                   <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full border border-stone-300 rounded p-2" placeholder="张三"/>
+                   <input type="text" value={name} onChange={e => setName(e.target.value)} className="glass-input w-full rounded-2xl p-3" placeholder="张三"/>
                  </div>
               )}
 
@@ -2150,7 +2192,7 @@ const App: React.FC = () => {
                       type="number" 
                       value={birthYear} 
                       onChange={e => setBirthYear(e.target.value)} 
-                      className="w-full border border-stone-300 rounded p-2" 
+                      className="glass-input w-full rounded-2xl p-3" 
                       placeholder="例如: 1995"
                     />
                  </div>
@@ -2161,8 +2203,8 @@ const App: React.FC = () => {
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">性别</label>
                   <div className="flex gap-4">
-                    <button onClick={() => setGender(0)} className={`flex-1 py-2 rounded-lg border ${gender === 0 ? 'bg-stone-800 text-white' : 'bg-white text-stone-600'}`}>男 (乾)</button>
-                    <button onClick={() => setGender(1)} className={`flex-1 py-2 rounded-lg border ${gender === 1 ? 'bg-stone-800 text-white' : 'bg-white text-stone-600'}`}>女 (坤)</button>
+                    <button onClick={() => setGender(0)} className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 0 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}>男 (乾)</button>
+                    <button onClick={() => setGender(1)} className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 1 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}>女 (坤)</button>
                   </div>
                 </div>
 
@@ -2174,8 +2216,8 @@ const App: React.FC = () => {
                     </label>
                     {!isLifeReading && (
                       <div className="flex gap-2 mb-2">
-                        <button onClick={() => setTimeMode('now')} className={`flex-1 text-xs py-1 rounded border ${timeMode === 'now' ? 'bg-amber-100 text-amber-800' : 'bg-white'}`}>即时</button>
-                        <button onClick={() => setTimeMode('custom')} className={`flex-1 text-xs py-1 rounded border ${timeMode === 'custom' ? 'bg-amber-100 text-amber-800' : 'bg-white'}`}>指定</button>
+                        <button onClick={() => setTimeMode('now')} className={`flex-1 text-xs py-1.5 rounded-xl border transition ${timeMode === 'now' ? 'glass-panel-soft text-amber-800 border-amber-200/80' : 'glass-chip text-stone-600'}`}>即时</button>
+                        <button onClick={() => setTimeMode('custom')} className={`flex-1 text-xs py-1.5 rounded-xl border transition ${timeMode === 'custom' ? 'glass-panel-soft text-amber-800 border-amber-200/80' : 'glass-chip text-stone-600'}`}>指定</button>
                       </div>
                     )}
                     {(timeMode === 'custom' || isLifeReading) && (
@@ -2183,7 +2225,7 @@ const App: React.FC = () => {
                         type="datetime-local" 
                         value={customDate} 
                         onChange={(e) => setCustomDate(e.target.value)} 
-                        className="w-full border border-stone-300 rounded p-2"
+                        className="glass-input w-full rounded-2xl p-3"
                       />
                     )}
                     {showSolarTimeReminder && (
@@ -2199,7 +2241,7 @@ const App: React.FC = () => {
               </div>
 
               {modelType === ModelType.QIMEN && (
-                <div className="bg-stone-50 p-4 rounded-lg border border-stone-100">
+                <div className="glass-panel-soft p-4 rounded-[28px]">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="text-sm font-bold text-stone-700">专业版设置</div>
@@ -2269,7 +2311,7 @@ const App: React.FC = () => {
 
               {/* --- LIU YAO SPECIFIC UI --- */}
               {modelType === ModelType.LIUYAO && (
-                 <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100 mt-4">
+                 <div className="glass-panel-soft bg-amber-50/55 p-4 rounded-[28px] border border-amber-100/80 mt-4">
                     <label className="block text-stone-700 font-bold mb-3">六爻起卦方式</label>
                     
                     {/* Mode Selector */}
@@ -2284,7 +2326,7 @@ const App: React.FC = () => {
                           <button 
                             key={m} 
                             onClick={() => setLiuyaoMode(m as LiuyaoMode)}
-                            className={`px-3 py-1.5 text-xs rounded-full border ${liuyaoMode === m ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-600 border-stone-200'}`}
+                          className={`px-3 py-1.5 text-xs rounded-full border transition ${liuyaoMode === m ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}
                           >
                             {l}
                           </button>
@@ -2301,7 +2343,7 @@ const App: React.FC = () => {
                           type="datetime-local" 
                           value={customDate} 
                           onChange={(e) => setCustomDate(e.target.value)} 
-                          className="w-full border border-stone-300 rounded p-2 text-sm"
+                          className="glass-input w-full rounded-2xl p-3 text-sm"
                         />
                        </div>
                     )}
@@ -2340,7 +2382,7 @@ const App: React.FC = () => {
                           <label className="text-xs text-stone-500 block mb-1">输入数字</label>
                           <input 
                             type="number" value={lyNum} onChange={e => setLyNum(e.target.value)}
-                            placeholder="例如: 369" className="w-full border border-stone-300 rounded p-2"
+                            placeholder="例如: 369" className="glass-input w-full rounded-2xl p-3"
                           />
                        </div>
                     )}
@@ -2348,11 +2390,11 @@ const App: React.FC = () => {
                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="text-xs text-stone-500 block mb-1">上卦数</label>
-                            <input type="number" value={lyNumUp} onChange={e => setLyNumUp(e.target.value)} placeholder="例: 3" className="w-full border border-stone-300 rounded p-2"/>
+                            <input type="number" value={lyNumUp} onChange={e => setLyNumUp(e.target.value)} placeholder="例: 3" className="glass-input w-full rounded-2xl p-3"/>
                           </div>
                           <div>
                             <label className="text-xs text-stone-500 block mb-1">下卦数</label>
-                            <input type="number" value={lyNumDown} onChange={e => setLyNumDown(e.target.value)} placeholder="例: 8" className="w-full border border-stone-300 rounded p-2"/>
+                            <input type="number" value={lyNumDown} onChange={e => setLyNumDown(e.target.value)} placeholder="例: 8" className="glass-input w-full rounded-2xl p-3"/>
                           </div>
                        </div>
                     )}
@@ -2380,7 +2422,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={handleCalculate} disabled={loading}
-                className="w-full bg-stone-900 hover:bg-stone-800 text-amber-500 font-bold py-4 rounded-lg shadow-md mt-4 flex justify-center items-center gap-2"
+                className="glass-cta w-full hover:brightness-105 text-amber-300 font-bold py-4 rounded-2xl mt-4 flex justify-center items-center gap-2 transition"
               >
                 {loading ? <Spinner /> : '开始排盘'}
               </button>
@@ -2392,7 +2434,7 @@ const App: React.FC = () => {
         {step === 'chart' && chartData && (
           <div className="animate-fade-in space-y-6">
             {!isLoggedIn && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+              <div className="glass-banner bg-amber-50/72 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
                 <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
                 <button
                   type="button"
@@ -2404,7 +2446,7 @@ const App: React.FC = () => {
               </div>
             )}
             <div ref={reportChartRef} className="space-y-4">
-              <div className="flex justify-between items-center bg-white p-3 rounded-lg shadow border border-stone-200">
+              <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
                  <span className="font-bold text-stone-700">
                   {modelType === ModelType.QIMEN ? '奇门排盘' : 
                    modelType === ModelType.BAZI ? '八字命盘' : 
@@ -2423,8 +2465,8 @@ const App: React.FC = () => {
             </div>
 
             {/* Chat */}
-            <div className="bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden flex flex-col h-[600px]">
-               <div className="bg-stone-100 px-4 py-3 border-b border-stone-200 flex justify-between items-center">
+            <div className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
+               <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><span>🔮</span> 大师解读</h3>
                  <button
                    onClick={handleGenerateReport}
@@ -2448,7 +2490,7 @@ const App: React.FC = () => {
                    {isGeneratingReport ? '生成中...' : '生成报告'}
                  </button>
                </div>
-               <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#f9fafb]">
+               <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto p-4 space-y-6">
                  {knowledgeHint && (
                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
                      <span>⚠️ 知识库检索失败，本次回答未使用参考资料。{knowledgeHint !== '知识库检索失败' && `（${knowledgeHint}）`}</span>
@@ -2460,7 +2502,7 @@ const App: React.FC = () => {
                    const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`max-w-[90%] rounded-lg p-4 shadow-sm relative ${msg.role === 'user' ? 'bg-stone-800 text-white' : 'bg-white border border-stone-100 text-stone-800'}`}>
+                     <div className={`max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
                         {msg.role === 'model' && (
                           <button
                             type="button"
@@ -2495,14 +2537,14 @@ const App: React.FC = () => {
                  {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">大师正在思考...</div>}
                  <div ref={chatEndRef} />
                </div>
-               <div className="p-4 bg-white border-t border-stone-200 flex gap-2">
+               <div className="glass-panel-soft p-4 border-t border-white/50 flex gap-2">
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                    placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
-                   className="flex-1 border border-stone-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none"
+                   className="glass-input flex-1 rounded-2xl px-4 py-2"
                  />
-                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="bg-stone-900 text-amber-500 p-2 rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:hover:bg-stone-900"><SendIcon /></button>
+                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="glass-cta text-amber-300 p-3 rounded-2xl hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100 transition"><SendIcon /></button>
               </div>
             </div>
           </div>
