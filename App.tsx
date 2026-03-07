@@ -2377,9 +2377,18 @@ const App: React.FC = () => {
                         <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${modelType === type ? 'bg-white/50' : 'bg-white/80'}`}></span>
                         <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${modelType === type ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
                         {label}
-                        {isRecommended && (
-                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            推荐【K线】
+                        {isRecommended && type === ModelType.BAZI && (
+                          <span className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
+                            <span className="bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
+                              推荐
+                            </span>
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full border shadow-[0_10px_20px_rgba(28,25,23,0.16)] ${
+                              modelType === type
+                                ? 'border-white/35 bg-white/14 text-amber-100'
+                                : 'border-amber-200/80 bg-white/78 text-amber-700'
+                            }`}>
+                              K线
+                            </span>
                           </span>
                         )}
                       </button>
