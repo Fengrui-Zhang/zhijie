@@ -79,7 +79,7 @@ export default function SessionSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-10 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col items-center pt-3">
+      <div className="w-10 h-full min-h-0 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col items-center pt-3">
         <button
           onClick={onToggle}
           className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
@@ -95,7 +95,7 @@ export default function SessionSidebar({
   const groups = groupByDate(sessions);
 
   return (
-    <div className="w-64 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col h-full overflow-hidden">
+    <div className="w-64 h-full min-h-0 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col overflow-hidden">
       <div className="p-3 border-b border-stone-200 flex items-center justify-between">
         <span className="text-sm font-medium text-stone-600">历史记录</span>
         <div className="flex items-center gap-1">
