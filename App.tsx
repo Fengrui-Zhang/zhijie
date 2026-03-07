@@ -1979,7 +1979,7 @@ const App: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {isLoggedIn && (
-          <div className="hidden md:flex h-full min-h-0 self-stretch">
+          <div className="hidden md:flex h-full min-h-0 self-start sticky top-[96px] pl-3 pr-2 pb-3">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}

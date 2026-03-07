@@ -79,10 +79,10 @@ export default function SessionSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-10 h-full min-h-0 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col items-center pt-3">
+      <div className="w-14 h-[calc(100vh-112px)] min-h-0 flex-shrink-0 rounded-2xl border border-white/70 bg-white/58 backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.12)] flex flex-col items-center pt-4">
         <button
           onClick={onToggle}
-          className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
+          className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-white/70 text-stone-600 transition-colors"
           title="展开侧边栏"
         >
           <SessionIcon className="w-4 h-4" />
@@ -95,13 +95,16 @@ export default function SessionSidebar({
   const groups = groupByDate(sessions);
 
   return (
-    <div className="w-64 h-full min-h-0 flex-shrink-0 bg-stone-50/80 border-r border-stone-200 flex flex-col overflow-hidden">
-      <div className="p-3 border-b border-stone-200 flex items-center justify-between">
-        <span className="text-sm font-medium text-stone-600">历史记录</span>
+    <div className="w-72 h-[calc(100vh-112px)] min-h-0 flex-shrink-0 rounded-[28px] border border-white/70 bg-white/58 backdrop-blur-xl shadow-[0_24px_60px_rgba(28,25,23,0.14)] flex flex-col overflow-hidden">
+      <div className="px-4 py-4 border-b border-stone-200/70 bg-gradient-to-r from-white/70 to-stone-50/40 flex items-center justify-between">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Sessions</div>
+          <span className="text-sm font-semibold text-stone-700">历史记录</span>
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onNewSession}
-            className="p-1.5 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
+            className="p-2 rounded-xl hover:bg-white/80 text-stone-500 transition-colors"
             title="新建排盘"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -110,7 +113,7 @@ export default function SessionSidebar({
           </button>
           <button
             onClick={onToggle}
-            className="p-1.5 rounded-lg hover:bg-stone-200 text-stone-500 transition-colors"
+            className="p-2 rounded-xl hover:bg-white/80 text-stone-500 transition-colors"
             title="收起侧边栏"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -120,7 +123,7 @@ export default function SessionSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
         {sessions.length === 0 && (
           <p className="text-xs text-stone-400 text-center py-8">
             暂无历史记录
@@ -129,24 +132,24 @@ export default function SessionSidebar({
 
         {Object.entries(groups).map(([label, items]) => (
           <div key={label}>
-            <div className="text-xs text-stone-400 px-2 py-1 font-medium">{label}</div>
-            <div className="space-y-0.5">
+            <div className="text-[11px] text-stone-400 px-2 py-1 font-medium tracking-wide">{label}</div>
+            <div className="space-y-1">
               {items.map(item => (
                 <div
                   key={item.id}
                   onClick={() => onSelect(item.id)}
-                  className={`group flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors text-sm ${
+                  className={`group flex items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all text-sm border ${
                     activeSessionId === item.id
-                      ? 'bg-amber-100/80 text-amber-900'
-                      : 'hover:bg-stone-100 text-stone-700'
+                      ? 'bg-amber-50/95 text-amber-900 border-amber-200/80 shadow-[0_10px_30px_rgba(245,158,11,0.12)]'
+                      : 'bg-white/50 text-stone-700 border-white/60 hover:bg-white/85 hover:border-stone-200/80'
                   }`}
                 >
-                  <span className="text-base flex-shrink-0 w-6 text-center opacity-70">
+                  <span className="text-base flex-shrink-0 w-7 h-7 rounded-full bg-stone-100/80 flex items-center justify-center opacity-80">
                     {MODEL_ICONS[item.modelType] || '卦'}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="truncate text-sm leading-snug">{item.title}</div>
-                    <div className="text-xs text-stone-400 mt-0.5">
+                    <div className="truncate text-sm leading-snug font-medium">{item.title}</div>
+                    <div className="text-xs text-stone-400 mt-1">
                       {MODEL_LABELS[item.modelType] || item.modelType}
                     </div>
                   </div>
@@ -161,7 +164,7 @@ export default function SessionSidebar({
                         setTimeout(() => setConfirmDelete(null), 3000);
                       }
                     }}
-                    className={`flex-shrink-0 p-1 rounded transition-colors ${
+                    className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${
                       confirmDelete === item.id
                         ? 'text-red-500 bg-red-50'
                         : 'text-stone-300 hover:text-red-400 opacity-0 group-hover:opacity-100'
