@@ -27,16 +27,16 @@ export default function UserMenuPopup({
 }: Props) {
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/28 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
       onClick={onClose}
     >
       <div
-        className="glass-panel w-full max-w-sm rounded-[28px] p-6 space-y-4"
+        className="glass-panel w-full max-w-sm rounded-[30px] border border-white/55 p-6 space-y-4 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-stone-800">{name || '用户'}</h3>
-          <button type="button" onClick={onClose} className="text-sm text-stone-400 hover:text-stone-600">
+          <button type="button" onClick={onClose} className="glass-chip rounded-full px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700 hover:bg-white/70 transition">
             关闭
           </button>
         </div>

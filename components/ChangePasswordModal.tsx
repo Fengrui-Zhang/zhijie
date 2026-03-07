@@ -50,16 +50,16 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-stone-200 p-6 space-y-4"
+        className="glass-panel w-full max-w-sm rounded-[30px] border border-white/55 p-6 space-y-4 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-stone-800">修改密码</h3>
-          <button type="button" onClick={onClose} className="text-sm text-stone-400 hover:text-stone-600">
+          <button type="button" onClick={onClose} className="glass-chip rounded-full px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700 hover:bg-white/70 transition">
             关闭
           </button>
         </div>
@@ -69,21 +69,21 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
             value={oldPassword}
             onChange={(e) => { setOldPassword(e.target.value); setError(''); }}
             placeholder="旧密码"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+            className="glass-input w-full rounded-2xl px-3 py-2.5 text-sm outline-none"
           />
           <input
             type="password"
             value={newPassword}
             onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
             placeholder="新密码（至少6位）"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+            className="glass-input w-full rounded-2xl px-3 py-2.5 text-sm outline-none"
           />
           <input
             type="password"
             value={confirmPassword}
             onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
             placeholder="确认新密码"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+            className="glass-input w-full rounded-2xl px-3 py-2.5 text-sm outline-none"
           />
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
@@ -91,7 +91,7 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-stone-300 text-stone-600 text-sm hover:bg-stone-50"
+            className="glass-chip flex-1 rounded-2xl py-2.5 text-sm text-stone-600 hover:bg-white/70 transition"
           >
             取消
           </button>
@@ -99,7 +99,7 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="flex-1 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-700 disabled:opacity-50"
+            className="glass-panel-dark flex-1 rounded-2xl py-2.5 text-sm text-amber-200 hover:brightness-105 disabled:opacity-50"
           >
             {loading ? '提交中...' : '确认'}
           </button>

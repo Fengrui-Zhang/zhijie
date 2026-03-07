@@ -1944,31 +1944,33 @@ const App: React.FC = () => {
 
       {showUpdates && (
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
           onClick={() => setShowUpdates(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-white shadow-xl border border-stone-200"
+            className="glass-panel w-full max-w-lg rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
+            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/50 bg-white/12">
               <div>
-                <div className="text-sm font-bold text-stone-800">{updates.title}</div>
-                <div className="text-[11px] text-stone-500">更新于 {updates.updated_at}</div>
+                <div className="text-base font-bold text-stone-800">{updates.title}</div>
+                <div className="mt-1 text-xs text-stone-500 tracking-[0.08em]">更新于 {updates.updated_at}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowUpdates(false)}
-                className="text-sm text-stone-400 hover:text-stone-600"
+                className="glass-chip shrink-0 rounded-full px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700 hover:bg-white/70 transition"
               >
                 关闭
               </button>
             </div>
-            <div className="px-4 py-3 space-y-2 text-sm text-stone-700">
+            <div className="px-6 py-5 space-y-3 text-sm leading-7 text-stone-700">
               {updates.items.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                  <span>{item}</span>
+                <div key={idx} className="glass-panel-soft flex items-start gap-3 rounded-2xl px-4 py-3 border border-white/55">
+                  <span className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/90 text-[11px] font-bold text-white shadow-[0_0_18px_rgba(251,191,36,0.32)]">
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1">{item}</span>
                 </div>
               ))}
             </div>
