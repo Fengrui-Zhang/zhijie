@@ -63,6 +63,28 @@ const TaijiIcon = ({ className = 'w-5 h-5' }: { className?: string }) => (
     <circle cx="12" cy="16.5" r="1.4" fill="#F6EAD8" />
   </svg>
 );
+const GlowCheck = ({
+  checked,
+  sizeClass = 'h-4 w-4',
+  dotClass = 'h-1.5 w-1.5',
+  activeClass = 'border-amber-300/85 bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.14),0_0_18px_rgba(251,191,36,0.36)]',
+}: {
+  checked: boolean;
+  sizeClass?: string;
+  dotClass?: string;
+  activeClass?: string;
+}) => (
+  <span
+    aria-hidden="true"
+    className={`flex shrink-0 items-center justify-center rounded-full border transition-all ${sizeClass} ${
+      checked
+        ? activeClass
+        : 'border-stone-300/90 bg-white/35'
+    }`}
+  >
+    <span className={`${dotClass} rounded-full transition-all ${checked ? 'bg-white/95' : 'bg-transparent'}`} />
+  </span>
+);
 
 const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
@@ -2301,13 +2323,14 @@ const App: React.FC = () => {
                       <div className="text-sm font-bold text-stone-700">专业版设置</div>
                       <div className="text-xs text-stone-500">非专业人士请使用默认设置</div>
                     </div>
-                    <label className="flex items-center gap-2 text-sm text-stone-700">
+                    <label className="flex items-center gap-2 text-sm text-stone-700 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={qimenProEnabled}
                         onChange={(event) => setQimenProEnabled(event.target.checked)}
-                        className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={qimenProEnabled} sizeClass="h-4 w-4" />
                       <span>{qimenProEnabled ? '已开启' : '已关闭'}</span>
                     </label>
                   </div>
@@ -2455,10 +2478,11 @@ const App: React.FC = () => {
 
                     {/* Add Time Toggle (For Numbers) */}
                     {[LiuyaoMode.NUMBER, LiuyaoMode.SINGLE_NUM, LiuyaoMode.DOUBLE_NUM].includes(liuyaoMode) && (
-                       <div className="mt-3 flex items-center gap-2">
-                          <input type="checkbox" id="yaoTime" checked={yaoAddTime} onChange={e => setYaoAddTime(e.target.checked)} />
-                          <label htmlFor="yaoTime" className="text-sm text-stone-600">加时辰起动爻</label>
-                       </div>
+                       <label htmlFor="yaoTime" className="mt-3 inline-flex items-center gap-2 cursor-pointer text-sm text-stone-600">
+                          <input type="checkbox" id="yaoTime" checked={yaoAddTime} onChange={e => setYaoAddTime(e.target.checked)} className="sr-only" />
+                          <GlowCheck checked={yaoAddTime} sizeClass="h-4 w-4" />
+                          <span>加时辰起动爻</span>
+                       </label>
                     )}
 
                  </div>
@@ -2742,8 +2766,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={klineSeries.overall}
                         onChange={(e) => setKlineSeries((prev) => ({ ...prev, overall: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-stone-300 text-amber-600 focus:ring-amber-500"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={klineSeries.overall} sizeClass="h-3.5 w-3.5" dotClass="h-1 w-1" />
                       <span className="text-stone-700">总体趋势</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-amber-700"></span>
                     </label>
@@ -2752,8 +2777,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={klineSeries.wealth}
                         onChange={(e) => setKlineSeries((prev) => ({ ...prev, wealth: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-stone-300 text-yellow-500 focus:ring-yellow-500"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={klineSeries.wealth} sizeClass="h-3.5 w-3.5" dotClass="h-1 w-1" />
                       <span>财富</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-yellow-500"></span>
                     </label>
@@ -2762,8 +2788,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={klineSeries.love}
                         onChange={(e) => setKlineSeries((prev) => ({ ...prev, love: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-stone-300 text-pink-400 focus:ring-pink-400"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={klineSeries.love} sizeClass="h-3.5 w-3.5" dotClass="h-1 w-1" />
                       <span>感情</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-pink-400"></span>
                     </label>
@@ -2772,8 +2799,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={klineSeries.career}
                         onChange={(e) => setKlineSeries((prev) => ({ ...prev, career: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-stone-300 text-blue-500 focus:ring-blue-500"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={klineSeries.career} sizeClass="h-3.5 w-3.5" dotClass="h-1 w-1" />
                       <span>事业</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-blue-500"></span>
                     </label>
@@ -2782,8 +2810,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={klineSeries.health}
                         onChange={(e) => setKlineSeries((prev) => ({ ...prev, health: e.target.checked }))}
-                        className="h-3.5 w-3.5 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
+                        className="sr-only"
                       />
+                      <GlowCheck checked={klineSeries.health} sizeClass="h-3.5 w-3.5" dotClass="h-1 w-1" />
                       <span>健康</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-emerald-700"></span>
                     </label>
