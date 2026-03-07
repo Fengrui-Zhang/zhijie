@@ -2022,9 +2022,8 @@ const App: React.FC = () => {
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
   const desktopHistoryOffset = sidebarCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
   const desktopNoteOffset = noteCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
-  const desktopWorkOffset = isLoggedIn && !isCompactLayout
-    ? Math.max(desktopHistoryOffset, desktopNoteOffset)
-    : 0;
+  const desktopWorkPaddingLeft = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
+  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopNoteOffset : 0;
 
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
@@ -2275,7 +2274,11 @@ const App: React.FC = () => {
 
       <main
         className="flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300"
-        style={desktopWorkOffset ? { paddingLeft: desktopWorkOffset, paddingRight: desktopWorkOffset } : undefined}
+        style={
+          desktopWorkPaddingLeft || desktopWorkPaddingRight
+            ? { paddingLeft: desktopWorkPaddingLeft, paddingRight: desktopWorkPaddingRight }
+            : undefined
+        }
       >
         <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
         {!isLoggedIn && step === 'input' && (
