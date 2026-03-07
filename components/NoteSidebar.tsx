@@ -79,7 +79,7 @@ export default function NoteSidebar({
 
       <div className="border-b border-stone-200/60 px-4 py-3 text-xs text-stone-500">
         <div className="flex items-center justify-between gap-3">
-          <span>唯一草稿本，跨设备同步</span>
+          <span>草稿本，跨设备同步</span>
           <span
             className={`rounded-full px-2 py-0.5 ${
               saveState === 'error'
