@@ -139,12 +139,20 @@ const renderMarkdownToHtml = (text: string) => {
   let html = '';
   let inCodeBlock = false;
   let listType: 'ul' | 'ol' | null = null;
+  let lastWasGap = false;
+  let hasVisibleContent = false;
 
   const closeList = () => {
     if (listType) {
       html += `</${listType}>`;
       listType = null;
     }
+  };
+
+  const appendGap = () => {
+    if (!hasVisibleContent || lastWasGap) return;
+    html += '<div class="gap"></div>';
+    lastWasGap = true;
   };
 
   const inlineFormat = (value: string) =>
@@ -163,10 +171,14 @@ const renderMarkdownToHtml = (text: string) => {
       if (inCodeBlock) {
         html += '</code></pre>';
         inCodeBlock = false;
+        hasVisibleContent = true;
+        lastWasGap = false;
       } else {
         closeList();
         inCodeBlock = true;
         html += '<pre class="code-block"><code>';
+        hasVisibleContent = true;
+        lastWasGap = false;
       }
       continue;
     }
@@ -178,7 +190,17 @@ const renderMarkdownToHtml = (text: string) => {
 
     if (!trimmed) {
       closeList();
-      html += '<div class="gap"></div>';
+      appendGap();
+      continue;
+    }
+
+    const hrMatch = trimmed.match(/^([-*_])\1{2,}$/);
+    if (hrMatch) {
+      closeList();
+      if (hasVisibleContent) {
+        html += '<hr class="msg-divider" />';
+        lastWasGap = false;
+      }
       continue;
     }
 
@@ -188,6 +210,8 @@ const renderMarkdownToHtml = (text: string) => {
       const level = headingMatch[1].length;
       const content = inlineFormat(escapeHtml(headingMatch[2]));
       html += `<h${level}>${content}</h${level}>`;
+      hasVisibleContent = true;
+      lastWasGap = false;
       continue;
     }
 
@@ -196,6 +220,8 @@ const renderMarkdownToHtml = (text: string) => {
       closeList();
       const content = inlineFormat(escapeHtml(quoteMatch[1]));
       html += `<blockquote>${content}</blockquote>`;
+      hasVisibleContent = true;
+      lastWasGap = false;
       continue;
     }
 
@@ -207,6 +233,8 @@ const renderMarkdownToHtml = (text: string) => {
         html += '<ol>';
       }
       html += `<li>${inlineFormat(escapeHtml(olMatch[1]))}</li>`;
+      hasVisibleContent = true;
+      lastWasGap = false;
       continue;
     }
 
@@ -218,11 +246,15 @@ const renderMarkdownToHtml = (text: string) => {
         html += '<ul>';
       }
       html += `<li>${inlineFormat(escapeHtml(ulMatch[1]))}</li>`;
+      hasVisibleContent = true;
+      lastWasGap = false;
       continue;
     }
 
     closeList();
     html += `<p>${inlineFormat(escapeHtml(line))}</p>`;
+    hasVisibleContent = true;
+    lastWasGap = false;
   }
 
   closeList();
@@ -1017,6 +1049,11 @@ const App: React.FC = () => {
               color: #b45309;
               text-decoration: underline;
             }
+            .msg-divider {
+              margin: 12px 0;
+              border: 0;
+              border-top: 1px dashed #d6d3d1;
+            }
             .msg.user .msg-role {
               color: #92400e;
             }
@@ -1028,7 +1065,7 @@ const App: React.FC = () => {
               color: #44403c;
             }
             .gap {
-              height: 8px;
+              height: 4px;
             }
             .msg-reasoning {
               margin-bottom: 10px;
