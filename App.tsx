@@ -845,6 +845,11 @@ const App: React.FC = () => {
             .chart-live button {
               pointer-events: none !important;
             }
+            .chart-live * {
+              animation: none !important;
+              transition: none !important;
+              text-shadow: none !important;
+            }
             .chart-live .glass-panel,
             .chart-live .glass-panel-soft,
             .chart-live .glass-input,
@@ -878,6 +883,9 @@ const App: React.FC = () => {
             }
             .chart-live [class*="max-w-"] {
               max-width: none !important;
+            }
+            .chart-live [class*="shadow-"] {
+              box-shadow: none !important;
             }
             .chart-live > * {
               margin-left: 0 !important;
@@ -919,15 +927,15 @@ const App: React.FC = () => {
               page-break-inside: auto;
             }
             .msg.user {
-              border-color: #a8a29e;
-              background: #1c1917;
-              color: #fef3c7;
-              break-inside: avoid;
-              page-break-inside: avoid;
+              border-color: #f3d7a1;
+              background: #fffaf0;
+              color: #44403c;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .msg.user .msg-time,
             .msg.user .msg-index {
-              color: #fcd34d;
+              color: #b45309;
             }
             .msg-head {
               display: flex;
@@ -946,6 +954,7 @@ const App: React.FC = () => {
             .msg-text {
               font-size: 14px;
               line-height: 1.65;
+              color: inherit;
             }
             .msg-text p {
               margin: 0 0 10px;
@@ -1008,6 +1017,16 @@ const App: React.FC = () => {
               color: #b45309;
               text-decoration: underline;
             }
+            .msg.user .msg-role {
+              color: #92400e;
+            }
+            .msg.user .msg-text,
+            .msg.user .msg-text p,
+            .msg.user .msg-text li,
+            .msg.user .msg-text strong,
+            .msg.user .msg-text code {
+              color: #44403c;
+            }
             .gap {
               height: 8px;
             }
@@ -1062,8 +1081,8 @@ const App: React.FC = () => {
                 page-break-inside: auto;
               }
               .msg.user {
-                break-inside: avoid;
-                page-break-inside: avoid;
+                break-inside: auto;
+                page-break-inside: auto;
               }
               .msg-index {
                 position: static;
@@ -2317,7 +2336,7 @@ const App: React.FC = () => {
               </div>
 
               {modelType === ModelType.QIMEN && (
-                <div className="glass-panel-soft p-4 rounded-[28px]">
+                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="text-sm font-bold text-stone-700">专业版设置</div>
@@ -2348,7 +2367,7 @@ const App: React.FC = () => {
                         <select
                           value={qimenJuModel}
                           onChange={(e) => setQimenJuModel(parseInt(e.target.value, 10))}
-                          className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                          className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
                         >
                           <option value={0}>拆补法</option>
                           <option value={1}>置闰法</option>
@@ -2361,7 +2380,7 @@ const App: React.FC = () => {
                         <select
                           value={qimenPanModel}
                           onChange={(e) => setQimenPanModel(parseInt(e.target.value, 10))}
-                          className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                          className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
                         >
                           <option value={0}>飞盘奇门</option>
                           <option value={1}>转盘奇门</option>
@@ -2374,7 +2393,7 @@ const App: React.FC = () => {
                           <select
                             value={qimenFeiPanModel}
                             onChange={(e) => setQimenFeiPanModel(parseInt(e.target.value, 10))}
-                            className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                            className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
                           >
                             <option value={1}>全部顺排</option>
                             <option value={2}>阴顺阳逆</option>
@@ -2545,7 +2564,7 @@ const App: React.FC = () => {
             {/* Chat */}
             <div className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
-                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><span>🔮</span> 大师解读</h3>
+                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> 大师解读</h3>
                  <button
                    onClick={handleGenerateReport}
                    disabled={!chatHistory.length || isTyping || isGeneratingReport}

@@ -44,30 +44,45 @@ const LocationSelector: React.FC<Props> = ({
     setCity(''); // Reset city when province changes
   };
 
+  const indicator = (
+    <span
+      aria-hidden="true"
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all ${
+        isEnabled
+          ? 'border-amber-300/85 bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.14),0_0_18px_rgba(251,191,36,0.36)]'
+          : 'border-stone-300/90 bg-white/35'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full transition-all ${isEnabled ? 'bg-white/95' : 'bg-transparent'}`} />
+    </span>
+  );
+
   return (
-    <div className="bg-stone-50 p-4 rounded-lg border border-stone-100 transition-all duration-300">
+    <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5 transition-all duration-300">
       <div className="flex items-center justify-between mb-3">
-        <label className="text-xs text-stone-500 font-bold uppercase tracking-wider">{title}</label>
-        <div className="flex items-center gap-2">
-           <span className={`text-xs ${isEnabled ? 'text-amber-600 font-bold' : 'text-stone-400'}`}>
-             {isEnabled ? '已开启' : '未开启'}
-           </span>
-           <button 
-             onClick={() => handleToggle(!isEnabled)}
-             className={`w-10 h-5 flex items-center rounded-full p-1 transition-colors ${isEnabled ? 'bg-amber-500' : 'bg-stone-300'}`}
-           >
-             <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${isEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-           </button>
+        <div>
+          <div className="text-sm font-bold text-stone-700">{title}</div>
+          <div className="text-xs text-stone-500">{helperText}</div>
         </div>
+        <button
+          type="button"
+          onClick={() => handleToggle(!isEnabled)}
+          className="inline-flex items-center gap-2 text-sm text-stone-700 cursor-pointer"
+          aria-pressed={isEnabled}
+        >
+          {indicator}
+          <span className={isEnabled ? 'text-amber-700 font-semibold' : 'text-stone-500'}>{isEnabled ? '已开启' : '已关闭'}</span>
+        </button>
       </div>
 
       {isEnabled && (
-        <div className="grid grid-cols-2 gap-4 animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
           <div>
+            <label className="block text-xs text-stone-500 mb-1">省份</label>
             <select 
               value={province} 
               onChange={handleProvinceChange}
-              className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+              className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
             >
               <option value="">选择省份</option>
               {provinces.map(p => (
@@ -76,11 +91,12 @@ const LocationSelector: React.FC<Props> = ({
             </select>
           </div>
           <div>
+            <label className="block text-xs text-stone-500 mb-1">城市</label>
             <select 
               value={city} 
               onChange={(e) => setCity(e.target.value)}
               disabled={!province}
-              className="w-full border border-stone-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-stone-100 disabled:text-stone-400"
+              className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
             >
               <option value="">选择城市</option>
               {availableCities.map(c => (
@@ -92,7 +108,7 @@ const LocationSelector: React.FC<Props> = ({
       )}
       {!isEnabled && (
         <div className="text-xs text-stone-400 italic">
-          {helperText}
+          开启后会显示省份与城市选择项，用于按出生地校准排盘时间。
         </div>
       )}
     </div>
