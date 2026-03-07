@@ -40,6 +40,7 @@ import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import LocationSelector from './components/LocationSelector';
+import NoteSidebar, { NoteIcon } from './components/NoteSidebar';
 
 // --- Icons ---
 const Spinner = () => (
@@ -91,6 +92,8 @@ const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
+const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
+const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -380,7 +383,11 @@ const App: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [noteCollapsed, setNoteCollapsed] = useState(false);
+  const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'note' | null>(null);
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const [noteSaveState, setNoteSaveState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
 
   // --- State ---
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
@@ -459,16 +466,20 @@ const App: React.FC = () => {
     startY: number;
   } | null>(null);
   const klineYearProgressRef = useRef(0);
+  const noteHydratedRef = useRef(false);
+  const noteLastSavedRef = useRef('');
+  const noteSaveRunRef = useRef(0);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const mediaQuery = window.matchMedia('(max-width: 1279px)');
     const syncViewport = (matches: boolean) => {
+      setIsCompactLayout(matches);
       if (!matches) {
-        setMobileSidebarOpen(false);
+        setActiveCompactPanel(null);
       }
     };
 
@@ -485,12 +496,12 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!mobileSidebarOpen) return;
+    if (!activeCompactPanel) return;
     document.body.classList.add('overflow-hidden');
     return () => {
       document.body.classList.remove('overflow-hidden');
     };
-  }, [mobileSidebarOpen]);
+  }, [activeCompactPanel]);
 
   useEffect(() => {
     if (modelType !== ModelType.BAZI || !chartData) return;
@@ -549,9 +560,31 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn]);
 
+  const fetchNote = useCallback(async () => {
+    if (!isLoggedIn) return;
+    setNoteSaveState('loading');
+    try {
+      const res = await fetch('/api/note');
+      if (!res.ok) throw new Error('笔记加载失败');
+      const data = await res.json();
+      const content = typeof data?.content === 'string' ? data.content : '';
+      noteHydratedRef.current = true;
+      noteLastSavedRef.current = content;
+      setNoteContent(content);
+      setNoteSaveState('idle');
+    } catch {
+      noteHydratedRef.current = true;
+      setNoteSaveState('error');
+    }
+  }, [isLoggedIn]);
+
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  useEffect(() => {
+    fetchNote();
+  }, [fetchNote]);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -581,6 +614,50 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    noteHydratedRef.current = false;
+    noteLastSavedRef.current = '';
+    noteSaveRunRef.current = 0;
+    setNoteContent('');
+    setNoteSaveState('idle');
+    setActiveCompactPanel(null);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !noteHydratedRef.current) return;
+    if (noteContent === noteLastSavedRef.current) return;
+
+    const runId = ++noteSaveRunRef.current;
+    const timer = window.setTimeout(async () => {
+      setNoteSaveState('saving');
+      try {
+        const res = await fetch('/api/note', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: noteContent }),
+        });
+
+        if (!res.ok) throw new Error('笔记保存失败');
+        const data = await res.json();
+        if (noteSaveRunRef.current !== runId) return;
+
+        const content = typeof data?.content === 'string' ? data.content : noteContent;
+        noteLastSavedRef.current = content;
+        setNoteSaveState('saved');
+        window.setTimeout(() => {
+          setNoteSaveState((current) => (current === 'saved' ? 'idle' : current));
+        }, 1200);
+      } catch {
+        if (noteSaveRunRef.current === runId) {
+          setNoteSaveState('error');
+        }
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timer);
+  }, [isLoggedIn, noteContent]);
 
   const saveSessionToDb = async (
     mType: string,
@@ -1943,6 +2020,11 @@ const App: React.FC = () => {
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
+  const desktopHistoryOffset = sidebarCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
+  const desktopNoteOffset = noteCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
+  const desktopWorkOffset = isLoggedIn && !isCompactLayout
+    ? Math.max(desktopHistoryOffset, desktopNoteOffset)
+    : 0;
 
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
@@ -1991,17 +2073,6 @@ const App: React.FC = () => {
       <header className="glass-topbar text-stone-100 py-4 px-4 border-b border-amber-500/40 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            {isLoggedIn && (
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(true)}
-                className="md:hidden inline-flex items-center gap-1 rounded-lg border border-stone-700/80 bg-stone-800/80 px-2.5 py-1.5 text-[11px] text-stone-200 hover:border-stone-500 hover:text-white transition"
-                title="打开会话列表"
-              >
-                <SessionIcon className="w-4 h-4" />
-                <span>会话</span>
-              </button>
-            )}
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
@@ -2100,32 +2171,76 @@ const App: React.FC = () => {
 
       {isLoggedIn && (
         <div
-          className={`md:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${mobileSidebarOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
-          aria-hidden={!mobileSidebarOpen}
+          className="xl:hidden fixed left-3 top-[106px] z-20 flex flex-col gap-2"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveCompactPanel((current) => (current === 'history' ? null : 'history'))}
+            className={`flex h-12 w-12 items-center justify-center rounded-2xl border backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.16)] transition ${
+              activeCompactPanel === 'history'
+                ? 'border-amber-200/80 bg-amber-50/90 text-amber-800'
+                : 'border-white/70 bg-white/62 text-stone-600'
+            }`}
+            title="历史记录"
+          >
+            <SessionIcon className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveCompactPanel((current) => (current === 'note' ? null : 'note'))}
+            className={`flex h-12 w-12 items-center justify-center rounded-2xl border backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.16)] transition ${
+              activeCompactPanel === 'note'
+                ? 'border-amber-200/80 bg-amber-50/90 text-amber-800'
+                : 'border-white/70 bg-white/62 text-stone-600'
+            }`}
+            title="笔记"
+          >
+            <NoteIcon className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
+      {isLoggedIn && (
+        <div
+          className={`xl:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${activeCompactPanel ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          aria-hidden={!activeCompactPanel}
         >
           <div
-            className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => setMobileSidebarOpen(false)}
+            className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${activeCompactPanel ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => setActiveCompactPanel(null)}
           />
           <div
-            className={`absolute inset-y-0 left-0 w-[82vw] max-w-[320px] transform transition-transform duration-300 ease-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            className={`absolute inset-y-0 left-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'history' ? 'translate-x-0' : '-translate-x-full'}`}
           >
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
               onSelect={(id) => {
-                setMobileSidebarOpen(false);
+                setActiveCompactPanel(null);
                 handleLoadSession(id);
               }}
               onDelete={(id) => {
                 handleDeleteSession(id);
               }}
               onNewSession={() => {
-                setMobileSidebarOpen(false);
+                setActiveCompactPanel(null);
                 handleReset();
               }}
               collapsed={false}
-              onToggle={() => setMobileSidebarOpen(false)}
+              onToggle={() => setActiveCompactPanel(null)}
+              mobile
+            />
+          </div>
+          <div
+            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'note' ? 'translate-x-0' : 'translate-x-full'}`}
+          >
+            <NoteSidebar
+              content={noteContent}
+              onChange={setNoteContent}
+              saveState={noteSaveState}
+              collapsed={false}
+              onToggle={() => setActiveCompactPanel(null)}
+              mobile
             />
           </div>
         </div>
@@ -2133,7 +2248,7 @@ const App: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {isLoggedIn && (
-          <div className="hidden md:block fixed left-3 top-[106px] z-10">
+          <div className="hidden xl:block fixed left-3 top-[106px] z-10">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
@@ -2146,7 +2261,23 @@ const App: React.FC = () => {
           </div>
         )}
 
-      <main className={`flex-1 max-w-4xl px-2 mt-6 pb-6 overflow-y-auto w-full min-h-0 transition-[margin] duration-300 ${isLoggedIn ? 'md:ml-[320px] md:mr-6' : 'mx-auto'}`}>
+        {isLoggedIn && (
+          <div className="hidden xl:block fixed right-3 top-[106px] z-10">
+            <NoteSidebar
+              content={noteContent}
+              onChange={setNoteContent}
+              saveState={noteSaveState}
+              collapsed={noteCollapsed}
+              onToggle={() => setNoteCollapsed((prev) => !prev)}
+            />
+          </div>
+        )}
+
+      <main
+        className="flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300"
+        style={desktopWorkOffset ? { paddingLeft: desktopWorkOffset, paddingRight: desktopWorkOffset } : undefined}
+      >
+        <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
         {!isLoggedIn && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
             <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
@@ -2697,6 +2828,7 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
       </main>
       </div>{/* end flex wrapper */}
 

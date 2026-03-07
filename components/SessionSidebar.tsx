@@ -33,6 +33,7 @@ interface SessionSidebarProps {
   onNewSession: () => void;
   collapsed: boolean;
   onToggle: () => void;
+  mobile?: boolean;
 }
 
 const SessionIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
@@ -74,6 +75,7 @@ export default function SessionSidebar({
   onNewSession,
   collapsed,
   onToggle,
+  mobile = false,
 }: SessionSidebarProps) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -94,30 +96,40 @@ export default function SessionSidebar({
   const groups = groupByDate(sessions);
 
   return (
-    <div className="w-72 h-[calc(100vh-112px)] min-h-0 flex-shrink-0 rounded-[28px] border border-white/70 bg-white/58 backdrop-blur-xl shadow-[0_24px_60px_rgba(28,25,23,0.14)] flex flex-col overflow-hidden">
+    <div className={`min-h-0 flex-shrink-0 border border-white/70 bg-white/58 backdrop-blur-xl shadow-[0_24px_60px_rgba(28,25,23,0.14)] flex flex-col overflow-hidden ${
+      mobile ? 'h-full w-full rounded-none border-y-0 border-l-0' : 'h-[calc(100vh-112px)] w-72 rounded-[28px]'
+    }`}>
       <div className="px-4 py-4 border-b border-stone-200/70 bg-gradient-to-r from-white/70 to-stone-50/40 flex items-center justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Sessions</div>
           <span className="text-sm font-semibold text-stone-700">历史记录</span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={onNewSession}
-            className="p-2 rounded-xl hover:bg-white/80 text-stone-500 transition-colors"
-            title="新建排盘"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-            </svg>
-          </button>
+          {!mobile && (
+            <button
+              onClick={onNewSession}
+              className="p-2 rounded-xl hover:bg-white/80 text-stone-500 transition-colors"
+              title="新建排盘"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={onToggle}
             className="p-2 rounded-xl hover:bg-white/80 text-stone-500 transition-colors"
-            title="收起侧边栏"
+            title={mobile ? '关闭侧边栏' : '收起侧边栏'}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-            </svg>
+            {mobile ? (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M4.47 4.47a.75.75 0 011.06 0L10 8.94l4.47-4.47a.75.75 0 111.06 1.06L11.06 10l4.47 4.47a.75.75 0 11-1.06 1.06L10 11.06l-4.47 4.47a.75.75 0 11-1.06-1.06L8.94 10 4.47 5.53a.75.75 0 010-1.06z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+              </svg>
+            )}
           </button>
         </div>
       </div>

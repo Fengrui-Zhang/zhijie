@@ -17,6 +17,7 @@ model User {
   quota     Int      @default(30)
   createdAt DateTime @default(now())
   sessions  DivinationSession[]
+  note      UserNote?
 }
 
 model DivinationSession {
@@ -39,4 +40,13 @@ model ChatMessage {
   content   String
   createdAt DateTime @default(now())
   session   DivinationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model UserNote {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  content   String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -1,0 +1,17 @@
+CREATE TABLE "UserNote" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "content" TEXT NOT NULL DEFAULT '',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "UserNote_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "UserNote_userId_key" ON "UserNote"("userId");
+
+ALTER TABLE "UserNote"
+ADD CONSTRAINT "UserNote_userId_fkey"
+FOREIGN KEY ("userId") REFERENCES "User"("id")
+ON DELETE CASCADE
+ON UPDATE CASCADE;
