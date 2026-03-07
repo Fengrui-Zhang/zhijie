@@ -2340,7 +2340,7 @@ const App: React.FC = () => {
                         {label}
                         {isRecommended && (
                           <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            强力推荐
+                            推荐
                           </span>
                         )}
                       </button>
@@ -2379,7 +2379,7 @@ const App: React.FC = () => {
                         {label}
                         {isRecommended && (
                           <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            强力推荐【人生K线上新】
+                            推荐【K线】
                           </span>
                         )}
                       </button>
