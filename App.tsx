@@ -825,11 +825,25 @@ const App: React.FC = () => {
           ${headAssetsHtml}
           <style>
             * { box-sizing: border-box; }
+            html {
+              background: #fff !important;
+            }
+            html::before,
+            html::after,
+            body::before,
+            body::after {
+              content: none !important;
+              display: none !important;
+              background: none !important;
+              box-shadow: none !important;
+            }
             body {
               margin: 0;
               font-family: "Songti SC", "Noto Serif SC", "STSong", serif;
               color: #1c1917;
-              background: #f8f5ef;
+              background: #f8f5ef !important;
+              min-height: auto !important;
+              position: static !important;
             }
             .page {
               padding: 32px 40px 56px;
@@ -950,17 +964,17 @@ const App: React.FC = () => {
               margin-top: 16px;
             }
             .msg {
-              background: transparent;
-              border: none;
-              border-left: 3px solid #d6d3d1;
-              border-radius: 0;
-              padding: 12px 0 10px 14px;
+              background: #fff;
+              border-radius: 16px;
+              padding: 16px 18px;
+              border: 1px solid #e7e5e4;
+              position: relative;
               break-inside: auto;
               page-break-inside: auto;
             }
             .msg.user {
-              border-left-color: #f3d7a1;
-              background: transparent;
+              border-color: #f3d7a1;
+              background: #fffaf0;
               color: #44403c;
               break-inside: auto;
               page-break-inside: auto;
@@ -973,7 +987,7 @@ const App: React.FC = () => {
               display: flex;
               justify-content: space-between;
               font-size: 12px;
-              margin-bottom: 6px;
+              margin-bottom: 8px;
               color: #78716c;
               break-inside: avoid;
               page-break-inside: avoid;
@@ -1069,10 +1083,10 @@ const App: React.FC = () => {
             }
             .msg-reasoning {
               margin-bottom: 10px;
-              padding: 8px 10px;
-              border-radius: 0;
-              background: #fffbeb;
-              border-left: 3px solid rgba(251, 191, 36, 0.8);
+              padding: 10px 12px;
+              border-radius: 12px;
+              background: rgba(251, 191, 36, 0.15);
+              border: 1px solid rgba(251, 191, 36, 0.4);
               color: #92400e;
               font-size: 12px;
               break-inside: avoid;
@@ -1083,10 +1097,9 @@ const App: React.FC = () => {
               margin-bottom: 6px;
             }
             .msg-index {
-              position: static;
-              display: block;
-              margin-top: 10px;
-              text-align: right;
+              position: absolute;
+              right: 16px;
+              bottom: 12px;
               font-size: 11px;
               color: #a8a29e;
             }
@@ -1117,9 +1130,6 @@ const App: React.FC = () => {
               .msg {
                 break-inside: auto;
                 page-break-inside: auto;
-                border-radius: 0;
-                background: transparent;
-                box-shadow: none;
               }
               .msg.user {
                 break-inside: auto;
@@ -1127,6 +1137,9 @@ const App: React.FC = () => {
               }
               .msg-index {
                 margin-top: 10px;
+                position: static;
+                display: block;
+                text-align: right;
               }
             }
           </style>
