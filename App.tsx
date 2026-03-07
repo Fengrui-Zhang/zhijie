@@ -749,7 +749,7 @@ const App: React.FC = () => {
     }).join('');
 
     const chartSnapshotHtml = chartMarkup
-      ? `<div class="chart-preview">
+      ? `<div class="chart-section">
           <div class="chart-live">${chartMarkup}</div>
         </div>`
       : '';
@@ -805,33 +805,57 @@ const App: React.FC = () => {
               border-radius: 14px;
               border: 1px solid #e7e5e4;
             }
-            .chart-preview {
+            .chart-section {
               margin-top: 14px;
-              padding: 14px 16px;
-              background: #fff;
-              border-radius: 14px;
-              border: 1px solid #e7e5e4;
               break-inside: auto;
               page-break-inside: auto;
-            }
-            .chart-preview img {
-              display: block;
-              width: 100%;
-              height: auto;
-              border-radius: 12px;
-              border: 1px solid #e7e5e4;
-              background: #fff;
             }
             .chart-live {
               overflow: visible;
               break-inside: auto;
               page-break-inside: auto;
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
             }
             .chart-live [data-report-ignore="true"] {
               display: none !important;
             }
             .chart-live button {
               pointer-events: none !important;
+            }
+            .chart-live .glass-panel,
+            .chart-live .glass-panel-soft,
+            .chart-live .glass-input,
+            .chart-live .glass-chip,
+            .chart-live .glass-banner {
+              background: #fff !important;
+              border-color: #e7e5e4 !important;
+              box-shadow: none !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
+            .chart-live .glass-panel-dark,
+            .chart-live .glass-cta,
+            .chart-live .glass-topbar {
+              background: linear-gradient(135deg, #1c1917 0%, #292524 100%) !important;
+              color: #fef3c7 !important;
+              border-color: rgba(245, 158, 11, 0.35) !important;
+              box-shadow: none !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
+            .chart-live .glass-chat-bg,
+            .chart-live .glass-scrollbar,
+            .chart-live [class*="overflow-hidden"],
+            .chart-live [class*="overflow-x-auto"],
+            .chart-live [class*="overflow-y-auto"],
+            .chart-live [class*="backdrop-blur"] {
+              overflow: visible !important;
+              backdrop-filter: none !important;
+              -webkit-backdrop-filter: none !important;
+            }
+            .chart-live [class*="max-w-"] {
+              max-width: none !important;
             }
             .chart-live > * {
               margin-left: 0 !important;
@@ -859,8 +883,9 @@ const App: React.FC = () => {
             }
             .content {
               margin-top: 20px;
-              display: grid;
-              gap: 16px;
+            }
+            .content > .msg + .msg {
+              margin-top: 16px;
             }
             .msg {
               background: #fff;
@@ -868,11 +893,15 @@ const App: React.FC = () => {
               padding: 16px 18px;
               border: 1px solid #e7e5e4;
               position: relative;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .msg.user {
               border-color: #a8a29e;
               background: #1c1917;
               color: #fef3c7;
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
             .msg.user .msg-time,
             .msg.user .msg-index {
@@ -884,6 +913,8 @@ const App: React.FC = () => {
               font-size: 12px;
               margin-bottom: 8px;
               color: #78716c;
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
             .msg-role {
               font-weight: 600;
@@ -896,6 +927,8 @@ const App: React.FC = () => {
             }
             .msg-text p {
               margin: 0 0 10px;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .msg-text p:last-child {
               margin-bottom: 0;
@@ -904,6 +937,8 @@ const App: React.FC = () => {
             .msg-text ol {
               margin: 0 0 10px 18px;
               padding: 0;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .msg-text li {
               margin-bottom: 6px;
@@ -914,6 +949,8 @@ const App: React.FC = () => {
               border-left: 3px solid #f59e0b;
               background: #fffbeb;
               color: #92400e;
+              break-inside: auto;
+              page-break-inside: auto;
             }
             .msg-text code {
               background: #f5f5f4;
@@ -960,6 +997,8 @@ const App: React.FC = () => {
               border: 1px solid rgba(251, 191, 36, 0.4);
               color: #92400e;
               font-size: 12px;
+              break-inside: avoid;
+              page-break-inside: avoid;
             }
             .tag {
               font-weight: 700;
@@ -982,12 +1021,12 @@ const App: React.FC = () => {
               body { background: #fff; }
               .page { padding: 0; max-width: none; }
               .header { border-radius: 0; }
-              .chart-preview,
+              .chart-section,
               .chart-info,
               .content {
                 margin-top: 12px;
               }
-              .chart-preview {
+              .chart-section {
                 break-inside: auto;
                 page-break-inside: auto;
               }
@@ -996,7 +1035,20 @@ const App: React.FC = () => {
                 break-inside: auto;
                 page-break-inside: auto;
               }
-              .msg { break-inside: avoid; }
+              .msg {
+                break-inside: auto;
+                page-break-inside: auto;
+              }
+              .msg.user {
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+              .msg-index {
+                position: static;
+                display: block;
+                margin-top: 10px;
+                text-align: right;
+              }
             }
           </style>
         </head>
