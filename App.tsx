@@ -591,7 +591,9 @@ const App: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isKlineRunning, setIsKlineRunning] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   const reportChartRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
@@ -632,8 +634,25 @@ const App: React.FC = () => {
   const noteLastSavedRef = useRef('');
   const noteSaveRunRef = useRef(0);
 
+  const syncAutoScrollState = useCallback(() => {
+    const container = chatScrollRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 96;
+  }, []);
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = chatScrollRef.current;
+    if (!container || !shouldAutoScrollRef.current) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: isTyping ? 'auto' : 'smooth',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
   }, [chatHistory, isTyping]);
 
   useEffect(() => {
@@ -3955,7 +3974,11 @@ const App: React.FC = () => {
                    {isGeneratingReport ? '生成中...' : '生成报告'}
                  </button>
                </div>
-               <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto p-4 space-y-6">
+               <div
+                 ref={chatScrollRef}
+                 onScroll={syncAutoScrollState}
+                 className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto p-4 space-y-6"
+               >
                  {knowledgeHint && (
                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
                      <span>⚠️ 知识库检索失败，本次回答未使用参考资料。{knowledgeHint !== '知识库检索失败' && `（${knowledgeHint}）`}</span>
