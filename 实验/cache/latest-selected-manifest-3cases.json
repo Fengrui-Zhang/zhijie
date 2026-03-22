@@ -1,0 +1,107 @@
+[
+  {
+    "case": "casebook-116",
+    "method": "A",
+    "kept": "A-ed27dfb386edfd012ae798e25c303358fb70acb053d8df1bf453b27ba501c2d3.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-116",
+    "method": "B",
+    "kept": "B-f084061f03d745676ada29a4f977187a9bd29618fa37334164028533807fc836.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-116",
+    "method": "C",
+    "kept": "C-69371327aecf37e2b7494a6382c91193653aa2c4693251985a931c71adf2b578.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-116",
+    "method": "D",
+    "kept": "D-bda7b1f972e95ce4c42cd4222319252cbad4343918801e252804517a2badd4be.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-116",
+    "method": "E",
+    "kept": "E-79c8770951ea754bfe54a7365b735c9cf58ef65e5fad4cf19ecb6f18fdcef0a4.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-007",
+    "method": "A",
+    "kept": "A-a639d2bd97d07c7d35599969858530ca6ddbe0ca4dc1da65610e3e641d28bfe1.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-007",
+    "method": "B",
+    "kept": "B-049fac63411c7dea389b965d045cadbc14294a77028479c8a4b9319ec3dccfe5.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-007",
+    "method": "C",
+    "kept": "C-6a689f0b3953e9878319e50cfd490b0c5cf14ecb7eaaa36f9d17e1f09479f5a9.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-007",
+    "method": "D",
+    "kept": "D-c41a95006d971d22700cb8803827b7d117de5995c53828cdf5872283a91e83ae.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-007",
+    "method": "E",
+    "kept": "E-407debf7729f3e3f63f24f8e7573800128d69721499a1fdf47079f6192de2670.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-112",
+    "method": "A",
+    "kept": "A-f97091365843348ae832032f4d4f7a2e6f8fc8b6fa38bf8b0b1f5501efd94ce4.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-112",
+    "method": "B",
+    "kept": "B-f5ed0a75f55a44917ac1d7ce59f71d23e5b0aad273a84ae081d120778e0da173.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-112",
+    "method": "C",
+    "kept": "C-daeee906d0c556e3166a20447e33e6e092b936f6e949296cafe082ef446aad9b.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-112",
+    "method": "D",
+    "kept": "D-f3fe7658ea21a9ea5369d5e14f50a62f57cad0765a28dd50f6cd2a6d15123b8d.json",
+    "rule": "latest_success",
+    "error": false
+  },
+  {
+    "case": "casebook-112",
+    "method": "E",
+    "kept": "E-d19d53afc7e7cb406fca7a8f9c55a8cc81438184ded6a3128de0968a81ce70ae.json",
+    "rule": "latest_success",
+    "error": false
+  }
+]

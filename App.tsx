@@ -2108,7 +2108,6 @@ const App: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
             <label className="flex max-w-[128px] items-center gap-1.5 rounded border border-stone-700/70 bg-stone-800/90 px-2 py-1 text-[10px] text-stone-300">
-              <span className="hidden md:inline text-stone-400">分析模型</span>
               <select
                 value={analysisModel}
                 onChange={(e) => {

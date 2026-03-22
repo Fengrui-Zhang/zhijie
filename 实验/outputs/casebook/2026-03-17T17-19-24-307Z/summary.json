@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2026-03-17T17:19:24.305Z",
+  "caseCount": 4,
+  "methods": [
+    {
+      "method": "D",
+      "methodLabel": "Method D：专业排盘 + 结构化提示词 + 普通切块检索",
+      "avg_ctx_chars": 28058.25,
+      "avg_retrieved_chunks": 5,
+      "avg_latency_ms": 91512.75,
+      "avg_output_chars": 2006,
+      "avg_conclusion_coverage": 0.3333,
+      "avg_evidence_coverage": 0.75,
+      "avg_judge_scores": null
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "casebook-116",
+      "methodResults": [
+        {
+          "method": "D",
+          "metrics": {
+            "ctx_chars": 26771,
+            "retrieved_chunks": 5,
+            "latency_ms": 99103,
+            "output_chars": 2209,
+            "conclusion_coverage": 1,
+            "evidence_coverage": 0.5
+          },
+          "judge": null
+        }
+      ]
+    },
+    {
+      "caseId": "casebook-007",
+      "methodResults": [
+        {
+          "method": "D",
+          "metrics": {
+            "ctx_chars": 31861,
+            "retrieved_chunks": 5,
+            "latency_ms": 84394,
+            "output_chars": 2169,
+            "conclusion_coverage": 0,
+            "evidence_coverage": 1
+          },
+          "judge": null
+        }
+      ]
+    },
+    {
+      "caseId": "casebook-112",
+      "methodResults": [
+        {
+          "method": "D",
+          "metrics": {
+            "ctx_chars": 26807,
+            "retrieved_chunks": 5,
+            "latency_ms": 92787,
+            "output_chars": 1724,
+            "conclusion_coverage": 0,
+            "evidence_coverage": 0.75
+          },
+          "judge": null
+        }
+      ]
+    },
+    {
+      "caseId": "casebook-077",
+      "methodResults": [
+        {
+          "method": "D",
+          "metrics": {
+            "ctx_chars": 26794,
+            "retrieved_chunks": 5,
+            "latency_ms": 89767,
+            "output_chars": 1922,
+            "conclusion_coverage": 0.3333,
+            "evidence_coverage": 0.75
+          },
+          "judge": null
+        }
+      ]
+    }
+  ],
+  "dVsE": null
+}

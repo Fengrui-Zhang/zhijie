@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { embedText } from './embedding';
+import { embedText } from './embedding.ts';
 
 type KnowledgeChunk = {
   id: string;

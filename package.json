@@ -10,7 +10,10 @@
     "start": "next start",
     "lint": "next lint",
     "ingest:knowledge": "node scripts/ingest-knowledge.mjs",
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "npx tsx prisma/seed.ts",
+    "experiment:bazi": "node --experimental-strip-types ./实验/cli.ts",
+    "experiment:casebook": "node --experimental-strip-types ./实验/casebook.ts",
+    "experiment:build-raw-index": "node --experimental-strip-types ./实验/build_raw_index.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

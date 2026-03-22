@@ -1,4 +1,4 @@
-// File: /Users/zixu/Documents/Github/zhijie/app/api/fortune/route.ts
+// File: /Users/zixu/Documents/CURSOR/zhijie/app/api/fortune/route.ts
 import * as entry from '../../../../../app/api/fortune/route.js'
 import type { NextRequest } from 'next/server.js'
 

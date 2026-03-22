@@ -1,1 +1,116 @@
-{"version":3,"caseSensitive":false,"basePath":"","rewrites":{"beforeFiles":[],"afterFiles":[],"fallback":[]},"redirects":[{"source":"/:path+/","destination":"/:path+","permanent":true,"internal":true,"regex":"^(?:\\/((?:[^\\/]+?)(?:\\/(?:[^\\/]+?))*))\\/$"}],"headers":[]}
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/api/admin/messages/[id]",
+      "regex": "^/api/admin/messages/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/messages/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/sessions/[id]/messages",
+      "regex": "^/api/admin/sessions/([^/]+?)/messages(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/sessions/(?<nxtPid>[^/]+?)/messages(?:/)?$"
+    },
+    {
+      "page": "/api/admin/users/[id]",
+      "regex": "^/api/admin/users/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/users/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/users/[id]/sessions",
+      "regex": "^/api/admin/users/([^/]+?)/sessions(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/users/(?<nxtPid>[^/]+?)/sessions(?:/)?$"
+    },
+    {
+      "page": "/api/auth/[...nextauth]",
+      "regex": "^/api/auth/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPnextauth": "nxtPnextauth"
+      },
+      "namedRegex": "^/api/auth/(?<nxtPnextauth>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/sessions/[id]",
+      "regex": "^/api/sessions/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/sessions/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/sessions/[id]/messages",
+      "regex": "^/api/sessions/([^/]+?)/messages(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/sessions/(?<nxtPid>[^/]+?)/messages(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/experiments",
+      "regex": "^/experiments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/experiments(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

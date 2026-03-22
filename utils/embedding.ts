@@ -23,23 +23,34 @@ const getEmbeddingConfig = () => {
 
 export const embedTexts = async (inputs: string[]): Promise<number[][]> => {
   const { apiKey, baseUrl, model, provider } = getEmbeddingConfig();
+  const timeoutMs = Number(process.env.EXPERIMENT_EMBEDDING_TIMEOUT_MS || process.env.EMBEDDING_TIMEOUT_MS || 30000);
 
   if (provider === 'dashscope') {
     const embedUrl = baseUrl.includes('compatible-mode')
       ? `${baseUrl}/embeddings`
       : `${baseUrl.replace(/\/$/, '')}/compatible-mode/v1/embeddings`;
-    const response = await fetch(embedUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: inputs,
-        encoding_format: 'float',
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(embedUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          input: inputs,
+          encoding_format: 'float',
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error: any) {
+      const message = error?.message || String(error);
+      if (error?.name === 'TimeoutError' || error?.name === 'AbortError' || /timeout|aborted/i.test(message)) {
+        throw new Error(`Embedding request timed out after ${timeoutMs}ms`);
+      }
+      throw new Error(`Embedding request failed: ${message}`);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -58,17 +69,27 @@ export const embedTexts = async (inputs: string[]): Promise<number[][]> => {
     return embeddings;
   }
 
-  const response = await fetch(`${baseUrl}/v1/embeddings`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      input: inputs,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/v1/embeddings`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: inputs,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError' || /timeout|aborted/i.test(message)) {
+      throw new Error(`Embedding request timed out after ${timeoutMs}ms`);
+    }
+    throw new Error(`Embedding request failed: ${message}`);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
