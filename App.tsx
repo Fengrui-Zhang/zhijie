@@ -3794,7 +3794,7 @@ const App: React.FC = () => {
                    modelType === ModelType.ZIWEI ? '紫微斗数' : 
                    modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲'}
                  </span>
-                 <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">重置 / 返回</button>
+                 <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
               </div>
 
               {/* Visualization Components */}
