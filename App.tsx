@@ -298,6 +298,39 @@ const formatSizhuInfo = (sizhu?: {
   return `${sizhu.year_gan}${sizhu.year_zhi} ${sizhu.month_gan}${sizhu.month_zhi} ${sizhu.day_gan}${sizhu.day_zhi} ${sizhu.hour_gan}${sizhu.hour_zhi}`;
 };
 
+const getCasePillarsPreview = (modelType: CaseModelType, chartData: unknown) => {
+  if (modelType === ModelType.BAZI) {
+    const pillars = (chartData as BaziResponse | null)?.bazi_info?.bazi;
+    if (Array.isArray(pillars) && pillars.length > 0) {
+      return pillars.join(' ');
+    }
+  }
+
+  const sizhu = (chartData as { sizhu_info?: {
+    year_gan: string; year_zhi: string;
+    month_gan: string; month_zhi: string;
+    day_gan: string; day_zhi: string;
+    hour_gan: string; hour_zhi: string;
+  } } | null)?.sizhu_info;
+
+  return formatSizhuInfo(sizhu);
+};
+
+const isSameCaseChartIdentity = (left: unknown, right: unknown) => {
+  const a = normalizeCaseChartParams(left);
+  const b = normalizeCaseChartParams(right);
+  return (
+    a.sex === b.sex &&
+    a.year === b.year &&
+    a.month === b.month &&
+    a.day === b.day &&
+    a.hours === b.hours &&
+    a.minute === b.minute &&
+    (a.province || '') === (b.province || '') &&
+    (a.city || '') === (b.city || '')
+  );
+};
+
 const buildReportHeadAssets = () =>
   Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
     .map((node) => node.outerHTML)
@@ -1914,16 +1947,6 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!isLoggedIn && guestFortuneCount >= 3) {
-      setError('');
-      setShowAuth(true);
-      return;
-    }
-
-    setCaseBusy(true);
-    setLoading(true);
-    setError('');
-
     try {
       const date = new Date(customDate);
       const chartParams = {
@@ -1937,10 +1960,28 @@ const App: React.FC = () => {
         province: province || '',
         city: city || '',
       };
+      const shouldReuseExistingChart = Boolean(
+        editingCaseId &&
+        activeCase &&
+        activeCase.chartData &&
+        isSameCaseChartIdentity(activeCase.chartParams, chartParams)
+      );
 
-      const chartResponse = modelType === ModelType.BAZI
-        ? await fetchBazi(chartParams)
-        : await fetchZiwei(chartParams);
+      if (!isLoggedIn && !shouldReuseExistingChart && guestFortuneCount >= 3) {
+        setError('');
+        setShowAuth(true);
+        return;
+      }
+
+      setCaseBusy(true);
+      setLoading(true);
+      setError('');
+
+      const chartResponse = shouldReuseExistingChart
+        ? activeCase!.chartData
+        : modelType === ModelType.BAZI
+          ? await fetchBazi(chartParams)
+          : await fetchZiwei(chartParams);
 
       const nowIso = new Date().toISOString();
 
@@ -1956,7 +1997,7 @@ const App: React.FC = () => {
         setActiveCase(detail);
       } else {
         const caseId = editingCaseId || `guest-case-${Date.now()}`;
-        if (editingCaseId) {
+        if (editingCaseId && !shouldReuseExistingChart) {
           clearGuestCaseSessions(caseId);
         }
         const nextCase: CaseItem = {
@@ -1970,11 +2011,18 @@ const App: React.FC = () => {
         };
         saveGuestCase(nextCase);
         refreshGuestActiveCase(caseId);
-        const newCount = guestFortuneCount + 1;
-        localStorage.setItem('guestFortuneCount', String(newCount));
-        setGuestFortuneCount(newCount);
-        setGuestFollowUpCount(0);
-        localStorage.setItem('guestFollowUpCount', '0');
+        if (!shouldReuseExistingChart) {
+          const newCount = guestFortuneCount + 1;
+          localStorage.setItem('guestFortuneCount', String(newCount));
+          setGuestFortuneCount(newCount);
+          setGuestFollowUpCount(0);
+          localStorage.setItem('guestFollowUpCount', '0');
+        } else {
+          const currentGuestSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
+          const nextFollowUpCount = currentGuestSession?.guestFollowUpCount || 0;
+          setGuestFollowUpCount(nextFollowUpCount);
+          localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
+        }
       }
 
       setChartData(chartResponse);
@@ -3249,7 +3297,7 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {supportsKnowledge && (
+            {supportsKnowledge && !isCaseModel && (
               <div className="glass-panel-soft mb-6 flex items-center justify-between rounded-[22px] px-3.5 py-3">
                 <div className="flex items-center gap-3">
                   <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
@@ -3293,10 +3341,7 @@ const App: React.FC = () => {
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-lg font-bold text-stone-700">命例中心</div>
-                    <div className="text-sm text-stone-500">
-                      先保存命例，再按命例开始分析。选择地区即启用真太阳时。
-                    </div>
+                    <div className="text-lg font-bold text-stone-700">命例库</div>
                   </div>
                   <button
                     type="button"
@@ -3317,6 +3362,7 @@ const App: React.FC = () => {
                   <div className="grid gap-3 md:grid-cols-2">
                     {caseItems.map((item) => {
                       const params = normalizeCaseChartParams(item.chartParams);
+                      const pillarPreview = getCasePillarsPreview(item.modelType, item.chartData);
                       const datetimeText = buildCaseDateTimeValue(item.chartParams)
                         ? buildCaseDateTimeValue(item.chartParams).replace('T', ' ')
                         : '未填写出生时间';
@@ -3337,6 +3383,11 @@ const App: React.FC = () => {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-base font-bold">{item.title}</div>
+                              {pillarPreview && (
+                                <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-600'}`}>
+                                  四柱：{pillarPreview}
+                                </div>
+                              )}
                               <div className={`mt-1 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
                                 {datetimeText}
                               </div>
@@ -3759,9 +3810,6 @@ const App: React.FC = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
-                    <div className="text-sm text-stone-500">
-                      选择地区即启用真太阳时。命例已保存，开始分析时不会重复调用排盘接口。
-                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -3780,6 +3828,46 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 </div>
+
+                {supportsKnowledge && (
+                  <div className="glass-panel-soft flex items-center justify-between rounded-[22px] px-3.5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
+                        册
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-stone-700">参考古籍</div>
+                        <div className="text-xs text-stone-500">检索并参考知识库资料</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={useKnowledge}
+                      onClick={() => setUseKnowledge((prev) => !prev)}
+                      className={`inline-flex h-11 min-w-[126px] items-center gap-3 rounded-full border px-3 py-1.5 transition-all ${
+                        useKnowledge
+                          ? 'glass-panel-dark border-transparent text-amber-200'
+                          : 'glass-chip text-stone-600'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
+                          useKnowledge
+                            ? 'border-amber-300/80 bg-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_0_24px_rgba(251,191,36,0.42)]'
+                            : 'border-stone-300/90 bg-white/30'
+                        }`}
+                      >
+                        <span
+                          className={`h-3 w-3 rounded-full transition-all ${
+                            useKnowledge ? 'bg-white/95' : 'bg-transparent'
+                          }`}
+                        />
+                      </span>
+                      <span className="min-w-[52px] text-right text-sm font-medium leading-none">{useKnowledge ? '已开启' : '已关闭'}</span>
+                    </button>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
