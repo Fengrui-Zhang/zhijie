@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   };
 
   if (isDoubaoModel) {
-    requestBody.thinking = { type: 'disabled' };
+    requestBody.thinking = { type: 'enabled' };
   }
 
   const response = await fetch(apiUrl, {
