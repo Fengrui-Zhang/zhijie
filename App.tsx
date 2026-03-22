@@ -6,6 +6,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSession, signOut } from 'next-auth/react';
 import updates from './data/updates.json';
+import {
+  ANALYSIS_MODEL_OPTIONS,
+  DEFAULT_ANALYSIS_MODEL,
+  type AnalysisModel,
+  isAnalysisModel,
+} from './lib/analysis-models';
 
 // Services
 import { 
@@ -92,6 +98,7 @@ const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
+const ANALYSIS_MODEL_STORAGE_KEY = 'analysis-model:v1';
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 
@@ -388,6 +395,7 @@ const App: React.FC = () => {
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteSaveState, setNoteSaveState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
+  const [analysisModel, setAnalysisModel] = useState<AnalysisModel>(DEFAULT_ANALYSIS_MODEL);
 
   // --- State ---
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
@@ -473,6 +481,25 @@ const App: React.FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
+
+  useEffect(() => {
+    try {
+      const savedModel = localStorage.getItem(ANALYSIS_MODEL_STORAGE_KEY);
+      if (isAnalysisModel(savedModel)) {
+        setAnalysisModel(savedModel);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ANALYSIS_MODEL_STORAGE_KEY, analysisModel);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [analysisModel]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1279px)');
@@ -729,6 +756,9 @@ const App: React.FC = () => {
         const p = data.chartParams as Record<string, unknown>;
         if (p.name) setName(p.name as string);
         if (p.question) setQuestion(p.question as string);
+        if (isAnalysisModel(p.analysisModel)) {
+          setAnalysisModel(p.analysisModel);
+        }
       }
 
       const msgs: ChatMessage[] = (data.messages || []).map(
@@ -1546,7 +1576,7 @@ const App: React.FC = () => {
       const newSessionId = await saveSessionToDb(
         modelType,
         sessionTitle,
-        { ...baseParams, question, timeMode } as Record<string, unknown>,
+        { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>,
         resultData
       );
       if (newSessionId) setActiveSessionId(newSessionId);
@@ -1589,7 +1619,8 @@ const App: React.FC = () => {
         (state) => {
           updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
         },
-        knowledge
+        knowledge,
+        analysisModel
       );
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
@@ -1661,7 +1692,8 @@ const App: React.FC = () => {
         (state) => {
           updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
         },
-        knowledge
+        knowledge,
+        analysisModel
       );
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
@@ -2070,12 +2102,29 @@ const App: React.FC = () => {
     <div className="app-shell min-h-screen flex flex-col text-stone-800 font-serif">
       {/* Header */}
       <header className="glass-topbar text-stone-100 py-4 px-4 border-b border-amber-500/40 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <div className="hidden sm:block text-[10px] bg-stone-800 px-2 py-1 rounded text-stone-400">DeepSeek R1 Powered</div>
+          <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
+            <label className="flex max-w-[128px] items-center gap-1.5 rounded border border-stone-700/70 bg-stone-800/90 px-2 py-1 text-[10px] text-stone-300">
+              <span className="hidden md:inline text-stone-400">分析模型</span>
+              <select
+                value={analysisModel}
+                onChange={(e) => {
+                  if (isAnalysisModel(e.target.value)) {
+                    setAnalysisModel(e.target.value);
+                  }
+                }}
+                className="min-w-0 bg-transparent text-stone-100 outline-none"
+              >
+                {ANALYSIS_MODEL_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-stone-900 text-stone-100">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => setShowUpdates(true)}

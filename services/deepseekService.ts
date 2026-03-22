@@ -1,3 +1,5 @@
+import { ChatModel } from '../lib/analysis-models';
+
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -66,8 +68,6 @@ type StreamState = {
   content: string;
   knowledgeFailed?: string;
 };
-
-type ChatModel = 'deepseek-reasoner' | 'deepseek-chat';
 
 export const sendMessageToDeepseekStream = async (
   message: string,

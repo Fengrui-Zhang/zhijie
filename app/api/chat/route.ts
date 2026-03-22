@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
+import {
+  DEEPSEEK_REASONER_MODEL,
+  DOUBAO_SEED_LITE_MODEL,
+  isChatModel,
+} from '../../../lib/analysis-models';
 import { prisma } from '../../../lib/prisma';
 import { formatKnowledgeContext, retrieveKnowledge } from '../../../utils/knowledge';
 
@@ -27,19 +32,11 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'DeepSeek API key is missing.' },
-      { status: 500 }
-    );
-  }
-
   const messages = body.messages as ChatMessage[] | undefined;
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
   const stream = body.stream === true;
   const knowledge = body.knowledge as KnowledgeRequest | undefined;
-  const requestedModel = body.model === 'deepseek-chat' ? 'deepseek-chat' : 'deepseek-reasoner';
+  const requestedModel = isChatModel(body.model) ? body.model : DEEPSEEK_REASONER_MODEL;
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
@@ -88,18 +85,41 @@ export async function POST(request: Request) {
     }
   }
 
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+  const isDoubaoModel = requestedModel === DOUBAO_SEED_LITE_MODEL;
+  const apiKey = isDoubaoModel ? process.env.ARK_API_KEY : process.env.DEEPSEEK_API_KEY;
+
+  if (!apiKey) {
+    return NextResponse.json(
+      {
+        error: isDoubaoModel
+          ? 'ARK_API_KEY is missing.'
+          : 'DeepSeek API key is missing.',
+      },
+      { status: 500 }
+    );
+  }
+
+  const apiUrl = isDoubaoModel
+    ? 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'
+    : 'https://api.deepseek.com/v1/chat/completions';
+  const requestBody: Record<string, unknown> = {
+    model: requestedModel,
+    messages: finalMessages,
+    temperature,
+    stream,
+  };
+
+  if (isDoubaoModel) {
+    requestBody.thinking = { type: 'disabled' };
+  }
+
+  const response = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: requestedModel,
-      messages: finalMessages,
-      temperature,
-      stream,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {

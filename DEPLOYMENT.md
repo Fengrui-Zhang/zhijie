@@ -22,6 +22,7 @@
 | `NEXTAUTH_SECRET` | 必填，运行 `openssl rand -base64 32` 生成 | 随机字符串 |
 | `NEXTAUTH_URL` | 部署后域名 | `https://zhijie-xxx.vercel.app` |
 | `DEEPSEEK_API_KEY` | DeepSeek LLM | 你的 API Key |
+| `ARK_API_KEY` | 豆包 / 火山方舟 LLM | 你的 API Key |
 | `YUANFENJU_API_KEY` | 元奋局排盘 | 你的 API Key |
 | `EMBEDDING_PROVIDER` | 向量嵌入服务 | dashscope / openai |
 | `EMBEDDING_BASE_URL` | 嵌入 API 地址 | 可选 |
