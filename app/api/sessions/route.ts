@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
-  const { modelType, title, chartParams, chartData } = await request.json();
+  const { modelType, title, chartParams, chartData, caseId } = await request.json();
 
   if (!modelType || !chartData) {
     return NextResponse.json(
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
   const created = await prisma.divinationSession.create({
     data: {
       userId: session.user.id,
+      caseId: caseId || null,
       modelType,
       title: title || `${modelType} - ${new Date().toLocaleDateString('zh-CN')}`,
       chartParams: chartParams || {},

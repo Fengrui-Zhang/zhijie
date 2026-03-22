@@ -16,13 +16,30 @@ model User {
   role      String   @default("user")
   quota     Int      @default(30)
   createdAt DateTime @default(now())
+  cases     DivinationCase[]
   sessions  DivinationSession[]
   note      UserNote?
+}
+
+model DivinationCase {
+  id         String   @id @default(cuid())
+  userId     String
+  modelType  String
+  title      String
+  chartParams Json?
+  chartData  Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions   DivinationSession[]
+
+  @@index([userId, modelType, updatedAt])
 }
 
 model DivinationSession {
   id          String   @id @default(cuid())
   userId      String
+  caseId      String?
   modelType   String
   title       String
   chartParams Json?
@@ -30,7 +47,10 @@ model DivinationSession {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  divinationCase DivinationCase? @relation(fields: [caseId], references: [id], onDelete: Cascade)
   messages    ChatMessage[]
+
+  @@index([caseId, updatedAt])
 }
 
 model ChatMessage {

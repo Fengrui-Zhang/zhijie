@@ -12,6 +12,18 @@ import {
   type AnalysisModel,
   isAnalysisModel,
 } from './lib/analysis-models';
+import {
+  buildCaseDateTimeValue,
+  buildCaseSessionTitle,
+  buildCaseTitle,
+  CASE_MODEL_TYPES,
+  type CaseDetail,
+  type CaseItem,
+  type CaseModelType,
+  type CaseSessionItem,
+  isCaseModelType,
+  normalizeCaseChartParams,
+} from './lib/divination-cases';
 
 // Services
 import { 
@@ -99,6 +111,8 @@ const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当�
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
 const ANALYSIS_MODEL_STORAGE_KEY = 'analysis-model:v1';
+const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
+const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 
@@ -306,6 +320,24 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+type GuestStoredSession = {
+  id: string;
+  caseId: string;
+  modelType: CaseModelType;
+  title: string;
+  chartParams: Record<string, unknown>;
+  chartData: unknown;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'model';
+    content: string;
+    timestamp: string;
+  }>;
+  guestFollowUpCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type KlineScores = {
   wealth: number;
   career: number;
@@ -358,14 +390,97 @@ const MODEL_LABELS: Record<string, string> = {
   liuyao: '六爻纳甲',
 };
 
+const buildBaziSystemInstruction = (data: BaziResponse) => {
+  const panText = formatBaziPrompt(data);
+  const now = new Date();
+  const currentTimeText = `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
+
+  return [
+    "你是一位深谙段建业盲派命理体系的算命专家。你推命的核心逻辑是理法、象法、技法三位一体，重点在于观察八字如何通过做功来表述人生 。",
+    "如果知识库检索到强有力的证据，请保持专业判断，不要为了迎合用户情绪而轻易动摇观点；在适当位置可引用或提及知识库中的关键信息作为依据。",
+    "Workflow:",
+    "1. 建立坐标：宾主与体用 分清宾主：日、时为主位（代表我、我的家、我的工具）；年、月为宾位（代表他人的、外界的、我面对的环境） 。 定体用：将十神分为体（日主、印、禄、比劫，代表我自己或操纵的工具）和用（财、官，代表我的目的和追求）。食伤视情况而定，食神近体，伤官近用 。",
+    "2. 核心分析：寻找做功方式 请根据以下逻辑分析八字的能量耗散与效率： 日干意向：日干有无合（合财/官）、有无生（生食伤），这是日干追求目标的体现 。 主位动作：日支是否参与刑、冲、克、穿、合、墓。若日支不做功，再看有无禄神和比劫做功 。 成党成势：分析干支是否成党，成功者往往有势，通过强方制掉弱方来做功 。 做功类型：判定是制用、化用、生用还是合用结构 ，干支自合（如丁亥、戊子、辛巳、壬午）属于合制做功，合则能去，效率极高。",
+    "3. 层次判定：效率与干净度 富贵贫贱：制得干净、做功效率高者为大富贵；制不干净、能量内耗或废神多者为平庸 。 虚实取象：财星虚透主才华、口才而非钱财；官星虚透主名气而非权位 。",
+    "4. 细节推断：穿、破与墓库 穿（害）分析：重点观察子未、丑午、卯辰、酉戌等相穿，这代表防不胜防的伤害或穿倒（破坏性质） 。 墓库开闭：辰戌丑未是否逢冲刑，不冲为墓（死的），冲开为库（活的），库必须开才能发挥作用 。日主坐下的印库或者比劫库不能被冲，财库和官库逢冲则开。",
+    "5. 输出格式要求：",
+    "6. 八字排盘及体用分析。",
+    "7. 做功逻辑详解（说明使用了什么工具，制了什么东西，效率如何）。",
+    "8. 富贵层次判定。",
+    "",
+    "这是某位提问者的八字排盘信息，请你据此进行推断：",
+    "",
+    panText,
+    currentTimeText,
+    "",
+    "请严格基于以上数据分析，不得臆测与杜撰。",
+  ].join('\n');
+};
+
+const buildZiweiSystemInstruction = (data: ZiweiResponse) =>
+  "你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。";
+
+const buildLifeReadingAnalysisBundle = (
+  mType: CaseModelType,
+  cData: BaziResponse | ZiweiResponse,
+  question: string
+) => {
+  const trimmedQuestion = question.trim();
+  const now = new Date();
+  const currentTimeText = `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
+
+  if (mType === ModelType.BAZI) {
+    const defaultBaziQuestion = "请分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。";
+    const finalQuestion = trimmedQuestion || defaultBaziQuestion;
+    return {
+      prompt: trimmedQuestion
+        ? `用户问题：${trimmedQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`
+        : `用户问题：${finalQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`,
+      systemInstruction: buildBaziSystemInstruction(cData as BaziResponse),
+      knowledgeQuery: trimmedQuestion || defaultBaziQuestion,
+    };
+  }
+
+  return {
+    prompt: `${formatZiweiPrompt(cData as ZiweiResponse)}\n${currentTimeText}`,
+    systemInstruction: buildZiweiSystemInstruction(cData as ZiweiResponse),
+    knowledgeQuery: trimmedQuestion,
+  };
+};
+
+const buildInitialUserContent = (
+  mType: ModelType,
+  chartParams: Record<string, unknown>,
+  question: string
+) => {
+  const trimmedQuestion = question.trim();
+  const params = normalizeCaseChartParams(chartParams);
+  const birthText =
+    params.year !== undefined &&
+    params.month !== undefined &&
+    params.day !== undefined
+      ? `${params.year}年${params.month}月${params.day}日`
+      : '命盘';
+
+  if (mType === ModelType.BAZI) {
+    return `请分析我的命盘: ${birthText}${trimmedQuestion ? `\n问题: ${trimmedQuestion}` : ''}`;
+  }
+
+  if (mType === ModelType.ZIWEI) {
+    return `请分析我的命盘: ${birthText}${trimmedQuestion ? `\n问题: ${trimmedQuestion}` : ''}`;
+  }
+
+  return `问题: ${question}`;
+};
+
 const buildSystemInstruction = (mType: ModelType, cData: unknown): string => {
   switch (mType) {
     case ModelType.QIMEN:
       return `你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。\n\n${formatQimenPrompt(cData as any, '')}`;
     case ModelType.BAZI:
-      return `你是一位深谙段建业盲派命理体系的算命专家。\n\n${formatBaziPrompt(cData as any)}`;
+      return buildBaziSystemInstruction(cData as BaziResponse);
     case ModelType.ZIWEI:
-      return `你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。\n\n${formatZiweiPrompt(cData as any)}`;
+      return buildZiweiSystemInstruction(cData as ZiweiResponse);
     case ModelType.MEIHUA:
       return `你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。\n\n${formatMeihuaPrompt(cData as any, '')}`;
     case ModelType.LIUYAO:
@@ -389,6 +504,11 @@ const App: React.FC = () => {
   // --- Persistence State ---
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
+  const [caseItems, setCaseItems] = useState<CaseItem[]>([]);
+  const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
+  const [caseFormOpen, setCaseFormOpen] = useState(false);
+  const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+  const [caseBusy, setCaseBusy] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [noteCollapsed, setNoteCollapsed] = useState(false);
   const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'note' | null>(null);
@@ -446,6 +566,7 @@ const App: React.FC = () => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
+  const isCaseModel = isCaseModelType(modelType);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
@@ -500,6 +621,149 @@ const App: React.FC = () => {
       // Ignore localStorage errors
     }
   }, [analysisModel]);
+
+  const readGuestCases = useCallback((): CaseItem[] => {
+    try {
+      const raw = localStorage.getItem(GUEST_CASES_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item): item is CaseItem => {
+        return !!item && typeof item.id === 'string' && isCaseModelType(item.modelType);
+      });
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const writeGuestCases = useCallback((items: CaseItem[]) => {
+    localStorage.setItem(GUEST_CASES_STORAGE_KEY, JSON.stringify(items));
+  }, []);
+
+  const readGuestCaseSessions = useCallback((): GuestStoredSession[] => {
+    try {
+      const raw = localStorage.getItem(GUEST_CASE_SESSIONS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item): item is GuestStoredSession => {
+        return (
+          !!item &&
+          typeof item.id === 'string' &&
+          typeof item.caseId === 'string' &&
+          isCaseModelType(item.modelType) &&
+          Array.isArray(item.messages)
+        );
+      });
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const writeGuestCaseSessions = useCallback((items: GuestStoredSession[]) => {
+    localStorage.setItem(GUEST_CASE_SESSIONS_STORAGE_KEY, JSON.stringify(items));
+  }, []);
+
+  const applyCaseChartParamsToForm = useCallback((chartParams: unknown) => {
+    const params = normalizeCaseChartParams(chartParams);
+    setName(params.name || '');
+    setGender(params.sex ?? 0);
+    setCustomDate(buildCaseDateTimeValue(params));
+    setProvince(params.province || '');
+    setCity(params.city || '');
+    setTimeMode('custom');
+  }, []);
+
+  const resetCaseFormInputs = useCallback(() => {
+    setName('');
+    setGender(0);
+    setCustomDate('');
+    setProvince('');
+    setCity('');
+    setQuestion('');
+  }, []);
+
+  const getGuestCaseDetail = useCallback((caseId: string): CaseDetail | null => {
+    const allCases = readGuestCases();
+    const matchedCase = allCases.find((item) => item.id === caseId);
+    if (!matchedCase) return null;
+
+    const sessions = readGuestCaseSessions()
+      .filter((item) => item.caseId === caseId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map((item) => ({
+        id: item.id,
+        modelType: item.modelType,
+        title: item.title,
+        caseId: item.caseId,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+
+    return {
+      ...matchedCase,
+      sessions,
+    };
+  }, [readGuestCaseSessions, readGuestCases]);
+
+  const hydrateCasesForModel = useCallback(async (type: ModelType) => {
+    if (!isCaseModelType(type)) return;
+
+    if (!isLoggedIn) {
+      const items = readGuestCases()
+        .filter((item) => item.modelType === type)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      setCaseItems(items);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/cases?modelType=${type}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setCaseItems(Array.isArray(data) ? data : []);
+    } catch {
+      // silently ignore
+    }
+  }, [isLoggedIn, readGuestCases]);
+
+  const loadCaseDetail = useCallback(async (caseId: string) => {
+    if (!isCaseModel) return;
+
+    if (!isLoggedIn) {
+      const detail = getGuestCaseDetail(caseId);
+      if (!detail) return;
+      const storedSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
+      clearChatSession();
+      setActiveCase(detail);
+      setChartData(detail.chartData);
+      setQuestion('');
+      setChatHistory([]);
+      setKnowledgeHint(null);
+      setActiveSessionId(null);
+      const nextFollowUpCount = storedSession?.guestFollowUpCount || 0;
+      setGuestFollowUpCount(nextFollowUpCount);
+      localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
+      setStep('chart');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/cases/${caseId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      clearChatSession();
+      setActiveCase(data);
+      setChartData(data.chartData);
+      setQuestion('');
+      setChatHistory([]);
+      setKnowledgeHint(null);
+      setActiveSessionId(null);
+      setStep('chart');
+    } catch {
+      // silently ignore
+    }
+  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1279px)');
@@ -614,6 +878,18 @@ const App: React.FC = () => {
   }, [fetchNote]);
 
   useEffect(() => {
+    if (!isCaseModelType(modelType)) {
+      setCaseItems([]);
+      setActiveCase(null);
+      setCaseFormOpen(false);
+      setEditingCaseId(null);
+      return;
+    }
+
+    hydrateCasesForModel(modelType);
+  }, [hydrateCasesForModel, modelType]);
+
+  useEffect(() => {
     if (authStatus === 'unauthenticated') {
       const dismissed = sessionStorage.getItem('welcomeDismissed');
       if (!dismissed) setShowWelcome(true);
@@ -690,14 +966,15 @@ const App: React.FC = () => {
     mType: string,
     title: string,
     chartParams: Record<string, unknown>,
-    cData: unknown
+    cData: unknown,
+    caseId?: string | null
   ): Promise<string | null> => {
     if (!isLoggedIn) return null;
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modelType: mType, title, chartParams, chartData: cData }),
+        body: JSON.stringify({ modelType: mType, title, chartParams, chartData: cData, caseId }),
       });
       if (res.ok) {
         const created = await res.json();
@@ -709,6 +986,115 @@ const App: React.FC = () => {
     }
     return null;
   };
+
+  const createCaseInDb = async (
+    type: CaseModelType,
+    chartParams: Record<string, unknown>,
+    cData: unknown
+  ): Promise<CaseDetail | null> => {
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelType: type,
+          title: buildCaseTitle(type, chartParams),
+          chartParams,
+          chartData: cData,
+        }),
+      });
+      if (!res.ok) return null;
+      const created = await res.json();
+      const detailRes = await fetch(`/api/cases/${created.id}`);
+      if (!detailRes.ok) return null;
+      return await detailRes.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const updateCaseInDb = async (
+    caseId: string,
+    type: CaseModelType,
+    chartParams: Record<string, unknown>,
+    cData: unknown
+  ): Promise<CaseDetail | null> => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: buildCaseTitle(type, chartParams),
+          chartParams,
+          chartData: cData,
+        }),
+      });
+      if (!res.ok) return null;
+      const detailRes = await fetch(`/api/cases/${caseId}`);
+      if (!detailRes.ok) return null;
+      return await detailRes.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const deleteCaseInDb = async (caseId: string) => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, { method: 'DELETE' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const saveGuestCase = useCallback((nextCase: CaseItem) => {
+    const current = readGuestCases().filter((item) => item.id !== nextCase.id);
+    const next = [nextCase, ...current].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    writeGuestCases(next);
+    setCaseItems(next.filter((item) => item.modelType === modelType));
+  }, [modelType, readGuestCases, writeGuestCases]);
+
+  const saveGuestCaseSession = useCallback((session: GuestStoredSession) => {
+    const current = readGuestCaseSessions().filter((item) => item.id !== session.id);
+    const next = [session, ...current];
+    writeGuestCaseSessions(next);
+  }, [readGuestCaseSessions, writeGuestCaseSessions]);
+
+  const updateGuestCaseSessionMessages = useCallback((
+    sessionId: string,
+    messages: ChatMessage[],
+    nextFollowUpCount?: number
+  ) => {
+    const current = readGuestCaseSessions();
+    const next = current.map((item) => {
+      if (item.id !== sessionId) return item;
+      return {
+        ...item,
+        messages: messages.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+        })),
+        guestFollowUpCount: nextFollowUpCount ?? item.guestFollowUpCount,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    writeGuestCaseSessions(next);
+  }, [readGuestCaseSessions, writeGuestCaseSessions]);
+
+  const deleteGuestCase = useCallback((caseId: string) => {
+    const nextCases = readGuestCases().filter((item) => item.id !== caseId);
+    const nextSessions = readGuestCaseSessions().filter((item) => item.caseId !== caseId);
+    writeGuestCases(nextCases);
+    writeGuestCaseSessions(nextSessions);
+    setCaseItems(nextCases.filter((item) => item.modelType === modelType));
+  }, [modelType, readGuestCaseSessions, readGuestCases, writeGuestCases, writeGuestCaseSessions]);
+
+  const clearGuestCaseSessions = useCallback((caseId: string) => {
+    const nextSessions = readGuestCaseSessions().filter((item) => item.caseId !== caseId);
+    writeGuestCaseSessions(nextSessions);
+  }, [readGuestCaseSessions, writeGuestCaseSessions]);
 
   const saveMessagesToDb = async (
     sessionId: string | null,
@@ -730,6 +1116,13 @@ const App: React.FC = () => {
     try {
       await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
       setSavedSessions(prev => prev.filter(s => s.id !== id));
+      if (activeCase && isLoggedIn) {
+        const detailRes = await fetch(`/api/cases/${activeCase.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          setActiveCase(detail);
+        }
+      }
       if (activeSessionId === id) {
         setActiveSessionId(null);
         handleReset();
@@ -744,13 +1137,29 @@ const App: React.FC = () => {
       const res = await fetch(`/api/sessions/${id}`);
       if (!res.ok) return;
       const data = await res.json();
+      let effectiveChartData = data.chartData;
+      let matchedCase: CaseDetail | null = null;
+
+      if (isCaseModelType(data.modelType) && data.caseId) {
+        try {
+          const detailRes = await fetch(`/api/cases/${data.caseId}`);
+          if (detailRes.ok) {
+            matchedCase = await detailRes.json();
+            effectiveChartData = matchedCase.chartData;
+          }
+        } catch {
+          // silently ignore
+        }
+      }
 
       clearChatSession();
       setActiveSessionId(id);
       setModelType(data.modelType as ModelType);
-      setChartData(data.chartData);
+      setChartData(effectiveChartData);
       setStep('chart');
       setError('');
+      setCaseFormOpen(false);
+      setEditingCaseId(null);
 
       if (data.chartParams) {
         const p = data.chartParams as Record<string, unknown>;
@@ -772,14 +1181,17 @@ const App: React.FC = () => {
       setChatHistory(msgs);
 
       if (msgs.length > 0) {
-        const systemInstruction = buildSystemInstruction(data.modelType as ModelType, data.chartData);
+        const systemInstruction = buildSystemInstruction(
+          data.modelType as ModelType,
+          effectiveChartData
+        );
         restoreChatSession(
           systemInstruction,
           msgs.map(m => ({ role: m.role, content: m.content }))
         );
       }
 
-      if (data.modelType === 'bazi' && data.chartData) {
+      if (data.modelType === 'bazi' && effectiveChartData) {
         const firstModelMsg = msgs.find(m => m.role === 'model');
         if (firstModelMsg) {
           const parsed = parseModelContent(firstModelMsg.content);
@@ -787,8 +1199,54 @@ const App: React.FC = () => {
           setKlineUnlocked(true);
         }
       }
+
+      setActiveCase(matchedCase);
     } catch {
       // silently ignore
+    }
+  };
+
+  const handleLoadGuestCaseSession = (sessionId: string) => {
+    const storedSession = readGuestCaseSessions().find((item) => item.id === sessionId);
+    if (!storedSession) return;
+
+    const detail = getGuestCaseDetail(storedSession.caseId);
+    const effectiveChartData = detail?.chartData ?? storedSession.chartData;
+    clearChatSession();
+    setModelType(storedSession.modelType);
+    setChartData(effectiveChartData);
+    setActiveSessionId(storedSession.id);
+    setActiveCase(detail);
+    setStep('chart');
+    setError('');
+    setCaseFormOpen(false);
+    setEditingCaseId(null);
+    setQuestion('');
+
+    const msgs: ChatMessage[] = storedSession.messages.map((msg) => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp),
+    }));
+    setChatHistory(msgs);
+    setGuestFollowUpCount(storedSession.guestFollowUpCount || 0);
+
+    if (msgs.length > 0) {
+      const systemInstruction = buildSystemInstruction(storedSession.modelType, effectiveChartData);
+      restoreChatSession(
+        systemInstruction,
+        msgs.map((msg) => ({ role: msg.role, content: msg.content }))
+      );
+    }
+
+    if (storedSession.modelType === ModelType.BAZI) {
+      const firstModelMsg = msgs.find((msg) => msg.role === 'model');
+      if (firstModelMsg) {
+        const parsed = parseModelContent(firstModelMsg.content);
+        setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+        setKlineUnlocked(true);
+      }
     }
   };
 
@@ -1365,7 +1823,12 @@ const App: React.FC = () => {
     setChatHistory([]);
     clearChatSession();
     setError('');
+    setQuestion('');
     setBirthYear('');
+    setName('');
+    setCustomDate('');
+    setProvince('');
+    setCity('');
     setLiuyaoMode(LiuyaoMode.AUTO);
     setManualLines([1,0,1,0,1,0]);
     setLyNum('');
@@ -1388,7 +1851,308 @@ const App: React.FC = () => {
     klineYearProgressRef.current = 0;
     setKlinePos(null);
     setActiveSessionId(null);
+    setActiveCase(null);
+    setCaseFormOpen(false);
+    setEditingCaseId(null);
     setKnowledgeHint(null);
+  };
+
+  const beginCaseCreate = () => {
+    setEditingCaseId(null);
+    setCaseFormOpen(true);
+    resetCaseFormInputs();
+    setError('');
+  };
+
+  const beginCaseEdit = () => {
+    if (!activeCase) return;
+    setEditingCaseId(activeCase.id);
+    setCaseFormOpen(true);
+    applyCaseChartParamsToForm(activeCase.chartParams);
+    setError('');
+    setStep('input');
+  };
+
+  const refreshGuestActiveCase = useCallback((caseId: string) => {
+    const detail = getGuestCaseDetail(caseId);
+    setActiveCase(detail);
+    if (detail) {
+      setChartData(detail.chartData);
+    }
+  }, [getGuestCaseDetail]);
+
+  const handleDeleteCase = async () => {
+    if (!activeCase) return;
+
+    if (isLoggedIn) {
+      const ok = await deleteCaseInDb(activeCase.id);
+      if (!ok) {
+        setError('删除命例失败，请稍后重试');
+        return;
+      }
+      await hydrateCasesForModel(activeCase.modelType);
+      fetchSessions();
+    } else {
+      deleteGuestCase(activeCase.id);
+    }
+
+    setActiveCase(null);
+    setActiveSessionId(null);
+    setChartData(null);
+    setChatHistory([]);
+    setQuestion('');
+    clearChatSession();
+    setGuestFollowUpCount(0);
+    localStorage.setItem('guestFollowUpCount', '0');
+    setStep('input');
+  };
+
+  const handleSaveCase = async () => {
+    if (!isCaseModelType(modelType)) return;
+    if (!customDate) {
+      setError('请选择出生日期');
+      return;
+    }
+
+    if (!isLoggedIn && guestFortuneCount >= 3) {
+      setError('');
+      setShowAuth(true);
+      return;
+    }
+
+    setCaseBusy(true);
+    setLoading(true);
+    setError('');
+
+    try {
+      const date = new Date(customDate);
+      const chartParams = {
+        name: name || '',
+        sex: gender,
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        day: date.getDate(),
+        hours: date.getHours(),
+        minute: date.getMinutes(),
+        province: province || '',
+        city: city || '',
+      };
+
+      const chartResponse = modelType === ModelType.BAZI
+        ? await fetchBazi(chartParams)
+        : await fetchZiwei(chartParams);
+
+      const nowIso = new Date().toISOString();
+
+      if (isLoggedIn) {
+        const detail = editingCaseId
+          ? await updateCaseInDb(editingCaseId, modelType, chartParams, chartResponse)
+          : await createCaseInDb(modelType, chartParams, chartResponse);
+        if (!detail) {
+          throw new Error('保存命例失败');
+        }
+
+        await hydrateCasesForModel(modelType);
+        setActiveCase(detail);
+      } else {
+        const caseId = editingCaseId || `guest-case-${Date.now()}`;
+        if (editingCaseId) {
+          clearGuestCaseSessions(caseId);
+        }
+        const nextCase: CaseItem = {
+          id: caseId,
+          modelType,
+          title: buildCaseTitle(modelType, chartParams),
+          chartParams,
+          chartData: chartResponse,
+          createdAt: editingCaseId && activeCase ? activeCase.createdAt : nowIso,
+          updatedAt: nowIso,
+        };
+        saveGuestCase(nextCase);
+        refreshGuestActiveCase(caseId);
+        const newCount = guestFortuneCount + 1;
+        localStorage.setItem('guestFortuneCount', String(newCount));
+        setGuestFortuneCount(newCount);
+        setGuestFollowUpCount(0);
+        localStorage.setItem('guestFollowUpCount', '0');
+      }
+
+      setChartData(chartResponse);
+      setChatHistory([]);
+      setActiveSessionId(null);
+      setQuestion('');
+      clearChatSession();
+      setStep('chart');
+      setCaseFormOpen(false);
+      setEditingCaseId(null);
+      setKnowledgeHint(null);
+    } catch (err: any) {
+      setError(err.message || '排盘失败，请稍后重试');
+    } finally {
+      setLoading(false);
+      setCaseBusy(false);
+    }
+  };
+
+  const handleStartCaseAnalysis = async () => {
+    if (!activeCase || !isCaseModelType(activeCase.modelType)) return;
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
+    const existingGuestSession = !isLoggedIn
+      ? readGuestCaseSessions().find((item) => item.caseId === activeCase.id)
+      : null;
+
+    if (!isLoggedIn && existingGuestSession) {
+      handleLoadGuestCaseSession(existingGuestSession.id);
+      const nextQuestion = question.trim();
+      setQuestion('');
+      if (!nextQuestion) return;
+      if ((existingGuestSession.guestFollowUpCount || 0) >= 1) {
+        setShowAuth(true);
+        return;
+      }
+      await sendFollowUpMessage(nextQuestion, {
+        bypassGuestLimit: true,
+        sessionIdOverride: existingGuestSession.id,
+        caseIdOverride: activeCase.id,
+        guestFollowUpCountOverride: existingGuestSession.guestFollowUpCount || 0,
+      });
+      return;
+    }
+
+    setLoading(true);
+    setIsTyping(true);
+    setError('');
+    setKnowledgeHint(null);
+    clearChatSession();
+    setChatHistory([]);
+    setActiveSessionId(null);
+    if (!isLoggedIn) {
+      setGuestFollowUpCount(0);
+      localStorage.setItem('guestFollowUpCount', '0');
+    }
+
+    const chartParams = (activeCase.chartParams || {}) as Record<string, unknown>;
+    const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
+      activeCase.modelType,
+      activeCase.chartData as BaziResponse & ZiweiResponse,
+      question
+    );
+    const userContent = buildInitialUserContent(activeCase.modelType, chartParams, question);
+    const sessionTitle = buildCaseSessionTitle(activeCase.modelType, activeCase.title, question);
+
+    try {
+      let currentSessionId: string | null = null;
+      let guestSessionCreated: GuestStoredSession | null = null;
+
+      if (isLoggedIn) {
+        currentSessionId = await saveSessionToDb(
+          activeCase.modelType,
+          sessionTitle,
+          { ...chartParams, analysisModel },
+          activeCase.chartData,
+          activeCase.id
+        );
+      } else {
+        const nowIso = new Date().toISOString();
+        guestSessionCreated = {
+          id: `guest-case-session-${Date.now()}`,
+          caseId: activeCase.id,
+          modelType: activeCase.modelType,
+          title: sessionTitle,
+          chartParams,
+          chartData: activeCase.chartData,
+          messages: [],
+          guestFollowUpCount: 0,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        saveGuestCaseSession(guestSessionCreated);
+        currentSessionId = guestSessionCreated.id;
+        refreshGuestActiveCase(activeCase.id);
+      }
+
+      if (currentSessionId) {
+        setActiveSessionId(currentSessionId);
+      }
+
+      await startQimenChat(systemInstruction);
+
+      const userMsg: ChatMessage = {
+        id: 'init-u',
+        role: 'user',
+        content: userContent,
+        timestamp: new Date(),
+      };
+      const modelId = 'init-m';
+      setChatHistory([
+        userMsg,
+        { id: modelId, role: 'model', content: '', timestamp: new Date() },
+      ]);
+
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[activeCase.modelType],
+            query: knowledgeQuery || question.trim(),
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge,
+        analysisModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalModelMessage: ChatMessage = {
+        id: modelId,
+        role: 'model',
+        content: finalContent,
+        timestamp: new Date(),
+      };
+      setChatHistory([userMsg, finalModelMessage]);
+
+      if (activeCase.modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
+        setKlineUnlocked(true);
+      }
+
+      if (isLoggedIn) {
+        await saveMessagesToDb(currentSessionId, [
+          { role: 'user', content: userContent },
+          { role: 'model', content: finalContent },
+        ]);
+        fetchSessions();
+        const detailRes = await fetch(`/api/cases/${activeCase.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          setActiveCase(detail);
+        }
+        fetchUserProfile();
+      } else if (guestSessionCreated) {
+        updateGuestCaseSessionMessages(currentSessionId!, [userMsg, finalModelMessage], 0);
+        refreshGuestActiveCase(activeCase.id);
+      }
+
+      setQuestion('');
+    } catch (err: any) {
+      setError(err.message || '分析失败，请稍后重试');
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+    }
   };
 
   const handleCalculate = async () => {
@@ -1658,27 +2422,47 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
-    if (!isLoggedIn) {
-      if (guestFollowUpCount >= 1) {
-        setShowAuth(true);
-        return;
-      }
+  const sendFollowUpMessage = async (
+    rawMessage: string,
+    options?: {
+      bypassGuestLimit?: boolean;
+      sessionIdOverride?: string;
+      caseIdOverride?: string;
+      guestFollowUpCountOverride?: number;
+    }
+  ) => {
+    const outgoingMessage = rawMessage.trim();
+    if (!outgoingMessage) return;
+
+    const effectiveGuestFollowUpCount = options?.guestFollowUpCountOverride ?? guestFollowUpCount;
+    if (!isLoggedIn && !options?.bypassGuestLimit && effectiveGuestFollowUpCount >= 1) {
+      setShowAuth(true);
+      return;
     }
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
       return;
     }
-    const outgoingMessage = inputMessage;
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: outgoingMessage, timestamp: new Date() };
-    setChatHistory(prev => [...prev, userMsg]);
+
+    const sessionId = options?.sessionIdOverride ?? activeSessionId;
+    const caseId = options?.caseIdOverride ?? activeCase?.id ?? null;
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: outgoingMessage,
+      timestamp: new Date(),
+    };
+    const modelId = (Date.now() + 1).toString();
+
+    setChatHistory((prev) => [
+      ...prev,
+      userMsg,
+      { id: modelId, role: 'model', content: '', timestamp: new Date() },
+    ]);
     setInputMessage('');
     setIsTyping(true);
 
     try {
-      const modelId = (Date.now() + 1).toString();
-      setChatHistory(prev => [...prev, { id: modelId, role: 'model', content: '', timestamp: new Date() }]);
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
@@ -1698,27 +2482,46 @@ const App: React.FC = () => {
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
-      updateChatMessage(modelId, finalContent);
 
-      await saveMessagesToDb(activeSessionId, [
-        { role: 'user', content: outgoingMessage },
-        { role: 'model', content: finalContent },
-      ]);
-
-      if (!isLoggedIn) {
-        const newCount = guestFollowUpCount + 1;
-        localStorage.setItem('guestFollowUpCount', String(newCount));
-        setGuestFollowUpCount(newCount);
-      } else {
+      if (isLoggedIn) {
+        updateChatMessage(modelId, finalContent);
+        await saveMessagesToDb(sessionId, [
+          { role: 'user', content: outgoingMessage },
+          { role: 'model', content: finalContent },
+        ]);
         fetchUserProfile();
+      } else {
+        const nextGuestFollowUpCount = effectiveGuestFollowUpCount + 1;
+        localStorage.setItem('guestFollowUpCount', String(nextGuestFollowUpCount));
+        setGuestFollowUpCount(nextGuestFollowUpCount);
+        setChatHistory((prev) => {
+          const next = prev.map((msg) =>
+            msg.id === modelId ? { ...msg, content: finalContent } : msg
+          );
+          if (sessionId) {
+            updateGuestCaseSessionMessages(sessionId, next, nextGuestFollowUpCount);
+          }
+          return next;
+        });
+        if (caseId) {
+          refreshGuestActiveCase(caseId);
+        }
       }
-    } catch (err) {
-      setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'model', content: "⚠️ 网络错误，请重试。", timestamp: new Date() }]);
+    } catch {
+      setChatHistory((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'model', content: '⚠️ 网络错误，请重试。', timestamp: new Date() },
+      ]);
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSendMessage = async () => {
+    await sendFollowUpMessage(inputMessage);
   };
 
   // Helper for Manual Line Toggling
@@ -2486,7 +3289,167 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
+            {isCaseModel ? (
+              <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-bold text-stone-700">命例中心</div>
+                    <div className="text-sm text-stone-500">
+                      先保存命例，再按命例开始分析。选择地区即启用真太阳时。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={beginCaseCreate}
+                    className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
+                  >
+                    新增命例
+                  </button>
+                </div>
+
+                {caseItems.length === 0 && !caseFormOpen && (
+                  <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
+                    暂无已保存命例，点击右上角“新增命例”开始排盘并保存。
+                  </div>
+                )}
+
+                {caseItems.length > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {caseItems.map((item) => {
+                      const params = normalizeCaseChartParams(item.chartParams);
+                      const datetimeText = buildCaseDateTimeValue(item.chartParams)
+                        ? buildCaseDateTimeValue(item.chartParams).replace('T', ' ')
+                        : '未填写出生时间';
+                      const solarText = params.province && params.city
+                        ? `真太阳时 · ${params.province}${params.city}`
+                        : '普通时间';
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => loadCaseDetail(item.id)}
+                          className={`text-left rounded-[24px] border p-4 transition ${
+                            activeCase?.id === item.id
+                              ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.22)]'
+                              : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-base font-bold">{item.title}</div>
+                              <div className={`mt-1 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                {datetimeText}
+                              </div>
+                            </div>
+                            <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                              activeCase?.id === item.id
+                                ? 'border-amber-200/30 text-amber-100'
+                                : 'border-stone-200 text-stone-500'
+                            }`}>
+                              {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
+                            </span>
+                          </div>
+                          <div className={`mt-3 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                            {solarText}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {caseFormOpen && (
+                  <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-base font-bold text-stone-700">
+                          {editingCaseId ? '编辑命例' : '新增命例'}
+                        </div>
+                        <div className="text-xs text-stone-500">
+                          选择地区即按真太阳时排盘；不选择地区则按普通时间排盘。
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCaseFormOpen(false);
+                          setEditingCaseId(null);
+                          resetCaseFormInputs();
+                        }}
+                        className="text-sm text-stone-500 underline hover:text-stone-800"
+                      >
+                        取消
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-stone-700 font-bold mb-2">姓名 (可选)</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="glass-input w-full rounded-2xl p-3"
+                        placeholder="张三"
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-stone-700 font-bold mb-2">性别</label>
+                        <div className="flex gap-4">
+                          <button
+                            type="button"
+                            onClick={() => setGender(0)}
+                            className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 0 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}
+                          >
+                            男 (乾)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGender(1)}
+                            className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 1 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}
+                          >
+                            女 (坤)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-stone-700 font-bold mb-2">出生时间 (阳历)</label>
+                        <input
+                          type="datetime-local"
+                          value={customDate}
+                          onChange={(e) => setCustomDate(e.target.value)}
+                          className="glass-input w-full rounded-2xl p-3"
+                        />
+                        {showSolarTimeReminder && (
+                          <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                            当前时间接近时辰交界（前后30分钟），建议选择地区启用真太阳时。
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <LocationSelector
+                      province={province}
+                      setProvince={setProvince}
+                      city={city}
+                      setCity={setCity}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleSaveCase}
+                      disabled={loading || caseBusy}
+                      className="glass-cta w-full hover:brightness-105 text-amber-300 font-bold py-4 rounded-2xl flex justify-center items-center gap-2 transition"
+                    >
+                      {loading || caseBusy ? <Spinner /> : '排盘并保存命例'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
               {/* Question (Divination) */}
               {!isLifeReading && (
                 <div>
@@ -2495,19 +3458,6 @@ const App: React.FC = () => {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     placeholder={modelType === ModelType.QIMEN ? "例如：这次面试能过吗？" : "例如：近期财运如何？"}
-                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[80px]"
-                  />
-                </div>
-              )}
-
-              {/* Question (Bazi Optional) */}
-              {modelType === ModelType.BAZI && (
-                <div>
-                  <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
-                  <textarea 
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="例如：事业发展方向如何？"
                     className="glass-input w-full rounded-2xl p-3 outline-none min-h-[80px]"
                   />
                 </div>
@@ -2765,7 +3715,8 @@ const App: React.FC = () => {
               >
                 {loading ? <Spinner /> : '开始排盘'}
               </button>
-            </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2803,7 +3754,94 @@ const App: React.FC = () => {
               {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
             </div>
 
+            {isCaseModel && activeCase && (
+              <div className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
+                    <div className="text-sm text-stone-500">
+                      选择地区即启用真太阳时。命例已保存，开始分析时不会重复调用排盘接口。
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={beginCaseEdit}
+                      className="rounded-full border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:border-stone-300 hover:text-stone-800"
+                    >
+                      编辑命例
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteCase}
+                      className="rounded-full border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:border-red-300 hover:text-red-600"
+                    >
+                      删除命例
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
+                  <textarea
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder={modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
+                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleStartCaseAnalysis}
+                    disabled={loading || isTyping}
+                    className="glass-cta mt-4 w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
+                  >
+                    {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-stone-700">历史分析会话</div>
+                    <div className="text-xs text-stone-500">
+                      {activeCase.sessions.length ? `共 ${activeCase.sessions.length} 条` : '暂无分析记录'}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {activeCase.sessions.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-5 text-sm text-stone-400 text-center">
+                        这个命例还没有分析记录。
+                      </div>
+                    )}
+                    {activeCase.sessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => {
+                          if (isLoggedIn) {
+                            handleLoadSession(session.id);
+                          } else {
+                            handleLoadGuestCaseSession(session.id);
+                          }
+                        }}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                          activeSessionId === session.id
+                            ? 'glass-panel-dark border-transparent text-amber-200'
+                            : 'glass-panel bg-white/70 text-stone-700 border-white/60 hover:bg-white/85'
+                        }`}
+                      >
+                        <div className="text-sm font-semibold">{session.title}</div>
+                        <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
+                          {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Chat */}
+            {(!isCaseModel || chatHistory.length > 0) && (
             <div className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> 大师解读</h3>
@@ -2886,6 +3924,7 @@ const App: React.FC = () => {
                  <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="glass-cta text-amber-300 p-3 rounded-2xl hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100 transition"><SendIcon /></button>
               </div>
             </div>
+            )}
           </div>
         )}
         </div>
