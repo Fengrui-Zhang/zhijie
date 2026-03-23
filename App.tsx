@@ -424,10 +424,10 @@ const MODEL_LABELS: Record<string, string> = {
 };
 
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
-  [LiuyaoMode.AUTO, '自动起卦'],
-  [LiuyaoMode.CUSTOM_TIME, '自选时间'],
+  [LiuyaoMode.AUTO, '时间起卦'],
+  [LiuyaoMode.CUSTOM_TIME, '指定时间'],
   [LiuyaoMode.LIFETIME, '终身卦'],
-  [LiuyaoMode.MANUAL, '手工指定'],
+  [LiuyaoMode.MANUAL, '手动摇卦'],
   [LiuyaoMode.NUMBER, '数字起卦'],
   [LiuyaoMode.SINGLE_NUM, '单数起卦'],
   [LiuyaoMode.DOUBLE_NUM, '双数起卦'],
@@ -587,9 +587,9 @@ const App: React.FC = () => {
   
   // Liuyao Specifics
   const [liuyaoMode, setLiuyaoMode] = useState<LiuyaoMode>(LiuyaoMode.AUTO);
-  // Manual Lines: [line1, line2, ..., line6] where value is 0-3 (Young Yin, Young Yang, Old Yin, Old Yang)
-  // Initialized to all Young Yin (0) or alternating for demo
+  // Manual Lines: 0 = Yin, 1 = Yang; moving state is tracked separately.
   const [manualLines, setManualLines] = useState<number[]>([1,0,1,0,1,0]);
+  const [manualMovingLines, setManualMovingLines] = useState<boolean[]>([false, false, false, false, false, false]);
   const [lyNum, setLyNum] = useState<string>(''); // For single number
   const [lyNumUp, setLyNumUp] = useState<string>('');
   const [lyNumDown, setLyNumDown] = useState<string>('');
@@ -1901,6 +1901,7 @@ const App: React.FC = () => {
     setCity('');
     setLiuyaoMode(LiuyaoMode.AUTO);
     setManualLines([1,0,1,0,1,0]);
+    setManualMovingLines([false, false, false, false, false, false]);
     setLyNum('');
     setLyNumUp('');
     setLyNumDown('');
@@ -2271,6 +2272,14 @@ const App: React.FC = () => {
 
     // Meihua / Liuyao Specific Validation
     if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
+      if (
+        liuyaoMode === LiuyaoMode.MANUAL &&
+        modelType === ModelType.MEIHUA &&
+        manualMovingLines.filter(Boolean).length !== 1
+      ) {
+        setError("梅花易数手动摇卦必须且只能指定一个变爻");
+        return;
+      }
       if ((liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) && !lyNum) {
         setError("请输入数字");
         return;
@@ -2331,12 +2340,16 @@ const App: React.FC = () => {
       // Augment params for Meihua / Liuyao modes
       if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
          if (liuyaoMode === LiuyaoMode.MANUAL) {
-            baseParams.gua_yao1 = manualLines[0];
-            baseParams.gua_yao2 = manualLines[1];
-            baseParams.gua_yao3 = manualLines[2];
-            baseParams.gua_yao4 = manualLines[3];
-            baseParams.gua_yao5 = manualLines[4];
-            baseParams.gua_yao6 = manualLines[5];
+            const toManualYaoValue = (lineValue: number, isMoving: boolean) => {
+              if (lineValue === 1) return isMoving ? 3 : 1;
+              return isMoving ? 2 : 0;
+            };
+            baseParams.gua_yao1 = toManualYaoValue(manualLines[0], manualMovingLines[0]);
+            baseParams.gua_yao2 = toManualYaoValue(manualLines[1], manualMovingLines[1]);
+            baseParams.gua_yao3 = toManualYaoValue(manualLines[2], manualMovingLines[2]);
+            baseParams.gua_yao4 = toManualYaoValue(manualLines[3], manualMovingLines[3]);
+            baseParams.gua_yao5 = toManualYaoValue(manualLines[4], manualMovingLines[4]);
+            baseParams.gua_yao6 = toManualYaoValue(manualLines[5], manualMovingLines[5]);
          }
          else if (liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) {
             baseParams.number = parseInt(lyNum);
@@ -2616,22 +2629,26 @@ const App: React.FC = () => {
     await sendFollowUpMessage(inputMessage);
   };
 
-  // Helper for Manual Line Toggling
   const toggleLine = (idx: number) => {
     const newLines = [...manualLines];
-    // Cycle: 0 -> 1 -> 2 -> 3 -> 0
-    newLines[idx] = (newLines[idx] + 1) % 4;
+    newLines[idx] = newLines[idx] === 1 ? 0 : 1;
     setManualLines(newLines);
   };
+
+  const toggleManualMovingLine = (idx: number) => {
+    setManualMovingLines((prev) => {
+      if (modelType === ModelType.MEIHUA) {
+        return prev.map((_, lineIdx) => lineIdx === idx);
+      }
+      return prev.map((item, lineIdx) => (lineIdx === idx ? !item : item));
+    });
+  };
   
-  const getLineLabel = (val: number) => {
-     switch(val) {
-       case 0: return '少阴 --';
-       case 1: return '少阳 ━';
-       case 2: return '老阴 X'; // Changing Yin
-       case 3: return '老阳 O'; // Changing Yang
-       default: return '';
+  const getLineLabel = (lineValue: number, isMoving: boolean) => {
+     if (lineValue === 1) {
+       return isMoving ? '老阳' : '少阳';
      }
+     return isMoving ? '老阴' : '少阴';
   };
 
   const isNearShiChenBoundary = (value: string) => {
@@ -3732,25 +3749,44 @@ const App: React.FC = () => {
                     {/* 2. Manual Lines Generator */}
                     {liuyaoMode === LiuyaoMode.MANUAL && (
                        <div className="space-y-2">
-                          <p className="text-xs text-stone-500 mb-2">点击爻位切换状态 (初爻在下，六爻在上)</p>
+                          <p className="text-xs text-stone-500 mb-2">
+                            点击爻位切换阴阳；点击右侧圆圈设置变爻。{modelType === ModelType.MEIHUA ? '梅花易数必须且只能指定一个变爻。' : '六爻可按需要设置多个变爻。'}
+                          </p>
                           <div className="flex flex-col-reverse gap-2 bg-white p-3 rounded border border-stone-200">
                              {manualLines.map((val, idx) => (
-                                <div key={idx} onClick={() => toggleLine(idx)} className="flex items-center gap-3 cursor-pointer hover:bg-stone-50 p-1 rounded">
+                                <div key={idx} className="flex items-center gap-3 rounded p-1 hover:bg-stone-50">
                                    <span className="text-xs text-stone-400 w-8">{(idx === 0) ? '初爻' : (idx === 5) ? '六爻' : `${idx+1}爻`}</span>
+                                   <button
+                                     type="button"
+                                     onClick={() => toggleLine(idx)}
+                                     className="flex flex-1 items-center justify-center rounded px-2 py-1"
+                                   >
                                    <div className="flex-1 h-6 flex items-center justify-center relative">
                                       {/* Visual Representation */}
-                                      {[1, 3].includes(val) ? (
-                                        <div className={`w-full h-2 ${val === 3 ? 'bg-red-500 animate-pulse' : 'bg-stone-800'}`}></div> // Yang
+                                      {val === 1 ? (
+                                        <div className={`w-full h-2 ${manualMovingLines[idx] ? 'bg-red-500' : 'bg-stone-800'}`}></div>
                                       ) : (
                                         <div className="w-full flex justify-between">
-                                           <div className={`w-[40%] h-2 ${val === 2 ? 'bg-red-500 animate-pulse' : 'bg-stone-800'}`}></div>
-                                           <div className={`w-[40%] h-2 ${val === 2 ? 'bg-red-500 animate-pulse' : 'bg-stone-800'}`}></div>
-                                        </div> // Yin
+                                           <div className={`w-[40%] h-2 ${manualMovingLines[idx] ? 'bg-red-500' : 'bg-stone-800'}`}></div>
+                                           <div className={`w-[40%] h-2 ${manualMovingLines[idx] ? 'bg-red-500' : 'bg-stone-800'}`}></div>
+                                        </div>
                                       )}
-                                      {/* Marker for moving lines */}
-                                      {[2, 3].includes(val) && <span className="absolute right-0 text-red-500 text-[10px]">●</span>}
                                    </div>
-                                   <span className="text-xs w-12 text-right font-mono">{getLineLabel(val)}</span>
+                                   </button>
+                                   <button
+                                     type="button"
+                                     onClick={() => toggleManualMovingLine(idx)}
+                                     aria-pressed={manualMovingLines[idx]}
+                                     className="glass-chip flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-white/70"
+                                     title={modelType === ModelType.MEIHUA ? '设置变爻（单选）' : '设置变爻'}
+                                   >
+                                     <GlowCheck
+                                       checked={manualMovingLines[idx]}
+                                       sizeClass="h-4 w-4"
+                                       dotClass="h-1.5 w-1.5"
+                                     />
+                                   </button>
+                                   <span className="text-xs w-12 text-right font-mono">{getLineLabel(val, manualMovingLines[idx])}</span>
                                 </div>
                              ))}
                           </div>
