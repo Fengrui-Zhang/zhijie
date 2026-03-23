@@ -111,38 +111,22 @@ export const fetchZiwei = async (params: BaseParams) => {
   });
 };
 
-// --- 4. Meihua (Time Based) ---
-export const fetchMeihua = async (params: BaseParams) => {
-  return await fetchApi<MeihuaResponse>(ENDPOINTS[ModelType.MEIHUA], {
-    sex: params.sex.toString(),
-    born_year: params.born_year ? params.born_year.toString() : '1990',
-    year: params.year.toString(),
-    month: params.month.toString(),
-    day: params.day.toString(),
-    hours: params.hours.toString(),
-    minute: params.minute.toString(),
-    pan_model: '1' // Time based
-  });
-};
-
-// --- 5. Liuyao (All Modes) ---
-export const fetchLiuyao = async (params: BaseParams) => {
+const buildModePayload = (params: BaseParams) => {
   const panModel = params.pan_model || LiuyaoMode.AUTO;
-  
+
   const requestPayload: Record<string, string> = {
     sex: params.sex.toString(),
     born_year: params.born_year ? params.born_year.toString() : '1990',
     pan_model: panModel.toString(),
   };
 
-  // Logic to include specific parameters based on the divination mode
   if (panModel === LiuyaoMode.CUSTOM_TIME || panModel === LiuyaoMode.LIFETIME) {
     requestPayload.year = params.year.toString();
     requestPayload.month = params.month.toString();
     requestPayload.day = params.day.toString();
     requestPayload.hours = params.hours.toString();
     requestPayload.minute = params.minute.toString();
-  } 
+  }
   else if (panModel === LiuyaoMode.MANUAL) {
     requestPayload.gua_yao1 = (params.gua_yao1 ?? 0).toString();
     requestPayload.gua_yao2 = (params.gua_yao2 ?? 0).toString();
@@ -150,7 +134,7 @@ export const fetchLiuyao = async (params: BaseParams) => {
     requestPayload.gua_yao4 = (params.gua_yao4 ?? 0).toString();
     requestPayload.gua_yao5 = (params.gua_yao5 ?? 0).toString();
     requestPayload.gua_yao6 = (params.gua_yao6 ?? 0).toString();
-  } 
+  }
   else if (panModel === LiuyaoMode.NUMBER || panModel === LiuyaoMode.SINGLE_NUM) {
     requestPayload.number = (params.number || 0).toString();
     requestPayload.yao_add_time = (params.yao_add_time ?? 0).toString();
@@ -161,7 +145,23 @@ export const fetchLiuyao = async (params: BaseParams) => {
     requestPayload.yao_add_time = (params.yao_add_time ?? 0).toString();
   }
 
-  return await fetchApi<LiuyaoResponse>(ENDPOINTS[ModelType.LIUYAO], requestPayload);
+  return requestPayload;
+};
+
+// --- 4. Meihua (All Modes) ---
+export const fetchMeihua = async (params: BaseParams) => {
+  return await fetchApi<MeihuaResponse>(
+    ENDPOINTS[ModelType.MEIHUA],
+    buildModePayload(params)
+  );
+};
+
+// --- 5. Liuyao (All Modes) ---
+export const fetchLiuyao = async (params: BaseParams) => {
+  return await fetchApi<LiuyaoResponse>(
+    ENDPOINTS[ModelType.LIUYAO],
+    buildModePayload(params)
+  );
 };
 
 

@@ -423,6 +423,24 @@ const MODEL_LABELS: Record<string, string> = {
   liuyao: '六爻纳甲',
 };
 
+const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
+  [LiuyaoMode.AUTO, '自动起卦'],
+  [LiuyaoMode.CUSTOM_TIME, '自选时间'],
+  [LiuyaoMode.LIFETIME, '终身卦'],
+  [LiuyaoMode.MANUAL, '手工指定'],
+  [LiuyaoMode.NUMBER, '数字起卦'],
+  [LiuyaoMode.SINGLE_NUM, '单数起卦'],
+  [LiuyaoMode.DOUBLE_NUM, '双数起卦'],
+];
+
+const LIUYAO_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
+  [LiuyaoMode.AUTO, '时间起卦'],
+  [LiuyaoMode.CUSTOM_TIME, '指定时间'],
+  [LiuyaoMode.MANUAL, '手动摇卦'],
+  [LiuyaoMode.NUMBER, '数字起卦'],
+  [LiuyaoMode.DOUBLE_NUM, '双数起卦'],
+];
+
 const buildBaziSystemInstruction = (data: BaziResponse) => {
   const panText = formatBaziPrompt(data);
   const now = new Date();
@@ -2251,8 +2269,8 @@ const App: React.FC = () => {
       return;
     }
 
-    // Liuyao Specific Validation
-    if (modelType === ModelType.LIUYAO) {
+    // Meihua / Liuyao Specific Validation
+    if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
       if ((liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) && !lyNum) {
         setError("请输入数字");
         return;
@@ -2261,7 +2279,7 @@ const App: React.FC = () => {
         setError("请输入上卦和下卦的数字");
         return;
       }
-      if (liuyaoMode === LiuyaoMode.CUSTOM_TIME && !customDate) {
+      if ((liuyaoMode === LiuyaoMode.CUSTOM_TIME || liuyaoMode === LiuyaoMode.LIFETIME) && !customDate) {
          setError("请选择起卦时间");
          return;
       }
@@ -2281,9 +2299,16 @@ const App: React.FC = () => {
     try {
       // Date logic
       let date = new Date();
-      if (modelType === ModelType.LIUYAO && liuyaoMode === LiuyaoMode.CUSTOM_TIME && customDate) {
+      if (
+        (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) &&
+        (liuyaoMode === LiuyaoMode.CUSTOM_TIME || liuyaoMode === LiuyaoMode.LIFETIME) &&
+        customDate
+      ) {
          date = new Date(customDate);
-      } else if (modelType === ModelType.LIUYAO && liuyaoMode === LiuyaoMode.AUTO) {
+      } else if (
+        (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) &&
+        liuyaoMode === LiuyaoMode.AUTO
+      ) {
          date = new Date();
       } else if ((timeMode === 'custom' || isLifeReading) && customDate) {
          date = new Date(customDate);
@@ -2300,11 +2325,11 @@ const App: React.FC = () => {
         born_year: birthYear ? parseInt(birthYear) : undefined,
         province: province,
         city: city,
-        pan_model: modelType === ModelType.LIUYAO ? liuyaoMode : undefined,
+        pan_model: (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) ? liuyaoMode : undefined,
       };
 
-      // Augment params for Liuyao modes
-      if (modelType === ModelType.LIUYAO) {
+      // Augment params for Meihua / Liuyao modes
+      if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
          if (liuyaoMode === LiuyaoMode.MANUAL) {
             baseParams.gua_yao1 = manualLines[0];
             baseParams.gua_yao2 = manualLines[1];
@@ -3566,7 +3591,7 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Time Input for Standard Models (Qimen, Meihua, Bazi, Ziwei) */}
-                {modelType !== ModelType.LIUYAO && (
+                {modelType !== ModelType.LIUYAO && modelType !== ModelType.MEIHUA && (
                   <div>
                     <label className="block text-stone-700 font-bold mb-2">
                       {isLifeReading ? "出生时间 (阳历)" : "起卦时间"}
@@ -3667,20 +3692,16 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* --- LIU YAO SPECIFIC UI --- */}
-              {modelType === ModelType.LIUYAO && (
+              {/* --- MEIHUA / LIUYAO SPECIFIC UI --- */}
+              {(modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) && (
                  <div className="glass-panel-soft bg-amber-50/55 p-4 rounded-[28px] border border-amber-100/80 mt-4">
-                    <label className="block text-stone-700 font-bold mb-3">六爻起卦方式</label>
+                    <label className="block text-stone-700 font-bold mb-3">
+                      {modelType === ModelType.MEIHUA ? '梅花起卦方式' : '六爻起卦方式'}
+                    </label>
                     
                     {/* Mode Selector */}
                     <div className="flex flex-wrap gap-2 mb-4">
-                       {[
-                         [LiuyaoMode.AUTO, '时间起卦'],
-                         [LiuyaoMode.CUSTOM_TIME, '指定时间'],
-                         [LiuyaoMode.MANUAL, '手动摇卦'],
-                         [LiuyaoMode.NUMBER, '数字起卦'],
-                         [LiuyaoMode.DOUBLE_NUM, '双数起卦']
-                       ].map(([m, l]) => (
+                       {(modelType === ModelType.MEIHUA ? MEIHUA_MODE_OPTIONS : LIUYAO_MODE_OPTIONS).map(([m, l]) => (
                           <button 
                             key={m} 
                             onClick={() => setLiuyaoMode(m as LiuyaoMode)}
@@ -3694,9 +3715,11 @@ const App: React.FC = () => {
                     {/* Dynamic Inputs */}
                     
                     {/* 1. Custom Time Input */}
-                    {liuyaoMode === LiuyaoMode.CUSTOM_TIME && (
+                    {(liuyaoMode === LiuyaoMode.CUSTOM_TIME || liuyaoMode === LiuyaoMode.LIFETIME) && (
                        <div>
-                         <label className="text-xs text-stone-500 block mb-1">选择时间</label>
+                         <label className="text-xs text-stone-500 block mb-1">
+                           {liuyaoMode === LiuyaoMode.LIFETIME ? '选择出生时间' : '选择时间'}
+                         </label>
                          <input 
                           type="datetime-local" 
                           value={customDate} 
@@ -3737,7 +3760,9 @@ const App: React.FC = () => {
                     {/* 3. Number Inputs */}
                     {(liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) && (
                        <div>
-                          <label className="text-xs text-stone-500 block mb-1">输入数字</label>
+                          <label className="text-xs text-stone-500 block mb-1">
+                            {liuyaoMode === LiuyaoMode.SINGLE_NUM ? '输入单个数字' : '输入数字'}
+                          </label>
                           <input 
                             type="number" value={lyNum} onChange={e => setLyNum(e.target.value)}
                             placeholder="例如: 369" className="glass-input w-full rounded-2xl p-3"
