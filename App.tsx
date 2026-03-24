@@ -2842,7 +2842,7 @@ const App: React.FC = () => {
   }, [chatHistory, messageVersionMap, persistCurrentMessages]);
 
   const handleRerunAnalysis = async () => {
-    if (!chartData || !chatHistory.length) return;
+    if (!chartData) return;
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
       return;
@@ -2870,21 +2870,22 @@ const App: React.FC = () => {
     setKnowledgeHint(null);
     resetMessageVersions();
     clearChatSession();
-    await startQimenChat(bundle.systemInstruction);
-
-    const userMsg: ChatMessage = {
-      id: 'rerun-u',
-      role: 'user',
-      content: bundle.userContent,
-      timestamp: new Date(),
-    };
-    const modelId = 'rerun-m';
-    setChatHistory([
-      userMsg,
-      { id: modelId, role: 'model', content: '', timestamp: new Date() },
-    ]);
 
     try {
+      await startQimenChat(bundle.systemInstruction);
+
+      const userMsg: ChatMessage = {
+        id: 'rerun-u',
+        role: 'user',
+        content: bundle.userContent,
+        timestamp: new Date(),
+      };
+      const modelId = 'rerun-m';
+      setChatHistory([
+        userMsg,
+        { id: modelId, role: 'model', content: '', timestamp: new Date() },
+      ]);
+
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
@@ -4538,16 +4539,16 @@ const App: React.FC = () => {
                    <button
                      type="button"
                      onClick={handleRerunAnalysis}
-                     disabled={!chatHistory.length || isTyping || loading}
+                     disabled={!chartData || isTyping || loading}
                      title={
-                       !chatHistory.length
-                         ? '暂无可重新分析的内容'
+                       !chartData
+                         ? '暂无可重新分析的排盘内容'
                          : isTyping || loading
                            ? 'AI 正在输出，请稍候'
-                           : '基于当前排盘和原问题重新分析'
+                           : '基于当前排盘信息和原始问题重新分析'
                      }
                      className={`text-sm font-medium ${
-                       !chatHistory.length || isTyping || loading
+                       !chartData || isTyping || loading
                          ? 'text-stone-300 cursor-not-allowed'
                          : 'text-stone-500 hover:text-stone-800'
                      }`}
