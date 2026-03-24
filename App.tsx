@@ -441,6 +441,114 @@ const LIUYAO_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
   [LiuyaoMode.DOUBLE_NUM, '双数起卦'],
 ];
 
+const isLiupanModeModel = (mType: ModelType) =>
+  mType === ModelType.MEIHUA || mType === ModelType.LIUYAO;
+
+const requiresLiupanDate = (mode: LiuyaoMode) =>
+  mode === LiuyaoMode.CUSTOM_TIME || mode === LiuyaoMode.LIFETIME;
+
+const usesLiupanSingleNumber = (mode: LiuyaoMode) =>
+  mode === LiuyaoMode.NUMBER || mode === LiuyaoMode.SINGLE_NUM;
+
+const toManualYaoValue = (lineValue: number, isMoving: boolean) => {
+  if (lineValue === 1) return isMoving ? 3 : 1;
+  return isMoving ? 2 : 0;
+};
+
+const buildLiupanModeParams = ({
+  mode,
+  manualLines,
+  manualMovingLines,
+  lyNum,
+  lyNumUp,
+  lyNumDown,
+  yaoAddTime,
+}: {
+  mode: LiuyaoMode;
+  manualLines: number[];
+  manualMovingLines: boolean[];
+  lyNum: string;
+  lyNumUp: string;
+  lyNumDown: string;
+  yaoAddTime: boolean;
+}) => {
+  if (mode === LiuyaoMode.MANUAL) {
+    return {
+      gua_yao1: toManualYaoValue(manualLines[0], manualMovingLines[0]),
+      gua_yao2: toManualYaoValue(manualLines[1], manualMovingLines[1]),
+      gua_yao3: toManualYaoValue(manualLines[2], manualMovingLines[2]),
+      gua_yao4: toManualYaoValue(manualLines[3], manualMovingLines[3]),
+      gua_yao5: toManualYaoValue(manualLines[4], manualMovingLines[4]),
+      gua_yao6: toManualYaoValue(manualLines[5], manualMovingLines[5]),
+    };
+  }
+
+  if (usesLiupanSingleNumber(mode)) {
+    return {
+      number: parseInt(lyNum, 10),
+      yao_add_time: yaoAddTime ? 1 : 0,
+    };
+  }
+
+  if (mode === LiuyaoMode.DOUBLE_NUM) {
+    return {
+      number_up: parseInt(lyNumUp, 10),
+      number_down: parseInt(lyNumDown, 10),
+      yao_add_time: yaoAddTime ? 1 : 0,
+    };
+  }
+
+  return {};
+};
+
+const KnowledgeToggleCard = ({
+  useKnowledge,
+  onToggle,
+  className = 'mb-6',
+}: {
+  useKnowledge: boolean;
+  onToggle: () => void;
+  className?: string;
+}) => (
+  <div className={`glass-panel-soft flex items-center justify-between rounded-[22px] px-3.5 py-3 ${className}`}>
+    <div className="flex items-center gap-3">
+      <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
+        册
+      </div>
+      <div>
+        <div className="text-sm font-bold text-stone-700">参考古籍</div>
+        <div className="text-xs text-stone-500">检索并参考知识库资料</div>
+      </div>
+    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={useKnowledge}
+      onClick={onToggle}
+      className={`inline-flex h-11 min-w-[126px] items-center gap-3 rounded-full border px-3 py-1.5 transition-all ${
+        useKnowledge
+          ? 'glass-panel-dark border-transparent text-amber-200'
+          : 'glass-chip text-stone-600'
+      }`}
+    >
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
+          useKnowledge
+            ? 'border-amber-300/80 bg-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_0_24px_rgba(251,191,36,0.42)]'
+            : 'border-stone-300/90 bg-white/30'
+        }`}
+      >
+        <span
+          className={`h-3 w-3 rounded-full transition-all ${
+            useKnowledge ? 'bg-white/95' : 'bg-transparent'
+          }`}
+        />
+      </span>
+      <span className="min-w-[52px] text-right text-sm font-medium leading-none">{useKnowledge ? '已开启' : '已关闭'}</span>
+    </button>
+  </div>
+);
+
 const buildBaziSystemInstruction = (data: BaziResponse) => {
   const panText = formatBaziPrompt(data);
   const now = new Date();
@@ -2271,7 +2379,7 @@ const App: React.FC = () => {
     }
 
     // Meihua / Liuyao Specific Validation
-    if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
+    if (isLiupanModeModel(modelType)) {
       if (
         liuyaoMode === LiuyaoMode.MANUAL &&
         modelType === ModelType.MEIHUA &&
@@ -2280,7 +2388,7 @@ const App: React.FC = () => {
         setError("梅花易数手动摇卦必须且只能指定一个变爻");
         return;
       }
-      if ((liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) && !lyNum) {
+      if (usesLiupanSingleNumber(liuyaoMode) && !lyNum) {
         setError("请输入数字");
         return;
       }
@@ -2288,7 +2396,7 @@ const App: React.FC = () => {
         setError("请输入上卦和下卦的数字");
         return;
       }
-      if ((liuyaoMode === LiuyaoMode.CUSTOM_TIME || liuyaoMode === LiuyaoMode.LIFETIME) && !customDate) {
+      if (requiresLiupanDate(liuyaoMode) && !customDate) {
          setError("请选择起卦时间");
          return;
       }
@@ -2308,16 +2416,9 @@ const App: React.FC = () => {
     try {
       // Date logic
       let date = new Date();
-      if (
-        (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) &&
-        (liuyaoMode === LiuyaoMode.CUSTOM_TIME || liuyaoMode === LiuyaoMode.LIFETIME) &&
-        customDate
-      ) {
+      if (isLiupanModeModel(modelType) && requiresLiupanDate(liuyaoMode) && customDate) {
          date = new Date(customDate);
-      } else if (
-        (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) &&
-        liuyaoMode === LiuyaoMode.AUTO
-      ) {
+      } else if (isLiupanModeModel(modelType) && liuyaoMode === LiuyaoMode.AUTO) {
          date = new Date();
       } else if ((timeMode === 'custom' || isLifeReading) && customDate) {
          date = new Date(customDate);
@@ -2334,41 +2435,25 @@ const App: React.FC = () => {
         born_year: birthYear ? parseInt(birthYear) : undefined,
         province: province,
         city: city,
-        pan_model: (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) ? liuyaoMode : undefined,
+        pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
       };
 
-      // Augment params for Meihua / Liuyao modes
-      if (modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) {
-         if (liuyaoMode === LiuyaoMode.MANUAL) {
-            const toManualYaoValue = (lineValue: number, isMoving: boolean) => {
-              if (lineValue === 1) return isMoving ? 3 : 1;
-              return isMoving ? 2 : 0;
-            };
-            baseParams.gua_yao1 = toManualYaoValue(manualLines[0], manualMovingLines[0]);
-            baseParams.gua_yao2 = toManualYaoValue(manualLines[1], manualMovingLines[1]);
-            baseParams.gua_yao3 = toManualYaoValue(manualLines[2], manualMovingLines[2]);
-            baseParams.gua_yao4 = toManualYaoValue(manualLines[3], manualMovingLines[3]);
-            baseParams.gua_yao5 = toManualYaoValue(manualLines[4], manualMovingLines[4]);
-            baseParams.gua_yao6 = toManualYaoValue(manualLines[5], manualMovingLines[5]);
-         }
-         else if (liuyaoMode === LiuyaoMode.NUMBER || liuyaoMode === LiuyaoMode.SINGLE_NUM) {
-            baseParams.number = parseInt(lyNum);
-            baseParams.yao_add_time = yaoAddTime ? 1 : 0;
-         }
-         else if (liuyaoMode === LiuyaoMode.DOUBLE_NUM) {
-            baseParams.number_up = parseInt(lyNumUp);
-            baseParams.number_down = parseInt(lyNumDown);
-            baseParams.yao_add_time = yaoAddTime ? 1 : 0;
-         }
+      if (isLiupanModeModel(modelType)) {
+        Object.assign(baseParams, buildLiupanModeParams({
+          mode: liuyaoMode,
+          manualLines,
+          manualMovingLines,
+          lyNum,
+          lyNumUp,
+          lyNumDown,
+          yaoAddTime,
+        }));
       }
 
       let resultData: any = null;
       let prompt = "";
       let systemInstruction = "";
       let knowledgeQuery = "";
-      const defaultBaziQuestion = "请分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。";
-      const now = new Date();
-      const currentTimeText = `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
 
       // --- API Calls & Prompt Gen ---
       switch (modelType) {
@@ -2391,39 +2476,20 @@ const App: React.FC = () => {
         case ModelType.BAZI:
           resultData = await fetchBazi(baseParams);
           {
-            const panText = formatBaziPrompt(resultData);
-            const trimmedQuestion = question.trim();
-            const finalQuestion = trimmedQuestion || defaultBaziQuestion;
-            prompt = trimmedQuestion
-              ? `用户问题：${trimmedQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`
-              : `用户问题：${finalQuestion}\n请结合命盘重点回答，必要时补充全盘背景。`;
-            knowledgeQuery = trimmedQuestion ? trimmedQuestion : defaultBaziQuestion;
-            systemInstruction = [
-            "你是一位深谙段建业盲派命理体系的算命专家。你推命的核心逻辑是理法、象法、技法三位一体，重点在于观察八字如何通过做功来表述人生 。",
-            "如果知识库检索到强有力的证据，请保持专业判断，不要为了迎合用户情绪而轻易动摇观点；在适当位置可引用或提及知识库中的关键信息作为依据。",
-            "Workflow:",
-            "1. 建立坐标：宾主与体用 分清宾主：日、时为主位（代表我、我的家、我的工具）；年、月为宾位（代表他人的、外界的、我面对的环境） 。 定体用：将十神分为体（日主、印、禄、比劫，代表我自己或操纵的工具）和用（财、官，代表我的目的和追求）。食伤视情况而定，食神近体，伤官近用 。",
-            "2. 核心分析：寻找做功方式 请根据以下逻辑分析八字的能量耗散与效率： 日干意向：日干有无合（合财/官）、有无生（生食伤），这是日干追求目标的体现 。 主位动作：日支是否参与刑、冲、克、穿、合、墓。若日支不做功，再看有无禄神和比劫做功 。 成党成势：分析干支是否成党，成功者往往有势，通过强方制掉弱方来做功 。 做功类型：判定是制用、化用、生用还是合用结构 ，干支自合（如丁亥、戊子、辛巳、壬午）属于合制做功，合则能去，效率极高。",
-            "3. 层次判定：效率与干净度 富贵贫贱：制得干净、做功效率高者为大富贵；制不干净、能量内耗或废神多者为平庸 。 虚实取象：财星虚透主才华、口才而非钱财；官星虚透主名气而非权位 。",
-            "4. 细节推断：穿、破与墓库 穿（害）分析：重点观察子未、丑午、卯辰、酉戌等相穿，这代表防不胜防的伤害或穿倒（破坏性质） 。 墓库开闭：辰戌丑未是否逢冲刑，不冲为墓（死的），冲开为库（活的），库必须开才能发挥作用 。日主坐下的印库或者比劫库不能被冲，财库和官库逢冲则开。",
-            "5. 输出格式要求：",
-            "6. 八字排盘及体用分析。",
-            "7. 做功逻辑详解（说明使用了什么工具，制了什么东西，效率如何）。",
-            "8. 富贵层次判定。",
-            "",
-            "这是某位提问者的八字排盘信息，请你据此进行推断：",
-            "",
-            panText,
-            currentTimeText,
-            "",
-            "请严格基于以上数据分析，不得臆测与杜撰。",
-          ].join('\n');
+            const analysisBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, resultData, question);
+            prompt = analysisBundle.prompt;
+            knowledgeQuery = analysisBundle.knowledgeQuery;
+            systemInstruction = analysisBundle.systemInstruction;
           }
           break;
         case ModelType.ZIWEI:
           resultData = await fetchZiwei(baseParams);
-          prompt = `${formatZiweiPrompt(resultData)}\n${currentTimeText}`;
-          systemInstruction = "你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。";
+          {
+            const analysisBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, resultData, question);
+            prompt = analysisBundle.prompt;
+            knowledgeQuery = analysisBundle.knowledgeQuery;
+            systemInstruction = analysisBundle.systemInstruction;
+          }
           break;
         case ModelType.MEIHUA:
           resultData = await fetchMeihua(baseParams);
@@ -2453,13 +2519,11 @@ const App: React.FC = () => {
       // --- AI Chat Init ---
       await startQimenChat(systemInstruction);
 
-      // Add user context
-      const trimmedQuestion = question.trim();
-      const userContent = modelType === ModelType.BAZI
-        ? `请分析我的命盘: ${baseParams.year}年${baseParams.month}月...${trimmedQuestion ? `\n问题: ${trimmedQuestion}` : ''}`
-        : modelType === ModelType.ZIWEI
-          ? `请分析我的命盘: ${baseParams.year}年${baseParams.month}月...`
-          : `问题: ${question}`;
+      const userContent = buildInitialUserContent(
+        modelType,
+        baseParams as Record<string, unknown>,
+        question
+      );
 
       setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
       setIsTyping(true);
@@ -3359,43 +3423,10 @@ const App: React.FC = () => {
             </div>
 
             {supportsKnowledge && !isCaseModel && (
-              <div className="glass-panel-soft mb-6 flex items-center justify-between rounded-[22px] px-3.5 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
-                    册
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-stone-700">参考古籍</div>
-                    <div className="text-xs text-stone-500">检索并参考知识库资料</div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={useKnowledge}
-                  onClick={() => setUseKnowledge((prev) => !prev)}
-                  className={`inline-flex h-11 min-w-[126px] items-center gap-3 rounded-full border px-3 py-1.5 transition-all ${
-                    useKnowledge
-                      ? 'glass-panel-dark border-transparent text-amber-200'
-                      : 'glass-chip text-stone-600'
-                  }`}
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
-                      useKnowledge
-                        ? 'border-amber-300/80 bg-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_0_24px_rgba(251,191,36,0.42)]'
-                        : 'border-stone-300/90 bg-white/30'
-                    }`}
-                  >
-                    <span
-                      className={`h-3 w-3 rounded-full transition-all ${
-                        useKnowledge ? 'bg-white/95' : 'bg-transparent'
-                      }`}
-                    />
-                  </span>
-                  <span className="min-w-[52px] text-right text-sm font-medium leading-none">{useKnowledge ? '已开启' : '已关闭'}</span>
-                </button>
-              </div>
+              <KnowledgeToggleCard
+                useKnowledge={useKnowledge}
+                onToggle={() => setUseKnowledge((prev) => !prev)}
+              />
             )}
 
             {isCaseModel ? (
@@ -3910,43 +3941,11 @@ const App: React.FC = () => {
                 </div>
 
                 {supportsKnowledge && (
-                  <div className="glass-panel-soft flex items-center justify-between rounded-[22px] px-3.5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base text-amber-700">
-                        册
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-stone-700">参考古籍</div>
-                        <div className="text-xs text-stone-500">检索并参考知识库资料</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={useKnowledge}
-                      onClick={() => setUseKnowledge((prev) => !prev)}
-                      className={`inline-flex h-11 min-w-[126px] items-center gap-3 rounded-full border px-3 py-1.5 transition-all ${
-                        useKnowledge
-                          ? 'glass-panel-dark border-transparent text-amber-200'
-                          : 'glass-chip text-stone-600'
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
-                          useKnowledge
-                            ? 'border-amber-300/80 bg-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.16),0_0_24px_rgba(251,191,36,0.42)]'
-                            : 'border-stone-300/90 bg-white/30'
-                        }`}
-                      >
-                        <span
-                          className={`h-3 w-3 rounded-full transition-all ${
-                            useKnowledge ? 'bg-white/95' : 'bg-transparent'
-                          }`}
-                        />
-                      </span>
-                      <span className="min-w-[52px] text-right text-sm font-medium leading-none">{useKnowledge ? '已开启' : '已关闭'}</span>
-                    </button>
-                  </div>
+                  <KnowledgeToggleCard
+                    useKnowledge={useKnowledge}
+                    onToggle={() => setUseKnowledge((prev) => !prev)}
+                    className=""
+                  />
                 )}
 
                 <div>
