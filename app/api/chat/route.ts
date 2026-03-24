@@ -3,6 +3,7 @@ import { auth } from '../../../lib/auth';
 import {
   DEEPSEEK_REASONER_MODEL,
   DOUBAO_SEED_LITE_MODEL,
+  DOUBAO_SEED_PRO_MODEL,
   isChatModel,
 } from '../../../lib/analysis-models';
 import { prisma } from '../../../lib/prisma';
@@ -85,7 +86,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const isDoubaoModel = requestedModel === DOUBAO_SEED_LITE_MODEL;
+  const isDoubaoModel =
+    requestedModel === DOUBAO_SEED_LITE_MODEL ||
+    requestedModel === DOUBAO_SEED_PRO_MODEL;
   const apiKey = isDoubaoModel ? process.env.ARK_API_KEY : process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) {

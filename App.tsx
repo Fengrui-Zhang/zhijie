@@ -9,7 +9,9 @@ import updates from './data/updates.json';
 import {
   ANALYSIS_MODEL_OPTIONS,
   DEFAULT_ANALYSIS_MODEL,
+  DOUBAO_SEED_PRO_MODEL,
   type AnalysisModel,
+  type ChatModel,
   isAnalysisModel,
 } from './lib/analysis-models';
 import {
@@ -130,6 +132,7 @@ const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
+const KLINE_CHAT_MODEL: ChatModel = DOUBAO_SEED_PRO_MODEL;
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -3463,6 +3466,7 @@ const App: React.FC = () => {
     klineYearProgressRef.current = 0;
     try {
       const prompt = buildKlinePrompt(chartData as BaziResponse, baziInitialAnalysis);
+      // const finalState = await sendMessageToDeepseekStream(prompt, onKlineDelta, undefined, 'deepseek-chat');
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
@@ -3472,7 +3476,7 @@ const App: React.FC = () => {
           setKlineYearProgress(count);
           setKlineProgress(Math.min(99, Math.round((count / 70) * 100)));
         }
-      }, undefined, 'deepseek-chat');
+      }, undefined, KLINE_CHAT_MODEL);
       let parsed: KlineResult | null = null;
       try {
         parsed = parseKlineResult(finalState.content);
@@ -3482,11 +3486,13 @@ const App: React.FC = () => {
         } catch {
           try {
             const repairPrompt = buildKlineRepairPrompt(finalState.content);
-            const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
+            // const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
+            const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
             parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
           } catch {
             const strictPrompt = buildKlinePromptStrict(chartData as BaziResponse);
-            const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, 'deepseek-chat');
+            // const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, 'deepseek-chat');
+            const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
             parsed = parseKlineResult(sanitizeKlineJson(retryState.content));
           }
         }
