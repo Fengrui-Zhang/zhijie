@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       title: true,
       chartParams: true,
       chartData: true,
+      klineData: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
   const modelType = body.modelType;
   const chartParams = normalizeCaseChartParams(body.chartParams);
   const chartData = body.chartData;
+  const klineData = body.klineData ?? null;
   const title = typeof body.title === 'string' ? body.title.trim() : '';
 
   if (!isCaseModelType(modelType) || !chartData) {
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
       title: title || buildCaseTitle(modelType, chartParams),
       chartParams,
       chartData,
+      klineData,
     },
   });
 

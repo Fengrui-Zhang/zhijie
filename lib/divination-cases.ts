@@ -31,6 +31,7 @@ export interface CaseItem {
   title: string;
   chartParams: CaseChartParams | null;
   chartData: unknown;
+  klineData?: unknown;
   createdAt: string;
   updatedAt: string;
 }

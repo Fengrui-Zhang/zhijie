@@ -54,7 +54,7 @@ export async function PUT(
   const { id } = await params;
   const existing = await prisma.divinationCase.findFirst({
     where: { id, userId: session.user.id },
-    select: { id: true, modelType: true },
+    select: { id: true, modelType: true, chartParams: true, chartData: true, klineData: true },
   });
 
   if (!existing) {
@@ -62,8 +62,14 @@ export async function PUT(
   }
 
   const body = await request.json();
-  const chartParams = normalizeCaseChartParams(body.chartParams);
-  const chartData = body.chartData;
+  const hasChartParams = body.chartParams !== undefined;
+  const chartParams = hasChartParams
+    ? normalizeCaseChartParams(body.chartParams)
+    : existing.chartParams;
+  const hasChartData = body.chartData !== undefined;
+  const chartData = hasChartData ? body.chartData : existing.chartData;
+  const hasKlineData = body.klineData !== undefined;
+  const klineData = hasKlineData ? body.klineData : existing.klineData;
   const title = typeof body.title === 'string' ? body.title.trim() : '';
 
   if (!chartData) {
@@ -80,6 +86,7 @@ export async function PUT(
       title: title || buildCaseTitle(existing.modelType, chartParams),
       chartParams,
       chartData,
+      klineData,
     },
   });
 

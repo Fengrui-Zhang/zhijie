@@ -126,7 +126,6 @@ const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
-const KLINE_STORAGE_PREFIX = 'bazi-kline-v1:';
 const ANALYSIS_MODEL_STORAGE_KEY = 'analysis-model:v1';
 const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
@@ -1108,21 +1107,23 @@ const App: React.FC = () => {
   }, [activeCompactPanel]);
 
   useEffect(() => {
-    if (modelType !== ModelType.BAZI || !chartData) return;
-    try {
-      const key = getKlineStorageKey(chartData as BaziResponse);
-      const cached = localStorage.getItem(key);
-      if (!cached) return;
-      const parsed = JSON.parse(cached) as KlineResult;
-      if (parsed?.schema_version === 'kline_v1') {
-        setKlineResult(parsed);
-        setKlineStatus('ready');
-        setKlineUnlocked(true);
-      }
-    } catch {
-      // Ignore cache errors
+    if (modelType !== ModelType.BAZI || !activeCase || activeCase.modelType !== ModelType.BAZI) {
+      setKlineResult(null);
+      setKlineStatus('idle');
+      return;
     }
-  }, [modelType, chartData]);
+
+    const parsed = activeCase.klineData as KlineResult | null | undefined;
+    if (parsed?.schema_version === 'kline_v1') {
+      setKlineResult(parsed);
+      setKlineStatus('ready');
+      setKlineUnlocked(true);
+      return;
+    }
+
+    setKlineResult(null);
+    setKlineStatus('idle');
+  }, [activeCase, modelType]);
 
   useEffect(() => {
     if (klineStatus !== 'analyzing') return;
@@ -1314,6 +1315,7 @@ const App: React.FC = () => {
           title: buildCaseTitle(type, chartParams),
           chartParams,
           chartData: cData,
+          klineData: null,
         }),
       });
       if (!res.ok) return null;
@@ -1330,7 +1332,8 @@ const App: React.FC = () => {
     caseId: string,
     type: CaseModelType,
     chartParams: Record<string, unknown>,
-    cData: unknown
+    cData: unknown,
+    klineData?: unknown
   ): Promise<CaseDetail | null> => {
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
@@ -1340,6 +1343,7 @@ const App: React.FC = () => {
           title: buildCaseTitle(type, chartParams),
           chartParams,
           chartData: cData,
+          ...(klineData !== undefined ? { klineData } : {}),
         }),
       });
       if (!res.ok) return null;
@@ -1357,6 +1361,22 @@ const App: React.FC = () => {
       return res.ok;
     } catch {
       return false;
+    }
+  };
+
+  const saveCaseKlineInDb = async (caseId: string, klineData: KlineResult | null): Promise<CaseDetail | null> => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ klineData }),
+      });
+      if (!res.ok) return null;
+      const detailRes = await fetch(`/api/cases/${caseId}`);
+      if (!detailRes.ok) return null;
+      return await detailRes.json();
+    } catch {
+      return null;
     }
   };
 
@@ -2334,7 +2354,13 @@ const App: React.FC = () => {
 
       if (isLoggedIn) {
         const detail = editingCaseId
-          ? await updateCaseInDb(editingCaseId, modelType, chartParams, chartResponse)
+          ? await updateCaseInDb(
+              editingCaseId,
+              modelType,
+              chartParams,
+              chartResponse,
+              shouldReuseExistingChart ? activeCase?.klineData : null
+            )
           : await createCaseInDb(modelType, chartParams, chartResponse);
         if (!detail) {
           throw new Error('保存命例失败');
@@ -2353,6 +2379,7 @@ const App: React.FC = () => {
           title: buildCaseTitle(modelType, chartParams),
           chartParams,
           chartData: chartResponse,
+          klineData: shouldReuseExistingChart ? activeCase?.klineData : null,
           createdAt: editingCaseId && activeCase ? activeCase.createdAt : nowIso,
           updatedAt: nowIso,
         };
@@ -2391,6 +2418,213 @@ const App: React.FC = () => {
     }
   };
 
+  const extractSuccessfulAnalysisTextFromMessages = (
+    messages: Array<{ role: string; content: string }>
+  ) => {
+    for (const message of messages) {
+      if (message.role !== 'model') continue;
+      const parsed = parseModelContent(message.content);
+      const answer = stripDisclaimer(parsed.answer).trim();
+      if (answer) return answer;
+    }
+    return '';
+  };
+
+  const runFreshCaseInitialAnalysis = async (
+    targetCase: CaseDetail,
+    questionText: string,
+    guestSessionOverride?: GuestStoredSession | null
+  ) => {
+    const trimmedQuestion = questionText.trim();
+    setLoading(true);
+    setIsTyping(true);
+    setError('');
+    setKnowledgeHint(null);
+    clearChatSession();
+    resetMessageVersions();
+    setChatHistory([]);
+    setActiveSessionId(null);
+    setChartData(targetCase.chartData);
+    setStep('chart');
+
+    if (!isLoggedIn) {
+      setGuestFollowUpCount(0);
+      localStorage.setItem('guestFollowUpCount', '0');
+    }
+
+    const chartParams = (targetCase.chartParams || {}) as Record<string, unknown>;
+    const sessionChartParams = { ...chartParams, question: trimmedQuestion, analysisModel };
+    const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
+      targetCase.modelType,
+      targetCase.chartData as BaziResponse & ZiweiResponse,
+      trimmedQuestion
+    );
+    const userContent = buildInitialUserContent(targetCase.modelType, chartParams, trimmedQuestion);
+    const sessionTitle = buildCaseSessionTitle(targetCase.modelType, targetCase.title, trimmedQuestion);
+
+    try {
+      let currentSessionId: string | null = null;
+
+      if (isLoggedIn) {
+        currentSessionId = await saveSessionToDb(
+          targetCase.modelType,
+          sessionTitle,
+          sessionChartParams,
+          targetCase.chartData,
+          targetCase.id
+        );
+      } else {
+        const nowIso = new Date().toISOString();
+        const guestSession: GuestStoredSession = guestSessionOverride
+          ? {
+              ...guestSessionOverride,
+              title: sessionTitle,
+              chartParams: sessionChartParams,
+              chartData: targetCase.chartData,
+              messages: [],
+              guestFollowUpCount: 0,
+              updatedAt: nowIso,
+            }
+          : {
+              id: `guest-case-session-${Date.now()}`,
+              caseId: targetCase.id,
+              modelType: targetCase.modelType,
+              title: sessionTitle,
+              chartParams: sessionChartParams,
+              chartData: targetCase.chartData,
+              messages: [],
+              guestFollowUpCount: 0,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            };
+        saveGuestCaseSession(guestSession);
+        currentSessionId = guestSession.id;
+        refreshGuestActiveCase(targetCase.id);
+      }
+
+      if (currentSessionId) {
+        setActiveSessionId(currentSessionId);
+      }
+      setActiveChartParams(sessionChartParams);
+      setSessionAnalysisModel(analysisModel);
+
+      await startQimenChat(systemInstruction);
+
+      const userMsg: ChatMessage = {
+        id: 'init-u',
+        role: 'user',
+        content: userContent,
+        timestamp: new Date(),
+      };
+      const modelId = 'init-m';
+      setChatHistory([
+        userMsg,
+        { id: modelId, role: 'model', content: '', timestamp: new Date() },
+      ]);
+
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[targetCase.modelType],
+            query: knowledgeQuery || trimmedQuestion,
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge,
+        analysisModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalModelMessage: ChatMessage = {
+        id: modelId,
+        role: 'model',
+        content: finalContent,
+        timestamp: new Date(),
+      };
+      const finalMessages = [userMsg, finalModelMessage];
+      setChatHistory(finalMessages);
+
+      const successfulAnalysis = stripDisclaimer(finalState.content);
+      if (targetCase.modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(successfulAnalysis);
+        setKlineUnlocked(true);
+      }
+
+      if (isLoggedIn) {
+        await saveMessagesToDb(currentSessionId, [
+          { role: 'user', content: userContent },
+          { role: 'model', content: finalContent },
+        ]);
+        fetchSessions();
+        const detailRes = await fetch(`/api/cases/${targetCase.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          setActiveCase(detail);
+        }
+        fetchUserProfile();
+      } else if (currentSessionId) {
+        updateGuestCaseSessionMessages(currentSessionId, finalMessages, 0);
+        refreshGuestActiveCase(targetCase.id);
+      }
+
+      setQuestion('');
+      return successfulAnalysis;
+    } catch (err: any) {
+      setError(err.message || '分析失败，请稍后重试');
+      return '';
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const resolveKlineInitializationAnalysis = async (targetCase: CaseDetail) => {
+    if (activeSessionId && targetCase.sessions.some((session) => session.id === activeSessionId)) {
+      const currentAnalysis = extractSuccessfulAnalysisTextFromMessages(chatHistory);
+      if (currentAnalysis) {
+        return currentAnalysis;
+      }
+    }
+
+    if (!isLoggedIn) {
+      const guestSessions = readGuestCaseSessions()
+        .filter((item) => item.caseId === targetCase.id)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+      for (const session of guestSessions) {
+        const analysisText = extractSuccessfulAnalysisTextFromMessages(session.messages);
+        if (analysisText) return analysisText;
+      }
+
+      const reusableGuestSession = guestSessions[0] || null;
+      return await runFreshCaseInitialAnalysis(targetCase, '', reusableGuestSession);
+    }
+
+    for (const session of targetCase.sessions) {
+      try {
+        const res = await fetch(`/api/sessions/${session.id}`);
+        if (!res.ok) continue;
+        const detail = await res.json();
+        const analysisText = extractSuccessfulAnalysisTextFromMessages(detail.messages || []);
+        if (analysisText) return analysisText;
+      } catch {
+        // silently ignore
+      }
+    }
+
+    return await runFreshCaseInitialAnalysis(targetCase, '');
+  };
+
   const handleStartCaseAnalysis = async () => {
     if (!activeCase || !isCaseModelType(activeCase.modelType)) return;
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
@@ -2420,139 +2654,7 @@ const App: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-    setIsTyping(true);
-    setError('');
-    setKnowledgeHint(null);
-    clearChatSession();
-    setChatHistory([]);
-    setActiveSessionId(null);
-    if (!isLoggedIn) {
-      setGuestFollowUpCount(0);
-      localStorage.setItem('guestFollowUpCount', '0');
-    }
-
-    const chartParams = (activeCase.chartParams || {}) as Record<string, unknown>;
-    const sessionChartParams = { ...chartParams, question, analysisModel };
-    const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
-      activeCase.modelType,
-      activeCase.chartData as BaziResponse & ZiweiResponse,
-      question
-    );
-    const userContent = buildInitialUserContent(activeCase.modelType, chartParams, question);
-    const sessionTitle = buildCaseSessionTitle(activeCase.modelType, activeCase.title, question);
-
-    try {
-      let currentSessionId: string | null = null;
-      let guestSessionCreated: GuestStoredSession | null = null;
-
-      if (isLoggedIn) {
-        currentSessionId = await saveSessionToDb(
-          activeCase.modelType,
-          sessionTitle,
-          sessionChartParams,
-          activeCase.chartData,
-          activeCase.id
-        );
-      } else {
-        const nowIso = new Date().toISOString();
-        guestSessionCreated = {
-          id: `guest-case-session-${Date.now()}`,
-          caseId: activeCase.id,
-          modelType: activeCase.modelType,
-          title: sessionTitle,
-          chartParams: sessionChartParams,
-          chartData: activeCase.chartData,
-          messages: [],
-          guestFollowUpCount: 0,
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        };
-        saveGuestCaseSession(guestSessionCreated);
-        currentSessionId = guestSessionCreated.id;
-        refreshGuestActiveCase(activeCase.id);
-      }
-
-      if (currentSessionId) {
-        setActiveSessionId(currentSessionId);
-      }
-      setActiveChartParams(sessionChartParams);
-      setSessionAnalysisModel(analysisModel);
-
-      await startQimenChat(systemInstruction);
-
-      const userMsg: ChatMessage = {
-        id: 'init-u',
-        role: 'user',
-        content: userContent,
-        timestamp: new Date(),
-      };
-      const modelId = 'init-m';
-      setChatHistory([
-        userMsg,
-        { id: modelId, role: 'model', content: '', timestamp: new Date() },
-      ]);
-
-      const knowledge = useKnowledge && supportsKnowledge
-        ? {
-            enabled: true,
-            board: knowledgeBoardMap[activeCase.modelType],
-            query: knowledgeQuery || question.trim(),
-          }
-        : undefined;
-
-      const finalState = await sendMessageToDeepseekStream(
-        prompt,
-        (state) => {
-          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
-        },
-        knowledge,
-        analysisModel
-      );
-
-      if (finalState.knowledgeFailed) {
-        setKnowledgeHint(finalState.knowledgeFailed);
-      }
-
-      const finalAnswer = appendDisclaimer(finalState.content);
-      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
-      const finalModelMessage: ChatMessage = {
-        id: modelId,
-        role: 'model',
-        content: finalContent,
-        timestamp: new Date(),
-      };
-      setChatHistory([userMsg, finalModelMessage]);
-
-      if (activeCase.modelType === ModelType.BAZI) {
-        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
-        setKlineUnlocked(true);
-      }
-
-      if (isLoggedIn) {
-        await saveMessagesToDb(currentSessionId, [
-          { role: 'user', content: userContent },
-          { role: 'model', content: finalContent },
-        ]);
-        fetchSessions();
-        const detailRes = await fetch(`/api/cases/${activeCase.id}`);
-        if (detailRes.ok) {
-          const detail = await detailRes.json();
-          setActiveCase(detail);
-        }
-        fetchUserProfile();
-      } else if (guestSessionCreated) {
-        updateGuestCaseSessionMessages(currentSessionId!, [userMsg, finalModelMessage], 0);
-        refreshGuestActiveCase(activeCase.id);
-      }
-
-      setQuestion('');
-    } catch (err: any) {
-      setError(err.message || '分析失败，请稍后重试');
-    } finally {
-      setLoading(false);
-      setIsTyping(false);
-    }
+    await runFreshCaseInitialAnalysis(activeCase, question);
   };
 
   const handleCalculate = async () => {
@@ -3297,13 +3399,6 @@ const App: React.FC = () => {
     }
   };
 
-  const getKlineStorageKey = (data: BaziResponse) => {
-    const base = data.base_info;
-    const bazi = data.bazi_info.bazi.join('');
-    const raw = `${base.name || '匿名'}-${base.gongli}-${bazi}`;
-    return `${KLINE_STORAGE_PREFIX}${encodeURIComponent(raw)}`;
-  };
-
   const buildKlinePrompt = (data: BaziResponse, analysisText: string) => {
     const panText = formatBaziPrompt(data);
     const dayunLines = data.dayun_info.big.map((name, idx) => {
@@ -3448,15 +3543,40 @@ const App: React.FC = () => {
     };
   };
 
-  const persistKlineResult = (result: KlineResult) => {
-    if (modelType !== ModelType.BAZI || !chartData) return;
-    const key = getKlineStorageKey(chartData as BaziResponse);
-    localStorage.setItem(key, JSON.stringify(result));
+  const persistKlineToCase = async (targetCase: CaseDetail, result: KlineResult | null) => {
+    if (isLoggedIn) {
+      const detail = await saveCaseKlineInDb(targetCase.id, result);
+      if (detail) {
+        await hydrateCasesForModel(targetCase.modelType);
+        setActiveCase(detail);
+      }
+      return;
+    }
+
+    const nextCase: CaseItem = {
+      id: targetCase.id,
+      modelType: targetCase.modelType,
+      title: targetCase.title,
+      chartParams: targetCase.chartParams,
+      chartData: targetCase.chartData,
+      klineData: result,
+      createdAt: targetCase.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    saveGuestCase(nextCase);
+    refreshGuestActiveCase(targetCase.id);
   };
 
-  const handleRunKline = async () => {
-    if (modelType !== ModelType.BAZI || !chartData) return;
+  const handleRunKline = async (forceRegenerate = false) => {
+    if (modelType !== ModelType.BAZI || !chartData || !activeCase || activeCase.modelType !== ModelType.BAZI) return;
     if (klineStatus === 'analyzing') return;
+    if (!forceRegenerate && klineResult) {
+      setKlineModalOpen(true);
+      setKlineStatus('ready');
+      return;
+    }
+
+    setKlineModalOpen(true);
     setKlineStatus('analyzing');
     setIsKlineRunning(true);
     setKlineError('');
@@ -3465,7 +3585,13 @@ const App: React.FC = () => {
     setKlineYearProgress(0);
     klineYearProgressRef.current = 0;
     try {
-      const prompt = buildKlinePrompt(chartData as BaziResponse, baziInitialAnalysis);
+      const initializationAnalysis = await resolveKlineInitializationAnalysis(activeCase);
+      if (!initializationAnalysis) {
+        throw new Error('K线初始化失败，请先完成一次八字分析');
+      }
+      setBaziInitialAnalysis(initializationAnalysis);
+
+      const prompt = buildKlinePrompt(chartData as BaziResponse, initializationAnalysis);
       // const finalState = await sendMessageToDeepseekStream(prompt, onKlineDelta, undefined, 'deepseek-chat');
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
@@ -3503,7 +3629,7 @@ const App: React.FC = () => {
       setKlineYearProgress(70);
       klineYearProgressRef.current = 70;
       setKlineStatus('ready');
-      persistKlineResult(normalized);
+      await persistKlineToCase(activeCase, normalized);
     } catch (err: any) {
       setKlineStatus('error');
       setKlineError(err.message || 'K线分析失败，请稍后重试');
@@ -3516,7 +3642,11 @@ const App: React.FC = () => {
   };
 
   const handleOpenKline = async () => {
-    setKlineModalOpen(true);
+    if (klineResult) {
+      setKlineModalOpen(true);
+      return;
+    }
+    await handleRunKline(false);
   };
 
   const handleSaveKline = () => {
@@ -4486,6 +4616,73 @@ const App: React.FC = () => {
                   />
                 )}
 
+                {activeCase.modelType === ModelType.BAZI && (
+                  <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 space-y-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-base font-bold text-stone-700">人生K线</div>
+                        <div className="mt-1 text-xs leading-5 text-stone-500">
+                          以当前八字命例为基础生成七步大运与七十年流年的运势曲线。
+                          {activeCase.klineData
+                            ? ' 当前命例已保存 K 线结果，可直接查看或重新生成。'
+                            : ' 首次运行会先自动补齐一条有效的八字分析，再继续生成 K 线。'}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleOpenKline}
+                          disabled={klineStatus === 'analyzing'}
+                          className="glass-chip rounded-2xl px-4 py-2 text-sm text-stone-600 hover:text-stone-800 disabled:opacity-50"
+                        >
+                          {activeCase.klineData ? '查看K线' : '推求K线'}
+                        </button>
+                        {activeCase.klineData && (
+                          <button
+                            type="button"
+                            onClick={() => void handleRunKline(true)}
+                            disabled={klineStatus === 'analyzing'}
+                            className="glass-panel-dark rounded-2xl px-4 py-2 text-sm text-amber-200 hover:brightness-105 disabled:opacity-60"
+                          >
+                            重新生成
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">状态</div>
+                        <div className="mt-2 text-sm font-semibold text-stone-700">
+                          {klineStatus === 'analyzing'
+                            ? '推演中'
+                            : activeCase.klineData
+                              ? '已生成'
+                              : '未生成'}
+                        </div>
+                      </div>
+                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">初始化</div>
+                        <div className="mt-2 text-sm font-semibold text-stone-700">
+                          {activeCase.sessions.length > 0 ? '优先复用最近成功分析' : '自动运行默认分析'}
+                        </div>
+                      </div>
+                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">记忆</div>
+                        <div className="mt-2 text-sm font-semibold text-stone-700">
+                          保存到当前命例
+                        </div>
+                      </div>
+                    </div>
+
+                    {klineStatus === 'error' && (
+                      <div className="rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-600">
+                        {klineError || 'K线分析失败，请稍后重试'}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
                   <textarea
@@ -4774,7 +4971,7 @@ const App: React.FC = () => {
       )}
 
       {/* K线浮球 */}
-      {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
+      {modelType === ModelType.BAZI && step === 'chart' && klinePos && !isCaseModel && (
         <div className="fixed z-40 select-none" style={{ left: klinePos.x, top: klinePos.y }}>
           <button
             type="button"
@@ -4801,37 +4998,47 @@ const App: React.FC = () => {
 
       {/* K线弹窗 */}
       {klineModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-6xl max-h-[90vh] rounded-3xl bg-white shadow-2xl border border-stone-200 overflow-hidden flex flex-col">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-stone-100 bg-stone-50/60">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6">
+          <div className="glass-panel w-full max-w-6xl max-h-[90vh] rounded-[32px] border border-white/55 overflow-hidden flex flex-col shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+            <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-white/50">
               <div>
                 <div className="text-sm font-bold text-stone-800">人生K线</div>
-                <div className="text-[11px] text-stone-500">四柱八字运势曲线（仅供娱乐）</div>
+                <div className="text-[11px] text-stone-500">当前八字命例的七步大运与七十流年运势曲线</div>
               </div>
               <div className="flex items-center gap-2">
                 {klineResult && (
                   <button
                     type="button"
                     onClick={handleSaveKline}
-                    className="text-xs px-3 py-1 rounded-full border border-stone-200 text-stone-600 hover:text-stone-800 hover:border-stone-300"
+                    className="glass-chip text-xs px-3 py-1 rounded-full text-stone-600 hover:text-stone-800"
                   >
                     保存到本地
+                  </button>
+                )}
+                {activeCase?.modelType === ModelType.BAZI && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRunKline(true)}
+                    disabled={klineStatus === 'analyzing'}
+                    className="glass-panel-dark text-xs px-3 py-1 rounded-full text-amber-200 hover:brightness-105 disabled:opacity-60"
+                  >
+                    重新生成
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setKlineModalOpen(false)}
-                  className="text-xs px-3 py-1 rounded-full border border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
+                  className="glass-chip text-xs px-3 py-1 rounded-full text-stone-500 hover:text-stone-700"
                 >
                   关闭
                 </button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto">
+            <div className="glass-chat-bg p-6 overflow-y-auto">
               {klineStatus === 'idle' && !klineResult && (
-                <div className="rounded-3xl border-2 border-dashed border-amber-100 bg-amber-50/50 h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-amber-100/70 text-amber-700 flex items-center justify-center">
+                <div className="glass-panel-soft rounded-[30px] border border-dashed border-amber-200/70 h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center">
                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3h18v18H3V3zm4 12l3-3 4 4 5-5" />
                     </svg>
@@ -4844,8 +5051,8 @@ const App: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={handleRunKline}
-                    className="text-xs px-4 py-2 rounded-full bg-stone-900 text-amber-400 hover:bg-stone-800"
+                    onClick={() => void handleRunKline(false)}
+                    className="glass-panel-dark text-xs px-4 py-2 rounded-full text-amber-300 hover:brightness-105"
                   >
                     推求K线
                   </button>
@@ -4877,7 +5084,7 @@ const App: React.FC = () => {
                   <div className="text-xs text-red-500">{klineError}</div>
                   <button
                     type="button"
-                    onClick={handleRunKline}
+                    onClick={() => void handleRunKline(true)}
                     className="mt-4 text-xs px-3 py-1 rounded-full border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
                   >
                     重新分析
