@@ -12,7 +12,7 @@ export type ChatModel =
   | typeof DEEPSEEK_CHAT_MODEL
   | typeof DOUBAO_SEED_PRO_MODEL;
 
-export const DEFAULT_ANALYSIS_MODEL: AnalysisModel = DEEPSEEK_REASONER_MODEL;
+export const DEFAULT_ANALYSIS_MODEL: AnalysisModel = DOUBAO_SEED_LITE_MODEL;
 
 export const ANALYSIS_MODEL_OPTIONS: Array<{
   value: AnalysisModel;
