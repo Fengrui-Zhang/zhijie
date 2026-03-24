@@ -135,6 +135,70 @@ const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 const KLINE_CHAT_MODEL: ChatModel = DOUBAO_SEED_PRO_MODEL;
+const NAVIGATION_STATE_MARKER = '__zhijieNav';
+
+const isNavigationScreen = (value: unknown): value is NavigationScreen =>
+  value === 'input' || value === 'chart' || value === 'case' || value === 'session';
+
+const isAppHistoryState = (value: unknown): value is AppHistoryState => {
+  if (!value || typeof value !== 'object') return false;
+  const input = value as Record<string, unknown>;
+  if (input[NAVIGATION_STATE_MARKER] !== true) return false;
+  if (typeof input.index !== 'number') return false;
+  const snapshot = input.snapshot;
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const candidate = snapshot as Record<string, unknown>;
+  return Object.values(ModelType).includes(candidate.modelType as ModelType)
+    && isNavigationScreen(candidate.screen);
+};
+
+const buildNavigationUrl = (snapshot: NavigationSnapshot) => {
+  const params = new URLSearchParams();
+  params.set('model', snapshot.modelType);
+  if (snapshot.screen !== 'input') {
+    params.set('view', snapshot.screen);
+  }
+  if (snapshot.caseId) {
+    params.set('case', snapshot.caseId);
+  }
+  if (snapshot.sessionId) {
+    params.set('session', snapshot.sessionId);
+  }
+  if (snapshot.klineOpen) {
+    params.set('kline', '1');
+  }
+  const query = params.toString();
+  return query ? `?${query}` : window.location.pathname;
+};
+
+const parseNavigationSnapshotFromLocation = (): NavigationSnapshot | null => {
+  const params = new URLSearchParams(window.location.search);
+  const model = params.get('model');
+  if (!Object.values(ModelType).includes(model as ModelType)) {
+    return null;
+  }
+
+  const view = params.get('view');
+  const screen: NavigationScreen = isNavigationScreen(view) ? view : 'input';
+  const caseId = params.get('case');
+  const sessionId = params.get('session');
+  return {
+    modelType: model as ModelType,
+    screen,
+    caseId: caseId || null,
+    sessionId: sessionId || null,
+    klineOpen: params.get('kline') === '1',
+  };
+};
+
+const buildNavigationKey = (snapshot: NavigationSnapshot) =>
+  JSON.stringify({
+    modelType: snapshot.modelType,
+    screen: snapshot.screen,
+    caseId: snapshot.caseId || null,
+    sessionId: snapshot.sessionId || null,
+    klineOpen: snapshot.klineOpen === true,
+  });
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -405,6 +469,38 @@ type GuestStoredSession = {
   guestFollowUpCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+type NavigationScreen = 'input' | 'chart' | 'case' | 'session';
+
+type NavigationTransientSnapshot = {
+  chartData: unknown;
+  chatHistory: Array<{
+    id: string;
+    role: 'user' | 'model';
+    content: string;
+    timestamp: string;
+  }>;
+  activeChartParams: Record<string, unknown>;
+  question: string;
+  analysisModel: AnalysisModel;
+  sessionAnalysisModel: AnalysisModel | null;
+  baziInitialAnalysis: string;
+};
+
+type NavigationSnapshot = {
+  modelType: ModelType;
+  screen: NavigationScreen;
+  caseId?: string | null;
+  sessionId?: string | null;
+  klineOpen?: boolean;
+  transient?: NavigationTransientSnapshot | null;
+};
+
+type AppHistoryState = {
+  __zhijieNav: true;
+  index: number;
+  snapshot: NavigationSnapshot;
 };
 
 type KlineScores = {
@@ -940,6 +1036,17 @@ const App: React.FC = () => {
   const noteHydratedRef = useRef(false);
   const noteLastSavedRef = useRef('');
   const noteSaveRunRef = useRef(0);
+  const navigationReadyRef = useRef(false);
+  const navigationRestoringRef = useRef(false);
+  const navigationIndexRef = useRef(0);
+  const navigationKeyRef = useRef('');
+  const restoreNavigationSnapshotRef = useRef<(snapshot: NavigationSnapshot | null) => Promise<void>>(
+    async () => {}
+  );
+  const buildNavigationSnapshotRef = useRef<() => NavigationSnapshot>(() => ({
+    modelType: ModelType.QIMEN,
+    screen: 'input',
+  }));
 
   const syncAutoScrollState = useCallback(() => {
     const container = chatScrollRef.current;
@@ -2370,44 +2477,32 @@ const App: React.FC = () => {
     [ModelType.LIUYAO]: 'liuyao',
   };
 
-  // --- Reset when model changes ---
-  const handleModelChange = (type: ModelType) => {
-    setModelType(type);
-    handleReset();
-    if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
-      setUseKnowledge(false);
-    }
-    // Set default time mode: Life reading (Bazi/Ziwei) usually requires custom birth time
-    if (type === ModelType.BAZI || type === ModelType.ZIWEI) {
-      setTimeMode('custom');
-    } else {
-      setTimeMode('now');
-    }
-  };
-
-  const handleReset = () => {
+  const clearViewState = useCallback((options?: { clearInputs?: boolean }) => {
+    const clearInputs = options?.clearInputs !== false;
     setStep('input');
     setChartData(null);
     setChatHistory([]);
     resetMessageVersions();
     clearChatSession();
     setError('');
-    setQuestion('');
-    setBirthYear('');
-    setName('');
-    setCustomDate('');
-    setProvince('');
-    setCity('');
-    setLiuyaoMode(LiuyaoMode.AUTO);
-    setManualLines([1,0,1,0,1,0]);
-    setManualMovingLines([false, false, false, false, false, false]);
-    setLyNum('');
-    setLyNumUp('');
-    setLyNumDown('');
-    setQimenProEnabled(false);
-    setQimenJuModel(1);
-    setQimenPanModel(1);
-    setQimenFeiPanModel(1);
+    if (clearInputs) {
+      setQuestion('');
+      setBirthYear('');
+      setName('');
+      setCustomDate('');
+      setProvince('');
+      setCity('');
+      setLiuyaoMode(LiuyaoMode.AUTO);
+      setManualLines([1, 0, 1, 0, 1, 0]);
+      setManualMovingLines([false, false, false, false, false, false]);
+      setLyNum('');
+      setLyNumUp('');
+      setLyNumDown('');
+      setQimenProEnabled(false);
+      setQimenJuModel(1);
+      setQimenPanModel(1);
+      setQimenFeiPanModel(1);
+    }
     setBaziInitialAnalysis('');
     setKlineUnlocked(false);
     setKlineModalOpen(false);
@@ -2428,6 +2523,25 @@ const App: React.FC = () => {
     setEditingCaseId(null);
     setShowInitialAnalysisModal(false);
     setKnowledgeHint(null);
+  }, []);
+
+  // --- Reset when model changes ---
+  const handleModelChange = (type: ModelType) => {
+    setModelType(type);
+    clearViewState();
+    if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
+      setUseKnowledge(false);
+    }
+    // Set default time mode: Life reading (Bazi/Ziwei) usually requires custom birth time
+    if (type === ModelType.BAZI || type === ModelType.ZIWEI) {
+      setTimeMode('custom');
+    } else {
+      setTimeMode('now');
+    }
+  };
+
+  const handleReset = () => {
+    clearViewState();
   };
 
   const beginCaseCreate = () => {
@@ -4178,6 +4292,284 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const buildTransientNavigationSnapshot = useCallback((): NavigationTransientSnapshot | null => {
+    if (step !== 'chart' || activeCase || activeSessionId || !chartData) {
+      return null;
+    }
+
+    return {
+      chartData,
+      chatHistory: chatHistory.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString(),
+      })),
+      activeChartParams,
+      question,
+      analysisModel,
+      sessionAnalysisModel,
+      baziInitialAnalysis,
+    };
+  }, [
+    activeCase,
+    activeChartParams,
+    activeSessionId,
+    analysisModel,
+    baziInitialAnalysis,
+    chartData,
+    chatHistory,
+    question,
+    sessionAnalysisModel,
+    step,
+  ]);
+
+  const buildNavigationSnapshot = useCallback((): NavigationSnapshot => {
+    const klineOpen = modelType === ModelType.BAZI && klineModalOpen;
+
+    if (step === 'input') {
+      return {
+        modelType,
+        screen: 'input',
+      };
+    }
+
+    if (activeSessionId) {
+      return {
+        modelType,
+        screen: 'session',
+        caseId: activeCase?.id ?? null,
+        sessionId: activeSessionId,
+        klineOpen,
+      };
+    }
+
+    if (activeCase?.id && isCaseModelType(modelType)) {
+      return {
+        modelType,
+        screen: 'case',
+        caseId: activeCase.id,
+        klineOpen,
+      };
+    }
+
+    return {
+      modelType,
+      screen: 'chart',
+      klineOpen,
+      transient: buildTransientNavigationSnapshot(),
+    };
+  }, [activeCase?.id, activeSessionId, buildTransientNavigationSnapshot, klineModalOpen, modelType, step]);
+
+  const restoreTransientNavigationSnapshot = useCallback((
+    targetModelType: ModelType,
+    transient: NavigationTransientSnapshot
+  ) => {
+    clearChatSession();
+    setModelType(targetModelType);
+    setChartData(transient.chartData);
+    setActiveChartParams(transient.activeChartParams || {});
+    setActiveSessionId(null);
+    setActiveCase(null);
+    setStep('chart');
+    setQuestion(transient.question || '');
+    setKnowledgeHint(null);
+    resetMessageVersions();
+    const restoredMessages: ChatMessage[] = transient.chatHistory.map((msg) => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp),
+    }));
+    setChatHistory(restoredMessages);
+    setAnalysisModel(transient.analysisModel);
+    setSessionAnalysisModel(transient.sessionAnalysisModel);
+    setBaziInitialAnalysis(transient.baziInitialAnalysis || '');
+    if (targetModelType === ModelType.BAZI) {
+      setKlineUnlocked(Boolean(transient.baziInitialAnalysis));
+    } else {
+      setKlineUnlocked(false);
+    }
+
+    if (restoredMessages.length > 0) {
+      const systemInstruction = buildSystemInstruction(
+        targetModelType,
+        transient.chartData,
+        transient.activeChartParams || {}
+      );
+      restoreChatSession(
+        systemInstruction,
+        restoredMessages.map((msg) => ({ role: msg.role, content: msg.content }))
+      );
+    }
+  }, []);
+
+  const restoreNavigationSnapshot = useCallback(async (snapshot: NavigationSnapshot | null) => {
+    if (!snapshot) return;
+
+    navigationRestoringRef.current = true;
+
+    try {
+      setKlineModalOpen(false);
+
+      if (snapshot.screen === 'input') {
+        setModelType(snapshot.modelType);
+        clearViewState({ clearInputs: false });
+        if (snapshot.modelType === ModelType.BAZI || snapshot.modelType === ModelType.ZIWEI) {
+          setTimeMode('custom');
+        } else {
+          setTimeMode('now');
+        }
+        return;
+      }
+
+      if (snapshot.screen === 'session' && snapshot.sessionId) {
+        if (isLoggedIn) {
+          await handleLoadSession(snapshot.sessionId);
+        } else {
+          handleLoadGuestCaseSession(snapshot.sessionId);
+        }
+      } else if (snapshot.screen === 'case' && snapshot.caseId) {
+        setModelType(snapshot.modelType);
+        await loadCaseDetail(snapshot.caseId);
+      } else if (snapshot.screen === 'chart' && snapshot.transient) {
+        restoreTransientNavigationSnapshot(snapshot.modelType, snapshot.transient);
+      } else {
+        setModelType(snapshot.modelType);
+        clearViewState({ clearInputs: false });
+      }
+
+      if (snapshot.klineOpen && snapshot.modelType === ModelType.BAZI) {
+        setKlineModalOpen(true);
+      }
+    } finally {
+      window.setTimeout(() => {
+        navigationRestoringRef.current = false;
+      }, 0);
+    }
+  }, [
+    clearViewState,
+    handleLoadGuestCaseSession,
+    handleLoadSession,
+    isLoggedIn,
+    loadCaseDetail,
+    restoreTransientNavigationSnapshot,
+  ]);
+
+  const handleNavigationBack = useCallback(() => {
+    const state = window.history.state;
+    if (isAppHistoryState(state) && state.index > 0) {
+      window.history.back();
+      return;
+    }
+
+    clearViewState({ clearInputs: false });
+  }, [clearViewState]);
+
+  const handleCloseKlineModal = useCallback(() => {
+    const state = window.history.state;
+    if (isAppHistoryState(state) && state.index > 0 && state.snapshot?.klineOpen) {
+      window.history.back();
+      return;
+    }
+    setKlineModalOpen(false);
+  }, []);
+
+  buildNavigationSnapshotRef.current = buildNavigationSnapshot;
+  restoreNavigationSnapshotRef.current = restoreNavigationSnapshot;
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const snapshot = isAppHistoryState(event.state)
+        ? event.state.snapshot
+        : parseNavigationSnapshotFromLocation();
+      if (isAppHistoryState(event.state)) {
+        navigationIndexRef.current = event.state.index;
+      }
+      void restoreNavigationSnapshotRef.current(snapshot);
+    };
+
+    const initialSnapshot =
+      parseNavigationSnapshotFromLocation() || buildNavigationSnapshotRef.current();
+    const initialState = window.history.state;
+    if (isAppHistoryState(initialState)) {
+      navigationIndexRef.current = initialState.index;
+    } else {
+      navigationIndexRef.current = 0;
+      window.history.replaceState(
+        {
+          [NAVIGATION_STATE_MARKER]: true,
+          index: 0,
+          snapshot: initialSnapshot,
+        } satisfies AppHistoryState,
+        '',
+        buildNavigationUrl(initialSnapshot)
+      );
+    }
+
+    navigationKeyRef.current = buildNavigationKey(initialSnapshot);
+    navigationReadyRef.current = true;
+
+    const shouldRestoreFromUrl =
+      initialSnapshot.screen !== 'input' ||
+      initialSnapshot.modelType !== modelType;
+    if (shouldRestoreFromUrl) {
+      void restoreNavigationSnapshotRef.current(initialSnapshot);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!navigationReadyRef.current || navigationRestoringRef.current) return;
+
+    const snapshot = buildNavigationSnapshot();
+    const key = buildNavigationKey(snapshot);
+    const currentState = window.history.state;
+
+    if (!navigationKeyRef.current) {
+      navigationKeyRef.current = key;
+      window.history.replaceState(
+        {
+          [NAVIGATION_STATE_MARKER]: true,
+          index: navigationIndexRef.current,
+          snapshot,
+        } satisfies AppHistoryState,
+        '',
+        buildNavigationUrl(snapshot)
+      );
+      return;
+    }
+
+    if (key !== navigationKeyRef.current) {
+      navigationIndexRef.current += 1;
+      navigationKeyRef.current = key;
+      window.history.pushState(
+        {
+          [NAVIGATION_STATE_MARKER]: true,
+          index: navigationIndexRef.current,
+          snapshot,
+        } satisfies AppHistoryState,
+        '',
+        buildNavigationUrl(snapshot)
+      );
+      return;
+    }
+
+    const nextIndex = isAppHistoryState(currentState) ? currentState.index : navigationIndexRef.current;
+    navigationIndexRef.current = nextIndex;
+    window.history.replaceState(
+      {
+        [NAVIGATION_STATE_MARKER]: true,
+        index: nextIndex,
+        snapshot,
+      } satisfies AppHistoryState,
+      '',
+      buildNavigationUrl(snapshot)
+    );
+  }, [buildNavigationSnapshot]);
+
   const handleCopyText = async (text: string) => {
     if (!text) return;
     try {
@@ -4655,13 +5047,13 @@ const App: React.FC = () => {
                         : '未填写出生时间';
                       const solarText = params.province && params.city
                         ? `真太阳时 · ${params.province}${params.city}`
-                        : '普通时间';
+                        : '';
                       return (
                         <button
                           key={item.id}
                           type="button"
                           onClick={() => loadCaseDetail(item.id)}
-                          className={`text-left rounded-[24px] border p-4 transition ${
+                          className={`text-left rounded-[24px] border px-4 py-3.5 transition ${
                             activeCase?.id === item.id
                               ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.22)]'
                               : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
@@ -4687,9 +5079,11 @@ const App: React.FC = () => {
                               {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
                             </span>
                           </div>
-                          <div className={`mt-3 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
-                            {solarText}
-                          </div>
+                          {solarText && (
+                            <div className={`mt-2 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                              {solarText}
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -5100,7 +5494,7 @@ const App: React.FC = () => {
                    modelType === ModelType.ZIWEI ? '紫微斗数' : 
                    modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲'}
                  </span>
-                 <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
+                 <button data-report-ignore="true" onClick={handleNavigationBack} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
               </div>
 
               {/* Visualization Components */}
@@ -5607,7 +6001,7 @@ const App: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => setKlineModalOpen(false)}
+                  onClick={handleCloseKlineModal}
                   className="glass-chip text-xs px-3 py-1 rounded-full text-stone-500 hover:text-stone-700"
                 >
                   关闭
