@@ -28,6 +28,7 @@ import {
   normalizeInitialAnalysisData,
   normalizeCaseChartParams,
 } from './lib/divination-cases';
+import { deriveInitialAnalysisFromSession } from './lib/initial-analysis';
 
 // Services
 import { 
@@ -1060,10 +1061,34 @@ const App: React.FC = () => {
     const matchedCase = allCases.find((item) => item.id === caseId);
     if (!matchedCase) return null;
 
-    const sessions = readGuestCaseSessions()
+    const rawSessions = readGuestCaseSessions()
       .filter((item) => item.caseId === caseId)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((item) => ({
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+    const currentInitialAnalysis = normalizeInitialAnalysisData(matchedCase.initialAnalysisData);
+    let effectiveCase = matchedCase;
+
+    if (!currentInitialAnalysis) {
+      for (const session of rawSessions) {
+        const derived = deriveInitialAnalysisFromSession(
+          session.chartParams,
+          session.messages,
+          session.updatedAt
+        );
+        if (!derived) continue;
+
+        effectiveCase = {
+          ...matchedCase,
+          initialAnalysisData: derived,
+        };
+        const nextCases = allCases.map((item) => (item.id === caseId ? effectiveCase : item));
+        writeGuestCases(nextCases);
+        setCaseItems(nextCases.filter((item) => item.modelType === modelType));
+        break;
+      }
+    }
+
+    const sessions = rawSessions.map((item) => ({
         id: item.id,
         modelType: item.modelType,
         title: item.title,
@@ -1073,10 +1098,10 @@ const App: React.FC = () => {
       }));
 
     return {
-      ...matchedCase,
+      ...effectiveCase,
       sessions,
     };
-  }, [readGuestCaseSessions, readGuestCases]);
+  }, [modelType, readGuestCaseSessions, readGuestCases, writeGuestCases]);
 
   const hydrateCasesForModel = useCallback(async (type: ModelType) => {
     if (!isCaseModelType(type)) return;
@@ -2615,6 +2640,70 @@ const App: React.FC = () => {
     };
   };
 
+  const resolveStoredCaseInitialAnalysis = async (targetCase: CaseDetail) => {
+    const currentInitialAnalysis = normalizeInitialAnalysisData(targetCase.initialAnalysisData);
+    if (currentInitialAnalysis) {
+      return { initialAnalysis: currentInitialAnalysis, caseDetail: targetCase };
+    }
+
+    if (isLoggedIn) {
+      try {
+        const detailRes = await fetch(`/api/cases/${targetCase.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json() as CaseDetail;
+          const syncedInitialAnalysis = normalizeInitialAnalysisData(detail.initialAnalysisData);
+          if (syncedInitialAnalysis) {
+            setActiveCase(detail);
+            return { initialAnalysis: syncedInitialAnalysis, caseDetail: detail };
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+      return { initialAnalysis: null, caseDetail: targetCase };
+    }
+
+    const guestSessions = readGuestCaseSessions()
+      .filter((item) => item.caseId === targetCase.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+    for (const session of guestSessions) {
+      const derived = deriveInitialAnalysisFromSession(
+        session.chartParams,
+        session.messages,
+        session.updatedAt
+      );
+      if (!derived) continue;
+
+      const nextCase: CaseItem = {
+        id: targetCase.id,
+        modelType: targetCase.modelType,
+        title: targetCase.title,
+        chartParams: targetCase.chartParams,
+        chartData: targetCase.chartData,
+        klineData: targetCase.klineData,
+        initialAnalysisData: derived,
+        createdAt: targetCase.createdAt,
+        updatedAt: targetCase.updatedAt,
+      };
+      saveGuestCase(nextCase);
+      const detail = getGuestCaseDetail(targetCase.id);
+      if (detail) {
+        setActiveCase(detail);
+        return { initialAnalysis: derived, caseDetail: detail };
+      }
+      return {
+        initialAnalysis: derived,
+        caseDetail: {
+          ...targetCase,
+          initialAnalysisData: derived,
+        },
+      };
+    }
+
+    return { initialAnalysis: null, caseDetail: targetCase };
+  };
+
   const openCaseInitialAnalysisSession = async (
     targetCase: CaseDetail,
     initialAnalysis: InitialAnalysisData
@@ -2846,15 +2935,17 @@ const App: React.FC = () => {
     targetCase: CaseDetail,
     options?: { displaySession?: boolean; forceRegenerate?: boolean }
   ) => {
-    const currentInitialAnalysis = normalizeInitialAnalysisData(targetCase.initialAnalysisData);
     const displaySession = options?.displaySession === true;
     const forceRegenerate = options?.forceRegenerate === true;
 
-    if (currentInitialAnalysis && !forceRegenerate) {
-      if (displaySession) {
-        await openCaseInitialAnalysisSession(targetCase, currentInitialAnalysis);
+    if (!forceRegenerate) {
+      const resolved = await resolveStoredCaseInitialAnalysis(targetCase);
+      if (resolved.initialAnalysis) {
+        if (displaySession) {
+          await openCaseInitialAnalysisSession(resolved.caseDetail, resolved.initialAnalysis);
+        }
+        return resolved;
       }
-      return { initialAnalysis: currentInitialAnalysis, caseDetail: targetCase };
     }
 
     return await generateCaseInitialAnalysis(targetCase, { displaySession });

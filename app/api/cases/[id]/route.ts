@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../../lib/auth';
+import { backfillDivinationCases } from '../../../../lib/case-migration';
 import {
   buildCaseTitle,
   isCaseModelType,
@@ -16,6 +17,7 @@ export async function GET(
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
+  await backfillDivinationCases(session.user.id);
   const { id } = await params;
 
   const divinationCase = await prisma.divinationCase.findFirst({
@@ -51,6 +53,7 @@ export async function PUT(
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
+  await backfillDivinationCases(session.user.id);
   const { id } = await params;
   const existing = await prisma.divinationCase.findFirst({
     where: { id, userId: session.user.id },
@@ -114,6 +117,7 @@ export async function DELETE(
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
+  await backfillDivinationCases(session.user.id);
   const { id } = await params;
 
   const existing = await prisma.divinationCase.findFirst({

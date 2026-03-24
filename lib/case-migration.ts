@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import {
   CASE_MODEL_TYPES,
@@ -5,6 +6,7 @@ import {
   buildCaseTitle,
   isCaseModelType,
 } from './divination-cases';
+import { deriveInitialAnalysisFromSession } from './initial-analysis';
 
 export async function backfillDivinationCases(userId: string) {
   const existingCases = await prisma.divinationCase.findMany({
@@ -77,14 +79,72 @@ export async function backfillDivinationCases(userId: string) {
     sessionIdsByCaseId.set(caseId, ids);
   }
 
-  if (sessionIdsByCaseId.size === 0) return;
+  if (sessionIdsByCaseId.size > 0) {
+    await prisma.$transaction(
+      Array.from(sessionIdsByCaseId.entries()).map(([caseId, sessionIds]) =>
+        prisma.divinationSession.updateMany({
+          where: { id: { in: sessionIds } },
+          data: { caseId },
+        })
+      )
+    );
+  }
 
-  await prisma.$transaction(
-    Array.from(sessionIdsByCaseId.entries()).map(([caseId, sessionIds]) =>
-      prisma.divinationSession.updateMany({
-        where: { id: { in: sessionIds } },
-        data: { caseId },
-      })
-    )
-  );
+  const casesNeedingInitialAnalysis = await prisma.divinationCase.findMany({
+    where: {
+      userId,
+      modelType: { in: [...CASE_MODEL_TYPES] },
+      initialAnalysisData: null,
+    },
+    select: { id: true },
+  });
+
+  if (casesNeedingInitialAnalysis.length === 0) return;
+
+  const sessionsWithMessages = await prisma.divinationSession.findMany({
+    where: {
+      userId,
+      caseId: { in: casesNeedingInitialAnalysis.map((item) => item.id) },
+      modelType: { in: [...CASE_MODEL_TYPES] },
+    },
+    orderBy: [{ caseId: 'asc' }, { updatedAt: 'desc' }],
+    select: {
+      id: true,
+      caseId: true,
+      chartParams: true,
+      updatedAt: true,
+      messages: {
+        orderBy: { createdAt: 'asc' },
+        select: {
+          role: true,
+          content: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  const seenCaseIds = new Set<string>();
+  const updates = sessionsWithMessages.flatMap((session) => {
+    if (!session.caseId || seenCaseIds.has(session.caseId)) return [];
+    const initialAnalysis = deriveInitialAnalysisFromSession(
+      session.chartParams,
+      session.messages,
+      session.updatedAt
+    );
+    if (!initialAnalysis) return [];
+    seenCaseIds.add(session.caseId);
+    return [
+      prisma.divinationCase.update({
+        where: { id: session.caseId },
+        data: {
+          initialAnalysisData: initialAnalysis as unknown as Prisma.InputJsonValue,
+        },
+      }),
+    ];
+  });
+
+  if (updates.length > 0) {
+    await prisma.$transaction(updates);
+  }
 }
