@@ -353,6 +353,11 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+type PersistedChatMessage = {
+  role: string;
+  content: string;
+};
+
 type GuestStoredSession = {
   id: string;
   caseId: string;
@@ -649,6 +654,84 @@ const buildSystemInstruction = (mType: ModelType, cData: unknown): string => {
   }
 };
 
+const extractQuestionFromMessages = (messages: ChatMessage[]) => {
+  const firstUserMessage = messages.find((msg) => msg.role === 'user');
+  if (!firstUserMessage) return '';
+
+  const questionLine = firstUserMessage.content.match(/(?:^|\n)问题:\s*(.+)$/m);
+  if (questionLine?.[1]) {
+    return questionLine[1].trim();
+  }
+
+  if (firstUserMessage.content.startsWith('问题:')) {
+    return firstUserMessage.content.replace(/^问题:\s*/, '').trim();
+  }
+
+  return '';
+};
+
+const getInitialAnalysisQuestion = (
+  chartParams: Record<string, unknown>,
+  messages: ChatMessage[]
+) => {
+  const storedQuestion = typeof chartParams.question === 'string' ? chartParams.question.trim() : '';
+  if (storedQuestion) return storedQuestion;
+  return extractQuestionFromMessages(messages);
+};
+
+const buildInitialAnalysisBundle = (
+  mType: ModelType,
+  cData: unknown,
+  chartParams: Record<string, unknown>,
+  messages: ChatMessage[]
+) => {
+  const question = getInitialAnalysisQuestion(chartParams, messages);
+
+  if (mType === ModelType.BAZI || mType === ModelType.ZIWEI) {
+    const analysisBundle = buildLifeReadingAnalysisBundle(
+      mType,
+      cData as BaziResponse | ZiweiResponse,
+      question
+    );
+
+    return {
+      question,
+      prompt: analysisBundle.prompt,
+      systemInstruction: analysisBundle.systemInstruction,
+      knowledgeQuery: analysisBundle.knowledgeQuery,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.QIMEN) {
+    return {
+      question,
+      prompt: formatQimenPrompt(cData as QimenResponse, question),
+      systemInstruction: "你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.MEIHUA) {
+    return {
+      question,
+      prompt: formatMeihuaPrompt(cData as MeihuaResponse, question),
+      systemInstruction: "你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  return {
+    question,
+    prompt: formatLiuyaoPrompt(cData as LiuyaoResponse, question),
+    systemInstruction: "你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。",
+    knowledgeQuery: question,
+    userContent: buildInitialUserContent(mType, chartParams, question),
+  };
+};
+
 const App: React.FC = () => {
   const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
@@ -675,6 +758,8 @@ const App: React.FC = () => {
   const [noteContent, setNoteContent] = useState('');
   const [noteSaveState, setNoteSaveState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
   const [analysisModel, setAnalysisModel] = useState<AnalysisModel>(DEFAULT_ANALYSIS_MODEL);
+  const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
+  const [sessionAnalysisModel, setSessionAnalysisModel] = useState<AnalysisModel | null>(null);
 
   // --- State ---
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
@@ -915,10 +1000,12 @@ const App: React.FC = () => {
       clearChatSession();
       setActiveCase(detail);
       setChartData(detail.chartData);
+      setActiveChartParams((detail.chartParams || {}) as Record<string, unknown>);
       setQuestion('');
       setChatHistory([]);
       setKnowledgeHint(null);
       setActiveSessionId(null);
+      setSessionAnalysisModel(null);
       const nextFollowUpCount = storedSession?.guestFollowUpCount || 0;
       setGuestFollowUpCount(nextFollowUpCount);
       localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
@@ -933,10 +1020,12 @@ const App: React.FC = () => {
       clearChatSession();
       setActiveCase(data);
       setChartData(data.chartData);
+      setActiveChartParams((data.chartParams || {}) as Record<string, unknown>);
       setQuestion('');
       setChatHistory([]);
       setKnowledgeHint(null);
       setActiveSessionId(null);
+      setSessionAnalysisModel(null);
       setStep('chart');
     } catch {
       // silently ignore
@@ -1238,28 +1327,32 @@ const App: React.FC = () => {
     writeGuestCaseSessions(next);
   }, [readGuestCaseSessions, writeGuestCaseSessions]);
 
+  const updateGuestCaseSession = useCallback((
+    sessionId: string,
+    updater: (session: GuestStoredSession) => GuestStoredSession
+  ) => {
+    const current = readGuestCaseSessions();
+    const next = current.map((item) => (item.id === sessionId ? updater(item) : item));
+    writeGuestCaseSessions(next);
+  }, [readGuestCaseSessions, writeGuestCaseSessions]);
+
   const updateGuestCaseSessionMessages = useCallback((
     sessionId: string,
     messages: ChatMessage[],
     nextFollowUpCount?: number
   ) => {
-    const current = readGuestCaseSessions();
-    const next = current.map((item) => {
-      if (item.id !== sessionId) return item;
-      return {
-        ...item,
-        messages: messages.map((msg) => ({
-          id: msg.id,
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp.toISOString(),
-        })),
-        guestFollowUpCount: nextFollowUpCount ?? item.guestFollowUpCount,
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    writeGuestCaseSessions(next);
-  }, [readGuestCaseSessions, writeGuestCaseSessions]);
+    updateGuestCaseSession(sessionId, (item) => ({
+      ...item,
+      messages: messages.map((msg) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString(),
+      })),
+      guestFollowUpCount: nextFollowUpCount ?? item.guestFollowUpCount,
+      updatedAt: new Date().toISOString(),
+    }));
+  }, [updateGuestCaseSession]);
 
   const deleteGuestCase = useCallback((caseId: string) => {
     const nextCases = readGuestCases().filter((item) => item.id !== caseId);
@@ -1284,6 +1377,38 @@ const App: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(messages),
+      });
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const replaceMessagesInDb = async (
+    sessionId: string | null,
+    messages: PersistedChatMessage[]
+  ) => {
+    if (!isLoggedIn || !sessionId) return;
+    try {
+      await fetch(`/api/sessions/${sessionId}/messages`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messages),
+      });
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const updateSessionInDb = async (
+    sessionId: string | null,
+    payload: { title?: string; chartParams?: Record<string, unknown> }
+  ) => {
+    if (!isLoggedIn || !sessionId) return;
+    try {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
     } catch {
       // silently ignore
@@ -1334,6 +1459,7 @@ const App: React.FC = () => {
       setActiveSessionId(id);
       setModelType(data.modelType as ModelType);
       setChartData(effectiveChartData);
+      setActiveChartParams((data.chartParams || {}) as Record<string, unknown>);
       setStep('chart');
       setError('');
       setCaseFormOpen(false);
@@ -1345,7 +1471,12 @@ const App: React.FC = () => {
         if (p.question) setQuestion(p.question as string);
         if (isAnalysisModel(p.analysisModel)) {
           setAnalysisModel(p.analysisModel);
+          setSessionAnalysisModel(p.analysisModel);
+        } else {
+          setSessionAnalysisModel(null);
         }
+      } else {
+        setSessionAnalysisModel(null);
       }
 
       const msgs: ChatMessage[] = (data.messages || []).map(
@@ -1393,6 +1524,7 @@ const App: React.FC = () => {
     clearChatSession();
     setModelType(storedSession.modelType);
     setChartData(effectiveChartData);
+    setActiveChartParams(storedSession.chartParams || {});
     setActiveSessionId(storedSession.id);
     setActiveCase(detail);
     setStep('chart');
@@ -1400,6 +1532,13 @@ const App: React.FC = () => {
     setCaseFormOpen(false);
     setEditingCaseId(null);
     setQuestion('');
+    const storedAnalysisModel = isAnalysisModel(storedSession.chartParams?.analysisModel)
+      ? storedSession.chartParams.analysisModel
+      : null;
+    setSessionAnalysisModel(storedAnalysisModel);
+    if (storedAnalysisModel) {
+      setAnalysisModel(storedAnalysisModel);
+    }
 
     const msgs: ChatMessage[] = storedSession.messages.map((msg) => ({
       id: msg.id,
@@ -2030,6 +2169,8 @@ const App: React.FC = () => {
     klineYearProgressRef.current = 0;
     setKlinePos(null);
     setActiveSessionId(null);
+    setActiveChartParams({});
+    setSessionAnalysisModel(null);
     setActiveCase(null);
     setCaseFormOpen(false);
     setEditingCaseId(null);
@@ -2172,6 +2313,8 @@ const App: React.FC = () => {
       }
 
       setChartData(chartResponse);
+      setActiveChartParams(chartParams);
+      setSessionAnalysisModel(null);
       setChatHistory([]);
       setActiveSessionId(null);
       setQuestion('');
@@ -2230,6 +2373,7 @@ const App: React.FC = () => {
     }
 
     const chartParams = (activeCase.chartParams || {}) as Record<string, unknown>;
+    const sessionChartParams = { ...chartParams, question, analysisModel };
     const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
       activeCase.modelType,
       activeCase.chartData as BaziResponse & ZiweiResponse,
@@ -2246,7 +2390,7 @@ const App: React.FC = () => {
         currentSessionId = await saveSessionToDb(
           activeCase.modelType,
           sessionTitle,
-          { ...chartParams, analysisModel },
+          sessionChartParams,
           activeCase.chartData,
           activeCase.id
         );
@@ -2257,7 +2401,7 @@ const App: React.FC = () => {
           caseId: activeCase.id,
           modelType: activeCase.modelType,
           title: sessionTitle,
-          chartParams,
+          chartParams: sessionChartParams,
           chartData: activeCase.chartData,
           messages: [],
           guestFollowUpCount: 0,
@@ -2272,6 +2416,8 @@ const App: React.FC = () => {
       if (currentSessionId) {
         setActiveSessionId(currentSessionId);
       }
+      setActiveChartParams(sessionChartParams);
+      setSessionAnalysisModel(analysisModel);
 
       await startQimenChat(systemInstruction);
 
@@ -2508,13 +2654,16 @@ const App: React.FC = () => {
 
       // --- Save session to DB immediately (before AI streaming) ---
       const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
+      const sessionChartParams = { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>;
       const newSessionId = await saveSessionToDb(
         modelType,
         sessionTitle,
-        { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>,
+        sessionChartParams,
         resultData
       );
       if (newSessionId) setActiveSessionId(newSessionId);
+      setActiveChartParams(sessionChartParams);
+      setSessionAnalysisModel(analysisModel);
 
       // --- AI Chat Init ---
       await startQimenChat(systemInstruction);
@@ -2587,6 +2736,248 @@ const App: React.FC = () => {
       setError(err.message || "Operation failed.");
     } finally {
       setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const toPersistedMessages = (messages: ChatMessage[]): PersistedChatMessage[] =>
+    messages.map((msg) => ({ role: msg.role, content: msg.content }));
+
+  const handleRerunAnalysis = async () => {
+    if (!chartData || !chatHistory.length) return;
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
+    const bundle = buildInitialAnalysisBundle(
+      modelType,
+      chartData,
+      activeChartParams,
+      chatHistory
+    );
+
+    const nextChartParams = {
+      ...activeChartParams,
+      question: bundle.question,
+      analysisModel,
+    };
+
+    setLoading(true);
+    setIsTyping(true);
+    setError('');
+    setKnowledgeHint(null);
+    clearChatSession();
+    await startQimenChat(bundle.systemInstruction);
+
+    const userMsg: ChatMessage = {
+      id: 'rerun-u',
+      role: 'user',
+      content: bundle.userContent,
+      timestamp: new Date(),
+    };
+    const modelId = 'rerun-m';
+    setChatHistory([
+      userMsg,
+      { id: modelId, role: 'model', content: '', timestamp: new Date() },
+    ]);
+
+    try {
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[modelType],
+            query: bundle.knowledgeQuery || bundle.question,
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        bundle.prompt,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge,
+        analysisModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalMessages: ChatMessage[] = [
+        userMsg,
+        {
+          id: modelId,
+          role: 'model',
+          content: finalContent,
+          timestamp: new Date(),
+        },
+      ];
+
+      setChatHistory(finalMessages);
+      setActiveChartParams(nextChartParams);
+      setSessionAnalysisModel(analysisModel);
+
+      if (modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
+        setKlineUnlocked(true);
+      }
+
+      if (isLoggedIn) {
+        await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
+        await updateSessionInDb(activeSessionId, { chartParams: nextChartParams });
+        fetchSessions();
+        fetchUserProfile();
+        if (activeCase) {
+          const detailRes = await fetch(`/api/cases/${activeCase.id}`);
+          if (detailRes.ok) {
+            const detail = await detailRes.json();
+            setActiveCase(detail);
+          }
+        }
+      } else if (activeSessionId && activeCase) {
+        updateGuestCaseSession(activeSessionId, (session) => ({
+          ...session,
+          chartParams: nextChartParams,
+          messages: finalMessages.map((msg) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+          })),
+          updatedAt: new Date().toISOString(),
+        }));
+        refreshGuestActiveCase(activeCase.id);
+      }
+    } catch (err: any) {
+      setError(err.message || '重新分析失败，请稍后重试');
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+    }
+  };
+
+  const handleRegenerateMessage = async (messageId: string) => {
+    if (!chartData || isTyping) return;
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
+    const targetIndex = chatHistory.findIndex((msg) => msg.id === messageId);
+    if (targetIndex < 0 || chatHistory[targetIndex]?.role !== 'model') return;
+
+    let userIndex = -1;
+    for (let idx = targetIndex - 1; idx >= 0; idx -= 1) {
+      if (chatHistory[idx].role === 'user') {
+        userIndex = idx;
+        break;
+      }
+    }
+    if (userIndex < 0) return;
+
+    const isInitialResponse = userIndex === 0;
+    const lockedModel = sessionAnalysisModel ?? DEFAULT_ANALYSIS_MODEL;
+
+    setError('');
+    setKnowledgeHint(null);
+    setIsTyping(true);
+
+    try {
+      let prompt = '';
+      let knowledgeQuery = '';
+      let nextMessagesBase: ChatMessage[] = [];
+
+      if (isInitialResponse) {
+        const bundle = buildInitialAnalysisBundle(
+          modelType,
+          chartData,
+          activeChartParams,
+          chatHistory
+        );
+        clearChatSession();
+        await startQimenChat(bundle.systemInstruction);
+        prompt = bundle.prompt;
+        knowledgeQuery = bundle.knowledgeQuery || bundle.question;
+        nextMessagesBase = [
+          {
+            id: chatHistory[0]?.id || 'regen-u',
+            role: 'user',
+            content: bundle.userContent,
+            timestamp: chatHistory[0]?.timestamp || new Date(),
+          },
+        ];
+      } else {
+        const prefixHistory = chatHistory.slice(0, userIndex);
+        restoreChatSession(
+          buildSystemInstruction(modelType, chartData),
+          prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
+        );
+        prompt = chatHistory[userIndex].content;
+        knowledgeQuery = prompt;
+        nextMessagesBase = [...prefixHistory, chatHistory[userIndex]];
+      }
+
+      const placeholder: ChatMessage = {
+        id: messageId,
+        role: 'model',
+        content: '',
+        timestamp: new Date(),
+      };
+      setChatHistory([...nextMessagesBase, placeholder]);
+
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[modelType],
+            query: knowledgeQuery,
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(messageId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge,
+        lockedModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalMessages: ChatMessage[] = [
+        ...nextMessagesBase,
+        {
+          ...placeholder,
+          content: finalContent,
+          timestamp: new Date(),
+        },
+      ];
+
+      setChatHistory(finalMessages);
+
+      if (isInitialResponse && modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
+        setKlineUnlocked(true);
+      }
+
+      if (isLoggedIn) {
+        await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
+        fetchSessions();
+        fetchUserProfile();
+      } else if (activeSessionId && activeCase) {
+        updateGuestCaseSessionMessages(activeSessionId, finalMessages);
+        refreshGuestActiveCase(activeCase.id);
+      }
+    } catch (err: any) {
+      setError(err.message || '重生成失败，请稍后重试');
+    } finally {
       setIsTyping(false);
     }
   };
@@ -4012,27 +4403,48 @@ const App: React.FC = () => {
             <div className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> 大师解读</h3>
-                 <button
-                   onClick={handleGenerateReport}
-                   disabled={!chatHistory.length || isTyping || isGeneratingReport}
-                   title={
-                     !chatHistory.length
-                       ? '暂无对话内容'
-                       : isTyping
-                         ? 'AI 正在输出，请稍候'
-                         : isGeneratingReport
-                           ? '正在生成排盘截图，请稍候'
-                           : '生成对话报告（可保存为 PDF）'
-                   }
-                   className={`flex items-center gap-2 text-sm font-medium ${
-                     !chatHistory.length || isTyping || isGeneratingReport
-                       ? 'text-stone-300 cursor-not-allowed'
-                       : 'text-stone-500 hover:text-stone-800'
-                   }`}
-                 >
-                   <ReportIcon />
-                   {isGeneratingReport ? '生成中...' : '生成报告'}
-                 </button>
+                 <div className="flex items-center gap-3">
+                   <button
+                     type="button"
+                     onClick={handleRerunAnalysis}
+                     disabled={!chatHistory.length || isTyping || loading}
+                     title={
+                       !chatHistory.length
+                         ? '暂无可重新分析的内容'
+                         : isTyping || loading
+                           ? 'AI 正在输出，请稍候'
+                           : '基于当前排盘和原问题重新分析'
+                     }
+                     className={`text-sm font-medium ${
+                       !chatHistory.length || isTyping || loading
+                         ? 'text-stone-300 cursor-not-allowed'
+                         : 'text-stone-500 hover:text-stone-800'
+                     }`}
+                   >
+                     重新分析
+                   </button>
+                   <button
+                     onClick={handleGenerateReport}
+                     disabled={!chatHistory.length || isTyping || isGeneratingReport}
+                     title={
+                       !chatHistory.length
+                         ? '暂无对话内容'
+                         : isTyping
+                           ? 'AI 正在输出，请稍候'
+                           : isGeneratingReport
+                             ? '正在生成排盘截图，请稍候'
+                             : '生成对话报告（可保存为 PDF）'
+                     }
+                     className={`flex items-center gap-2 text-sm font-medium ${
+                       !chatHistory.length || isTyping || isGeneratingReport
+                         ? 'text-stone-300 cursor-not-allowed'
+                         : 'text-stone-500 hover:text-stone-800'
+                     }`}
+                   >
+                     <ReportIcon />
+                     {isGeneratingReport ? '生成中...' : '生成报告'}
+                   </button>
+                 </div>
                </div>
                <div
                  ref={chatScrollRef}
@@ -4052,19 +4464,34 @@ const App: React.FC = () => {
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
                         {msg.role === 'model' && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              await handleCopyText(copyText);
-                              setCopiedMessageId(msg.id);
-                              window.setTimeout(() => {
-                                setCopiedMessageId((current) => (current === msg.id ? null : current));
-                              }, 1200);
-                            }}
-                            className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full border transition border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
-                          >
-                            {copiedMessageId === msg.id ? '已复制' : '复制'}
-                          </button>
+                          <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleRegenerateMessage(msg.id)}
+                              disabled={isTyping}
+                              title="从当前回复处重新生成，后续对话会被替换"
+                              className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
+                                isTyping
+                                  ? 'border-stone-200 text-stone-300 cursor-not-allowed'
+                                  : 'border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300'
+                              }`}
+                            >
+                              重生成
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await handleCopyText(copyText);
+                                setCopiedMessageId(msg.id);
+                                window.setTimeout(() => {
+                                  setCopiedMessageId((current) => (current === msg.id ? null : current));
+                                }, 1200);
+                              }}
+                              className="text-[10px] px-2 py-0.5 rounded-full border transition border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
+                            >
+                              {copiedMessageId === msg.id ? '已复制' : '复制'}
+                            </button>
+                          </div>
                         )}
                         {msg.role === 'model' && parsed?.reasoning && (
                           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
