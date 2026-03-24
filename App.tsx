@@ -23,7 +23,9 @@ import {
   type CaseItem,
   type CaseModelType,
   type CaseSessionItem,
+  type InitialAnalysisData,
   isCaseModelType,
+  normalizeInitialAnalysisData,
   normalizeCaseChartParams,
 } from './lib/divination-cases';
 
@@ -665,14 +667,68 @@ const buildInitialUserContent = (
   return `问题: ${question}`;
 };
 
-const buildSystemInstruction = (mType: ModelType, cData: unknown): string => {
+const appendInitialAnalysisContext = (systemInstruction: string, initialAnalysisContent: string) => {
+  const trimmed = initialAnalysisContent.trim();
+  if (!trimmed) return systemInstruction;
+  return [
+    systemInstruction,
+    '',
+    '【命例初始化分析基线】',
+    '以下内容是该命例在无具体问题时生成的全盘分析结论。回答当前问题时，可将其视为背景参考，但若命盘原始信息与当前问题更具体，应以命盘信息和当前问题为准。',
+    trimmed,
+  ].join('\n');
+};
+
+const getSessionInitialAnalysisSnapshot = (chartParams: Record<string, unknown>) => {
+  const initialAnalysis = normalizeInitialAnalysisData({
+    content: chartParams.baseAnalysisContent,
+    model: chartParams.baseAnalysisModel,
+    generatedAt: chartParams.baseAnalysisGeneratedAt,
+  });
+  const isInitialAnalysisSession = chartParams.isInitialAnalysisSession === true;
+  return { initialAnalysis, isInitialAnalysisSession };
+};
+
+const buildCaseInitialAnalysisSnapshot = (
+  initialAnalysis: InitialAnalysisData | null,
+  isInitialAnalysisSession: boolean
+) => {
+  if (!initialAnalysis) {
+    return {
+      isInitialAnalysisSession,
+    };
+  }
+
+  return {
+    baseAnalysisContent: initialAnalysis.content,
+    baseAnalysisModel: initialAnalysis.model,
+    baseAnalysisGeneratedAt: initialAnalysis.generatedAt,
+    isInitialAnalysisSession,
+  };
+};
+
+const buildSystemInstruction = (
+  mType: ModelType,
+  cData: unknown,
+  chartParams?: Record<string, unknown>
+): string => {
+  const snapshot = chartParams ? getSessionInitialAnalysisSnapshot(chartParams) : null;
+  const baseAnalysisContent =
+    snapshot && !snapshot.isInitialAnalysisSession ? snapshot.initialAnalysis?.content ?? '' : '';
+
   switch (mType) {
     case ModelType.QIMEN:
       return `你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。\n\n${formatQimenPrompt(cData as any, '')}`;
     case ModelType.BAZI:
-      return buildBaziSystemInstruction(cData as BaziResponse);
+      return appendInitialAnalysisContext(
+        buildBaziSystemInstruction(cData as BaziResponse),
+        baseAnalysisContent
+      );
     case ModelType.ZIWEI:
-      return buildZiweiSystemInstruction(cData as ZiweiResponse);
+      return appendInitialAnalysisContext(
+        buildZiweiSystemInstruction(cData as ZiweiResponse),
+        baseAnalysisContent
+      );
     case ModelType.MEIHUA:
       return `你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。\n\n${formatMeihuaPrompt(cData as any, '')}`;
     case ModelType.LIUYAO:
@@ -714,6 +770,7 @@ const buildInitialAnalysisBundle = (
   messages: ChatMessage[]
 ) => {
   const question = getInitialAnalysisQuestion(chartParams, messages);
+  const snapshot = getSessionInitialAnalysisSnapshot(chartParams);
 
   if (mType === ModelType.BAZI || mType === ModelType.ZIWEI) {
     const analysisBundle = buildLifeReadingAnalysisBundle(
@@ -725,7 +782,12 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: analysisBundle.prompt,
-      systemInstruction: analysisBundle.systemInstruction,
+      systemInstruction: snapshot.isInitialAnalysisSession
+        ? analysisBundle.systemInstruction
+        : appendInitialAnalysisContext(
+            analysisBundle.systemInstruction,
+            snapshot.initialAnalysis?.content ?? ''
+          ),
       knowledgeQuery: analysisBundle.knowledgeQuery,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -767,6 +829,7 @@ const App: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showInitialAnalysisModal, setShowInitialAnalysisModal] = useState(false);
   const [userQuota, setUserQuota] = useState<number | null>(null);
   const [guestFortuneCount, setGuestFortuneCount] = useState(0);
   const [guestFollowUpCount, setGuestFollowUpCount] = useState(0);
@@ -845,9 +908,10 @@ const App: React.FC = () => {
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
+  const [initialAnalysisBusy, setInitialAnalysisBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
-  const [klineUnlocked, setKlineUnlocked] = useState(false);
+  const [, setKlineUnlocked] = useState(false);
   const [klineModalOpen, setKlineModalOpen] = useState(false);
   const [klineStatus, setKlineStatus] = useState<'idle' | 'analyzing' | 'ready' | 'error'>('idle');
   const [klineResult, setKlineResult] = useState<KlineResult | null>(null);
@@ -1110,8 +1174,12 @@ const App: React.FC = () => {
     if (modelType !== ModelType.BAZI || !activeCase || activeCase.modelType !== ModelType.BAZI) {
       setKlineResult(null);
       setKlineStatus('idle');
+      setBaziInitialAnalysis('');
       return;
     }
+
+    const currentInitialAnalysis = normalizeInitialAnalysisData(activeCase.initialAnalysisData);
+    setBaziInitialAnalysis(currentInitialAnalysis?.content ?? '');
 
     const parsed = activeCase.klineData as KlineResult | null | undefined;
     if (parsed?.schema_version === 'kline_v1') {
@@ -1131,6 +1199,17 @@ const App: React.FC = () => {
     setKlineYearProgress(0);
     klineYearProgressRef.current = 0;
   }, [klineStatus]);
+
+  useEffect(() => {
+    if (!showInitialAnalysisModal) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowInitialAnalysisModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showInitialAnalysisModal]);
 
   useEffect(() => {
     if (modelType !== ModelType.BAZI || step !== 'chart') return;
@@ -1316,6 +1395,7 @@ const App: React.FC = () => {
           chartParams,
           chartData: cData,
           klineData: null,
+          initialAnalysisData: null,
         }),
       });
       if (!res.ok) return null;
@@ -1333,7 +1413,8 @@ const App: React.FC = () => {
     type: CaseModelType,
     chartParams: Record<string, unknown>,
     cData: unknown,
-    klineData?: unknown
+    klineData?: unknown,
+    initialAnalysisData?: unknown
   ): Promise<CaseDetail | null> => {
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
@@ -1344,6 +1425,7 @@ const App: React.FC = () => {
           chartParams,
           chartData: cData,
           ...(klineData !== undefined ? { klineData } : {}),
+          ...(initialAnalysisData !== undefined ? { initialAnalysisData } : {}),
         }),
       });
       if (!res.ok) return null;
@@ -1370,6 +1452,25 @@ const App: React.FC = () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ klineData }),
+      });
+      if (!res.ok) return null;
+      const detailRes = await fetch(`/api/cases/${caseId}`);
+      if (!detailRes.ok) return null;
+      return await detailRes.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const saveCaseInitialAnalysisInDb = async (
+    caseId: string,
+    initialAnalysisData: InitialAnalysisData | null
+  ): Promise<CaseDetail | null> => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initialAnalysisData }),
       });
       if (!res.ok) return null;
       const detailRes = await fetch(`/api/cases/${caseId}`);
@@ -1559,7 +1660,8 @@ const App: React.FC = () => {
       if (msgs.length > 0) {
         const systemInstruction = buildSystemInstruction(
           data.modelType as ModelType,
-          effectiveChartData
+          effectiveChartData,
+          (data.chartParams || {}) as Record<string, unknown>
         );
         restoreChatSession(
           systemInstruction,
@@ -1568,10 +1670,32 @@ const App: React.FC = () => {
       }
 
       if (data.modelType === 'bazi' && effectiveChartData) {
-        const firstModelMsg = msgs.find(m => m.role === 'model');
-        if (firstModelMsg) {
-          const parsed = parseModelContent(firstModelMsg.content);
-          setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+        const chartParams = (data.chartParams || {}) as Record<string, unknown>;
+        const snapshot = getSessionInitialAnalysisSnapshot(chartParams);
+        if (snapshot.initialAnalysis?.content) {
+          setBaziInitialAnalysis(snapshot.initialAnalysis.content);
+          setKlineUnlocked(true);
+        } else {
+          const firstModelMsg = msgs.find(m => m.role === 'model');
+          if (firstModelMsg) {
+            const parsed = parseModelContent(firstModelMsg.content);
+            setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+            setKlineUnlocked(true);
+          }
+        }
+      }
+
+      if (data.modelType !== 'bazi') {
+        setBaziInitialAnalysis('');
+        setKlineUnlocked(false);
+      }
+
+      if (data.modelType === 'bazi' && effectiveChartData && msgs.length === 0) {
+        const currentInitialAnalysis = matchedCase
+          ? normalizeInitialAnalysisData(matchedCase.initialAnalysisData)
+          : null;
+        if (currentInitialAnalysis?.content) {
+          setBaziInitialAnalysis(currentInitialAnalysis.content);
           setKlineUnlocked(true);
         }
       }
@@ -1618,7 +1742,11 @@ const App: React.FC = () => {
     setGuestFollowUpCount(storedSession.guestFollowUpCount || 0);
 
     if (msgs.length > 0) {
-      const systemInstruction = buildSystemInstruction(storedSession.modelType, effectiveChartData);
+      const systemInstruction = buildSystemInstruction(
+        storedSession.modelType,
+        effectiveChartData,
+        storedSession.chartParams || {}
+      );
       restoreChatSession(
         systemInstruction,
         msgs.map((msg) => ({ role: msg.role, content: msg.content }))
@@ -1626,10 +1754,29 @@ const App: React.FC = () => {
     }
 
     if (storedSession.modelType === ModelType.BAZI) {
-      const firstModelMsg = msgs.find((msg) => msg.role === 'model');
-      if (firstModelMsg) {
-        const parsed = parseModelContent(firstModelMsg.content);
-        setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+      const snapshot = getSessionInitialAnalysisSnapshot(storedSession.chartParams || {});
+      if (snapshot.initialAnalysis?.content) {
+        setBaziInitialAnalysis(snapshot.initialAnalysis.content);
+        setKlineUnlocked(true);
+      } else {
+        const firstModelMsg = msgs.find((msg) => msg.role === 'model');
+        if (firstModelMsg) {
+          const parsed = parseModelContent(firstModelMsg.content);
+          setBaziInitialAnalysis(stripDisclaimer(parsed.answer));
+          setKlineUnlocked(true);
+        }
+      }
+    } else {
+      setBaziInitialAnalysis('');
+      setKlineUnlocked(false);
+    }
+
+    if (storedSession.modelType === ModelType.BAZI && msgs.length === 0) {
+      const currentInitialAnalysis = detail
+        ? normalizeInitialAnalysisData(detail.initialAnalysisData)
+        : null;
+      if (currentInitialAnalysis?.content) {
+        setBaziInitialAnalysis(currentInitialAnalysis.content);
         setKlineUnlocked(true);
       }
     }
@@ -2254,6 +2401,7 @@ const App: React.FC = () => {
     setActiveCase(null);
     setCaseFormOpen(false);
     setEditingCaseId(null);
+    setShowInitialAnalysisModal(false);
     setKnowledgeHint(null);
   };
 
@@ -2359,7 +2507,8 @@ const App: React.FC = () => {
               modelType,
               chartParams,
               chartResponse,
-              shouldReuseExistingChart ? activeCase?.klineData : null
+              shouldReuseExistingChart ? activeCase?.klineData : null,
+              shouldReuseExistingChart ? activeCase?.initialAnalysisData : null
             )
           : await createCaseInDb(modelType, chartParams, chartResponse);
         if (!detail) {
@@ -2380,6 +2529,7 @@ const App: React.FC = () => {
           chartParams,
           chartData: chartResponse,
           klineData: shouldReuseExistingChart ? activeCase?.klineData : null,
+          initialAnalysisData: shouldReuseExistingChart ? activeCase?.initialAnalysisData : null,
           createdAt: editingCaseId && activeCase ? activeCase.createdAt : nowIso,
           updatedAt: nowIso,
         };
@@ -2418,22 +2568,302 @@ const App: React.FC = () => {
     }
   };
 
-  const extractSuccessfulAnalysisTextFromMessages = (
-    messages: Array<{ role: string; content: string }>
+  const buildInitialAnalysisDataPayload = (
+    content: string,
+    model: AnalysisModel
+  ): InitialAnalysisData => ({
+    content: content.trim(),
+    model,
+    generatedAt: new Date().toISOString(),
+  });
+
+  const persistInitialAnalysisToCase = async (
+    targetCase: CaseDetail,
+    initialAnalysisData: InitialAnalysisData | null
   ) => {
-    for (const message of messages) {
-      if (message.role !== 'model') continue;
-      const parsed = parseModelContent(message.content);
-      const answer = stripDisclaimer(parsed.answer).trim();
-      if (answer) return answer;
+    if (isLoggedIn) {
+      const detail = await saveCaseInitialAnalysisInDb(targetCase.id, initialAnalysisData);
+      if (detail) {
+        await hydrateCasesForModel(targetCase.modelType);
+        setActiveCase(detail);
+        return detail;
+      }
+      return targetCase;
     }
-    return '';
+
+    const nextCase: CaseItem = {
+      id: targetCase.id,
+      modelType: targetCase.modelType,
+      title: targetCase.title,
+      chartParams: targetCase.chartParams,
+      chartData: targetCase.chartData,
+      klineData: targetCase.klineData,
+      initialAnalysisData,
+      createdAt: targetCase.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    saveGuestCase(nextCase);
+    const detail = getGuestCaseDetail(targetCase.id);
+    if (detail) {
+      setActiveCase(detail);
+      return detail;
+    }
+    return {
+      ...targetCase,
+      initialAnalysisData,
+      updatedAt: nextCase.updatedAt,
+    };
   };
 
-  const runFreshCaseInitialAnalysis = async (
+  const openCaseInitialAnalysisSession = async (
+    targetCase: CaseDetail,
+    initialAnalysis: InitialAnalysisData
+  ) => {
+    const chartParams = (targetCase.chartParams || {}) as Record<string, unknown>;
+    const sessionChartParams = {
+      ...chartParams,
+      question: '',
+      analysisModel: initialAnalysis.model,
+      ...buildCaseInitialAnalysisSnapshot(initialAnalysis, true),
+    };
+    const userContent = buildInitialUserContent(targetCase.modelType, chartParams, '');
+    const userMsg: ChatMessage = {
+      id: 'init-u',
+      role: 'user',
+      content: userContent,
+      timestamp: new Date(),
+    };
+    const modelMsg: ChatMessage = {
+      id: 'init-m',
+      role: 'model',
+      content: buildModelContent('', appendDisclaimer(initialAnalysis.content)),
+      timestamp: new Date(),
+    };
+
+    clearChatSession();
+    resetMessageVersions();
+    setChatHistory([userMsg, modelMsg]);
+    setChartData(targetCase.chartData);
+    setActiveChartParams(sessionChartParams);
+    setSessionAnalysisModel(initialAnalysis.model);
+    setAnalysisModel(initialAnalysis.model);
+    setQuestion('');
+    setKnowledgeHint(null);
+    setStep('chart');
+    setShowInitialAnalysisModal(false);
+
+    const systemInstruction = buildSystemInstruction(
+      targetCase.modelType,
+      targetCase.chartData,
+      sessionChartParams
+    );
+    restoreChatSession(systemInstruction, [
+      { role: userMsg.role, content: userMsg.content },
+      { role: modelMsg.role, content: modelMsg.content },
+    ]);
+
+    const sessionTitle = buildCaseSessionTitle(targetCase.modelType, targetCase.title, '');
+
+    if (isLoggedIn) {
+      const sessionId = await saveSessionToDb(
+        targetCase.modelType,
+        sessionTitle,
+        sessionChartParams,
+        targetCase.chartData,
+        targetCase.id
+      );
+      if (sessionId) {
+        setActiveSessionId(sessionId);
+        await saveMessagesToDb(sessionId, [
+          { role: 'user', content: userMsg.content },
+          { role: 'model', content: modelMsg.content },
+        ]);
+      }
+      fetchSessions();
+      fetchUserProfile();
+      try {
+        const detailRes = await fetch(`/api/cases/${targetCase.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          setActiveCase(detail);
+        }
+      } catch {
+        // silently ignore
+      }
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const guestSession: GuestStoredSession = {
+      id: `guest-case-session-${Date.now()}`,
+      caseId: targetCase.id,
+      modelType: targetCase.modelType,
+      title: sessionTitle,
+      chartParams: sessionChartParams,
+      chartData: targetCase.chartData,
+      messages: [
+        {
+          id: userMsg.id,
+          role: userMsg.role,
+          content: userMsg.content,
+          timestamp: userMsg.timestamp.toISOString(),
+        },
+        {
+          id: modelMsg.id,
+          role: modelMsg.role,
+          content: modelMsg.content,
+          timestamp: modelMsg.timestamp.toISOString(),
+        },
+      ],
+      guestFollowUpCount: 0,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    saveGuestCaseSession(guestSession);
+    setActiveSessionId(guestSession.id);
+    setGuestFollowUpCount(0);
+    localStorage.setItem('guestFollowUpCount', '0');
+    refreshGuestActiveCase(targetCase.id);
+  };
+
+  const generateCaseInitialAnalysis = async (
+    targetCase: CaseDetail,
+    options?: { displaySession?: boolean }
+  ) => {
+    const displaySession = options?.displaySession === true;
+    const chartParams = (targetCase.chartParams || {}) as Record<string, unknown>;
+    const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
+      targetCase.modelType,
+      targetCase.chartData as BaziResponse & ZiweiResponse,
+      ''
+    );
+    const userContent = buildInitialUserContent(targetCase.modelType, chartParams, '');
+
+    setLoading(true);
+    setError('');
+    setKnowledgeHint(null);
+    setInitialAnalysisBusy(true);
+    if (displaySession) {
+      setIsTyping(true);
+      clearChatSession();
+      resetMessageVersions();
+      setChatHistory([]);
+      setActiveSessionId(null);
+      setChartData(targetCase.chartData);
+      setStep('chart');
+      setQuestion('');
+    }
+
+    try {
+      await startQimenChat(systemInstruction);
+
+      const userMsg: ChatMessage = {
+        id: 'init-u',
+        role: 'user',
+        content: userContent,
+        timestamp: new Date(),
+      };
+      const modelId = 'init-m';
+
+      if (displaySession) {
+        setChatHistory([
+          userMsg,
+          { id: modelId, role: 'model', content: '', timestamp: new Date() },
+        ]);
+      }
+
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[targetCase.modelType],
+            query: knowledgeQuery,
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          if (displaySession) {
+            updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+          }
+        },
+        knowledge,
+        analysisModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const cleanContent = stripDisclaimer(finalState.content);
+      const initialAnalysis = buildInitialAnalysisDataPayload(cleanContent, analysisModel);
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalMessages: ChatMessage[] = [
+        userMsg,
+        {
+          id: modelId,
+          role: 'model',
+          content: finalContent,
+          timestamp: new Date(),
+        },
+      ];
+
+      const updatedCase = await persistInitialAnalysisToCase(targetCase, initialAnalysis);
+
+      if (displaySession) {
+        setChatHistory(finalMessages);
+        setActiveChartParams({
+          ...chartParams,
+          question: '',
+          analysisModel,
+          ...buildCaseInitialAnalysisSnapshot(initialAnalysis, true),
+        });
+        setSessionAnalysisModel(analysisModel);
+      }
+
+      if (targetCase.modelType === ModelType.BAZI) {
+        setBaziInitialAnalysis(initialAnalysis.content);
+        setKlineUnlocked(true);
+      }
+
+      if (displaySession) {
+        await openCaseInitialAnalysisSession(updatedCase, initialAnalysis);
+      }
+
+      return { initialAnalysis, caseDetail: updatedCase };
+    } catch (err: any) {
+      setError(err.message || '初始化分析失败，请稍后重试');
+      return { initialAnalysis: null, caseDetail: targetCase };
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+      setInitialAnalysisBusy(false);
+    }
+  };
+
+  const ensureCaseInitialAnalysis = async (
+    targetCase: CaseDetail,
+    options?: { displaySession?: boolean; forceRegenerate?: boolean }
+  ) => {
+    const currentInitialAnalysis = normalizeInitialAnalysisData(targetCase.initialAnalysisData);
+    const displaySession = options?.displaySession === true;
+    const forceRegenerate = options?.forceRegenerate === true;
+
+    if (currentInitialAnalysis && !forceRegenerate) {
+      if (displaySession) {
+        await openCaseInitialAnalysisSession(targetCase, currentInitialAnalysis);
+      }
+      return { initialAnalysis: currentInitialAnalysis, caseDetail: targetCase };
+    }
+
+    return await generateCaseInitialAnalysis(targetCase, { displaySession });
+  };
+
+  const runCaseQuestionSession = async (
     targetCase: CaseDetail,
     questionText: string,
-    guestSessionOverride?: GuestStoredSession | null
+    baseAnalysis: InitialAnalysisData
   ) => {
     const trimmedQuestion = questionText.trim();
     setLoading(true);
@@ -2453,12 +2883,18 @@ const App: React.FC = () => {
     }
 
     const chartParams = (targetCase.chartParams || {}) as Record<string, unknown>;
-    const sessionChartParams = { ...chartParams, question: trimmedQuestion, analysisModel };
-    const { prompt, systemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
+    const sessionChartParams = {
+      ...chartParams,
+      question: trimmedQuestion,
+      analysisModel,
+      ...buildCaseInitialAnalysisSnapshot(baseAnalysis, false),
+    };
+    const { prompt, systemInstruction: rawSystemInstruction, knowledgeQuery } = buildLifeReadingAnalysisBundle(
       targetCase.modelType,
       targetCase.chartData as BaziResponse & ZiweiResponse,
       trimmedQuestion
     );
+    const systemInstruction = appendInitialAnalysisContext(rawSystemInstruction, baseAnalysis.content);
     const userContent = buildInitialUserContent(targetCase.modelType, chartParams, trimmedQuestion);
     const sessionTitle = buildCaseSessionTitle(targetCase.modelType, targetCase.title, trimmedQuestion);
 
@@ -2475,28 +2911,18 @@ const App: React.FC = () => {
         );
       } else {
         const nowIso = new Date().toISOString();
-        const guestSession: GuestStoredSession = guestSessionOverride
-          ? {
-              ...guestSessionOverride,
-              title: sessionTitle,
-              chartParams: sessionChartParams,
-              chartData: targetCase.chartData,
-              messages: [],
-              guestFollowUpCount: 0,
-              updatedAt: nowIso,
-            }
-          : {
-              id: `guest-case-session-${Date.now()}`,
-              caseId: targetCase.id,
-              modelType: targetCase.modelType,
-              title: sessionTitle,
-              chartParams: sessionChartParams,
-              chartData: targetCase.chartData,
-              messages: [],
-              guestFollowUpCount: 0,
-              createdAt: nowIso,
-              updatedAt: nowIso,
-            };
+        const guestSession: GuestStoredSession = {
+          id: `guest-case-session-${Date.now()}`,
+          caseId: targetCase.id,
+          modelType: targetCase.modelType,
+          title: sessionTitle,
+          chartParams: sessionChartParams,
+          chartData: targetCase.chartData,
+          messages: [],
+          guestFollowUpCount: 0,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
         saveGuestCaseSession(guestSession);
         currentSessionId = guestSession.id;
         refreshGuestActiveCase(targetCase.id);
@@ -2554,9 +2980,8 @@ const App: React.FC = () => {
       const finalMessages = [userMsg, finalModelMessage];
       setChatHistory(finalMessages);
 
-      const successfulAnalysis = stripDisclaimer(finalState.content);
       if (targetCase.modelType === ModelType.BAZI) {
-        setBaziInitialAnalysis(successfulAnalysis);
+        setBaziInitialAnalysis(baseAnalysis.content);
         setKlineUnlocked(true);
       }
 
@@ -2578,7 +3003,7 @@ const App: React.FC = () => {
       }
 
       setQuestion('');
-      return successfulAnalysis;
+      return stripDisclaimer(finalState.content);
     } catch (err: any) {
       setError(err.message || '分析失败，请稍后重试');
       return '';
@@ -2589,40 +3014,8 @@ const App: React.FC = () => {
   };
 
   const resolveKlineInitializationAnalysis = async (targetCase: CaseDetail) => {
-    if (activeSessionId && targetCase.sessions.some((session) => session.id === activeSessionId)) {
-      const currentAnalysis = extractSuccessfulAnalysisTextFromMessages(chatHistory);
-      if (currentAnalysis) {
-        return currentAnalysis;
-      }
-    }
-
-    if (!isLoggedIn) {
-      const guestSessions = readGuestCaseSessions()
-        .filter((item) => item.caseId === targetCase.id)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-
-      for (const session of guestSessions) {
-        const analysisText = extractSuccessfulAnalysisTextFromMessages(session.messages);
-        if (analysisText) return analysisText;
-      }
-
-      const reusableGuestSession = guestSessions[0] || null;
-      return await runFreshCaseInitialAnalysis(targetCase, '', reusableGuestSession);
-    }
-
-    for (const session of targetCase.sessions) {
-      try {
-        const res = await fetch(`/api/sessions/${session.id}`);
-        if (!res.ok) continue;
-        const detail = await res.json();
-        const analysisText = extractSuccessfulAnalysisTextFromMessages(detail.messages || []);
-        if (analysisText) return analysisText;
-      } catch {
-        // silently ignore
-      }
-    }
-
-    return await runFreshCaseInitialAnalysis(targetCase, '');
+    const result = await ensureCaseInitialAnalysis(targetCase, { displaySession: false });
+    return result.initialAnalysis?.content ?? '';
   };
 
   const handleStartCaseAnalysis = async () => {
@@ -2654,7 +3047,41 @@ const App: React.FC = () => {
       return;
     }
 
-    await runFreshCaseInitialAnalysis(activeCase, question);
+    const trimmedQuestion = question.trim();
+
+    if (!trimmedQuestion) {
+      await ensureCaseInitialAnalysis(activeCase, { displaySession: true });
+      return;
+    }
+
+    const baselineResult = await ensureCaseInitialAnalysis(activeCase, { displaySession: false });
+    if (!baselineResult.initialAnalysis) return;
+    await runCaseQuestionSession(
+      baselineResult.caseDetail ?? activeCase,
+      trimmedQuestion,
+      baselineResult.initialAnalysis
+    );
+  };
+
+  const handleRegenerateCaseInitialAnalysis = async () => {
+    if (!activeCase || !isCaseModelType(activeCase.modelType)) return;
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
+    const result = await ensureCaseInitialAnalysis(activeCase, {
+      displaySession: false,
+      forceRegenerate: true,
+    });
+    if (!result.initialAnalysis) return;
+
+    if (activeCase.modelType === ModelType.BAZI) {
+      setBaziInitialAnalysis(result.initialAnalysis.content);
+      setKlineUnlocked(true);
+    }
+
+    setShowInitialAnalysisModal(true);
   };
 
   const handleCalculate = async () => {
@@ -3038,8 +3465,9 @@ const App: React.FC = () => {
       setSessionAnalysisModel(analysisModel);
 
       if (modelType === ModelType.BAZI) {
-        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
-        setKlineUnlocked(true);
+        const snapshot = getSessionInitialAnalysisSnapshot(nextChartParams);
+        setBaziInitialAnalysis(snapshot.initialAnalysis?.content ?? '');
+        setKlineUnlocked(Boolean(snapshot.initialAnalysis?.content));
       }
 
       if (isLoggedIn) {
@@ -3130,7 +3558,7 @@ const App: React.FC = () => {
       } else {
         const prefixHistory = chatHistory.slice(0, userIndex);
         restoreChatSession(
-          buildSystemInstruction(modelType, chartData),
+          buildSystemInstruction(modelType, chartData, activeChartParams),
           prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
         );
         prompt = chatHistory[userIndex].content;
@@ -3194,11 +3622,6 @@ const App: React.FC = () => {
         [messageId]: nextVersionState,
       }));
       setOpenVersionMenuId(null);
-
-      if (isInitialResponse && modelType === ModelType.BAZI) {
-        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
-        setKlineUnlocked(true);
-      }
 
       if (isLoggedIn) {
         await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
@@ -3560,6 +3983,7 @@ const App: React.FC = () => {
       chartParams: targetCase.chartParams,
       chartData: targetCase.chartData,
       klineData: result,
+      initialAnalysisData: targetCase.initialAnalysisData,
       createdAt: targetCase.createdAt,
       updatedAt: new Date().toISOString(),
     };
@@ -3700,6 +4124,18 @@ const App: React.FC = () => {
   const desktopNoteOffset = noteCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
   const desktopWorkPaddingLeft = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
   const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopNoteOffset : 0;
+  const currentCaseInitialAnalysis = activeCase
+    ? normalizeInitialAnalysisData(activeCase.initialAnalysisData)
+    : null;
+  const currentInitialAnalysisModelLabel = currentCaseInitialAnalysis
+    ? ANALYSIS_MODEL_OPTIONS.find((option) => option.value === currentCaseInitialAnalysis.model)?.label
+      ?? currentCaseInitialAnalysis.model
+    : '';
+  const currentInitialAnalysisStatus = initialAnalysisBusy
+    ? '生成中'
+    : currentCaseInitialAnalysis
+      ? '已生成'
+      : '未生成';
 
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
@@ -4616,6 +5052,60 @@ const App: React.FC = () => {
                   />
                 )}
 
+                <div className="glass-panel-soft rounded-[26px] border border-white/60 p-4 md:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-stone-700">初始化分析</div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        命例级基线分析，后续新会话会默认读取这份上下文。
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {currentCaseInitialAnalysis && (
+                        <button
+                          type="button"
+                          onClick={() => setShowInitialAnalysisModal(true)}
+                          className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600 hover:text-stone-800"
+                        >
+                          查看初始化分析
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleRegenerateCaseInitialAnalysis()}
+                        disabled={initialAnalysisBusy || loading || isTyping}
+                        className={`rounded-full px-3 py-1.5 text-xs transition ${
+                          initialAnalysisBusy || loading || isTyping
+                            ? 'glass-chip text-stone-300 cursor-not-allowed'
+                            : 'glass-panel-dark text-amber-200 hover:brightness-105'
+                        }`}
+                      >
+                        {currentCaseInitialAnalysis ? '重新生成初始化分析' : '生成初始化分析'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
+                      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">状态</div>
+                      <div className="mt-2 text-base font-bold text-stone-700">{currentInitialAnalysisStatus}</div>
+                    </div>
+                    <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
+                      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">模型</div>
+                      <div className="mt-2 text-base font-bold text-stone-700">
+                        {currentInitialAnalysisModelLabel || '尚未生成'}
+                      </div>
+                    </div>
+                    <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
+                      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">更新时间</div>
+                      <div className="mt-2 text-sm font-medium text-stone-600">
+                        {currentCaseInitialAnalysis
+                          ? new Date(currentCaseInitialAnalysis.generatedAt).toLocaleString('zh-CN', { hour12: false })
+                          : '暂无'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
                   <textarea
@@ -4862,6 +5352,62 @@ const App: React.FC = () => {
         </div>
       </main>
       </div>{/* end flex wrapper */}
+
+      {showInitialAnalysisModal && currentCaseInitialAnalysis && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6"
+          onClick={() => setShowInitialAnalysisModal(false)}
+        >
+          <div
+            className="glass-panel w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-[32px] border border-white/55 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-bold text-stone-800">初始化分析</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                    <span className="rounded-full border border-white/60 bg-white/55 px-2.5 py-1">
+                      {currentInitialAnalysisModelLabel}
+                    </span>
+                    <span>生成于 {new Date(currentCaseInitialAnalysis.generatedAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerateCaseInitialAnalysis()}
+                    disabled={initialAnalysisBusy || loading || isTyping}
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
+                      initialAnalysisBusy || loading || isTyping
+                        ? 'glass-chip text-stone-300 cursor-not-allowed'
+                        : 'glass-panel-dark text-amber-200 hover:brightness-105'
+                    }`}
+                  >
+                    {initialAnalysisBusy ? '生成中...' : '重新生成'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowInitialAnalysisModal(false)}
+                    className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="glass-chat-bg max-h-[calc(86vh-108px)] overflow-y-auto px-6 py-5">
+              <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-5">
+                <div className="markdown-body text-sm leading-7 text-stone-700">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {currentCaseInitialAnalysis.content}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showRerunConfirm && (
         <div

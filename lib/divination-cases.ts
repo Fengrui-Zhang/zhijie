@@ -1,4 +1,5 @@
 import { ModelType } from '../types';
+import { isAnalysisModel, type AnalysisModel } from './analysis-models';
 
 export const CASE_MODEL_TYPES = [ModelType.BAZI, ModelType.ZIWEI] as const;
 
@@ -25,6 +26,12 @@ export interface CaseSessionItem {
   updatedAt: string;
 }
 
+export interface InitialAnalysisData {
+  content: string;
+  model: AnalysisModel;
+  generatedAt: string;
+}
+
 export interface CaseItem {
   id: string;
   modelType: CaseModelType;
@@ -32,6 +39,7 @@ export interface CaseItem {
   chartParams: CaseChartParams | null;
   chartData: unknown;
   klineData?: unknown;
+  initialAnalysisData?: InitialAnalysisData | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +61,16 @@ const toText = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed || undefined;
+};
+
+export const normalizeInitialAnalysisData = (value: unknown): InitialAnalysisData | null => {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  const content = toText(input.content);
+  const model = isAnalysisModel(input.model) ? input.model : null;
+  const generatedAt = toText(input.generatedAt);
+  if (!content || !model || !generatedAt) return null;
+  return { content, model, generatedAt };
 };
 
 export const isCaseModelType = (value: unknown): value is CaseModelType =>
