@@ -136,6 +136,7 @@ const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 const KLINE_CHAT_MODEL: ChatModel = DOUBAO_SEED_PRO_MODEL;
 const NAVIGATION_STATE_MARKER = '__zhijieNav';
+const NAVIGATION_TRANSIENT_STORAGE_PREFIX = 'zhijie-nav-transient:';
 
 const isNavigationScreen = (value: unknown): value is NavigationScreen =>
   value === 'input' || value === 'chart' || value === 'case' || value === 'session';
@@ -167,6 +168,9 @@ const buildNavigationUrl = (snapshot: NavigationSnapshot) => {
   if (snapshot.klineOpen) {
     params.set('kline', '1');
   }
+  if (snapshot.transientKey) {
+    params.set('draft', snapshot.transientKey);
+  }
   const query = params.toString();
   return query ? `?${query}` : window.location.pathname;
 };
@@ -188,6 +192,7 @@ const parseNavigationSnapshotFromLocation = (): NavigationSnapshot | null => {
     caseId: caseId || null,
     sessionId: sessionId || null,
     klineOpen: params.get('kline') === '1',
+    transientKey: params.get('draft'),
   };
 };
 
@@ -198,7 +203,31 @@ const buildNavigationKey = (snapshot: NavigationSnapshot) =>
     caseId: snapshot.caseId || null,
     sessionId: snapshot.sessionId || null,
     klineOpen: snapshot.klineOpen === true,
+    transientKey: snapshot.transientKey || null,
   });
+
+const getNavigationTransientStorageKey = (key: string) => `${NAVIGATION_TRANSIENT_STORAGE_PREFIX}${key}`;
+
+const writeNavigationTransientSnapshot = (key: string, snapshot: NavigationTransientSnapshot) => {
+  try {
+    window.sessionStorage.setItem(
+      getNavigationTransientStorageKey(key),
+      JSON.stringify(snapshot)
+    );
+  } catch {
+    // Ignore storage limits and private-mode failures.
+  }
+};
+
+const readNavigationTransientSnapshot = (key: string): NavigationTransientSnapshot | null => {
+  try {
+    const raw = window.sessionStorage.getItem(getNavigationTransientStorageKey(key));
+    if (!raw) return null;
+    return JSON.parse(raw) as NavigationTransientSnapshot;
+  } catch {
+    return null;
+  }
+};
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {
@@ -494,7 +523,7 @@ type NavigationSnapshot = {
   caseId?: string | null;
   sessionId?: string | null;
   klineOpen?: boolean;
-  transient?: NavigationTransientSnapshot | null;
+  transientKey?: string | null;
 };
 
 type AppHistoryState = {
@@ -1040,6 +1069,7 @@ const App: React.FC = () => {
   const navigationRestoringRef = useRef(false);
   const navigationIndexRef = useRef(0);
   const navigationKeyRef = useRef('');
+  const navigationTransientKeyRef = useRef<string | null>(null);
   const restoreNavigationSnapshotRef = useRef<(snapshot: NavigationSnapshot | null) => Promise<void>>(
     async () => {}
   );
@@ -2515,6 +2545,7 @@ const App: React.FC = () => {
     setKlineYearProgress(0);
     klineYearProgressRef.current = 0;
     setKlinePos(null);
+    navigationTransientKeyRef.current = null;
     setActiveSessionId(null);
     setActiveChartParams({});
     setSessionAnalysisModel(null);
@@ -4328,6 +4359,7 @@ const App: React.FC = () => {
     const klineOpen = modelType === ModelType.BAZI && klineModalOpen;
 
     if (step === 'input') {
+      navigationTransientKeyRef.current = null;
       return {
         modelType,
         screen: 'input',
@@ -4335,6 +4367,7 @@ const App: React.FC = () => {
     }
 
     if (activeSessionId) {
+      navigationTransientKeyRef.current = null;
       return {
         modelType,
         screen: 'session',
@@ -4345,6 +4378,7 @@ const App: React.FC = () => {
     }
 
     if (activeCase?.id && isCaseModelType(modelType)) {
+      navigationTransientKeyRef.current = null;
       return {
         modelType,
         screen: 'case',
@@ -4353,11 +4387,21 @@ const App: React.FC = () => {
       };
     }
 
+    const transient = buildTransientNavigationSnapshot();
+    let transientKey = navigationTransientKeyRef.current;
+    if (!transientKey) {
+      transientKey = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      navigationTransientKeyRef.current = transientKey;
+    }
+    if (transient) {
+      writeNavigationTransientSnapshot(transientKey, transient);
+    }
+
     return {
       modelType,
       screen: 'chart',
       klineOpen,
-      transient: buildTransientNavigationSnapshot(),
+      transientKey,
     };
   }, [activeCase?.id, activeSessionId, buildTransientNavigationSnapshot, klineModalOpen, modelType, step]);
 
@@ -4432,8 +4476,15 @@ const App: React.FC = () => {
       } else if (snapshot.screen === 'case' && snapshot.caseId) {
         setModelType(snapshot.modelType);
         await loadCaseDetail(snapshot.caseId);
-      } else if (snapshot.screen === 'chart' && snapshot.transient) {
-        restoreTransientNavigationSnapshot(snapshot.modelType, snapshot.transient);
+      } else if (snapshot.screen === 'chart' && snapshot.transientKey) {
+        const transient = readNavigationTransientSnapshot(snapshot.transientKey);
+        if (transient) {
+          navigationTransientKeyRef.current = snapshot.transientKey;
+          restoreTransientNavigationSnapshot(snapshot.modelType, transient);
+        } else {
+          setModelType(snapshot.modelType);
+          clearViewState({ clearInputs: false });
+        }
       } else {
         setModelType(snapshot.modelType);
         clearViewState({ clearInputs: false });
