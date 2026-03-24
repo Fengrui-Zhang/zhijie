@@ -842,6 +842,7 @@ const App: React.FC = () => {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
+  const [showRerunConfirm, setShowRerunConfirm] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
   const [klineUnlocked, setKlineUnlocked] = useState(false);
@@ -2841,15 +2842,23 @@ const App: React.FC = () => {
     }
   }, [chatHistory, messageVersionMap, persistCurrentMessages]);
 
-  const handleRerunAnalysis = async () => {
+  const handleRequestRerunAnalysis = () => {
     if (!chartData) return;
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
       return;
     }
-    if (!window.confirm('基于当前排盘信息和原始问题重新分析，会覆盖当前会话内容。\n\n是否重新分析？')) {
+    setShowRerunConfirm(true);
+  };
+
+  const handleRerunAnalysis = async () => {
+    if (!chartData) return;
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      setShowRerunConfirm(false);
       return;
     }
+    setShowRerunConfirm(false);
 
     const bundle = buildInitialAnalysisBundle(
       modelType,
@@ -4538,7 +4547,7 @@ const App: React.FC = () => {
                  <div className="flex items-center gap-3">
                    <button
                      type="button"
-                     onClick={handleRerunAnalysis}
+                     onClick={handleRequestRerunAnalysis}
                      disabled={!chartData || isTyping || loading}
                      title={
                        !chartData
@@ -4717,6 +4726,46 @@ const App: React.FC = () => {
         </div>
       </main>
       </div>{/* end flex wrapper */}
+
+      {showRerunConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
+          onClick={() => setShowRerunConfirm(false)}
+        >
+          <div
+            className="glass-panel w-full max-w-md rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)] overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
+              <div className="text-lg font-bold text-stone-800">重新分析</div>
+              <div className="mt-1 text-sm text-stone-500">
+                基于当前排盘信息和原始问题重新分析，会覆盖当前会话内容。
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <div className="glass-panel-soft rounded-[24px] border border-white/60 px-4 py-4 text-sm leading-6 text-stone-600">
+                当前会话中的已有首轮分析内容会被新的分析结果替换，后续追问上下文也会随之更新。
+              </div>
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRerunConfirm(false)}
+                  className="glass-chip rounded-2xl px-4 py-2 text-sm text-stone-600 hover:text-stone-800"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRerunAnalysis}
+                  className="glass-panel-dark rounded-2xl px-4 py-2 text-sm text-amber-200 hover:brightness-105"
+                >
+                  确认重新分析
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* K线浮球 */}
       {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
