@@ -1,7 +1,7 @@
 export const DEEPSEEK_REASONER_MODEL = 'deepseek-reasoner' as const;
 export const DEEPSEEK_CHAT_MODEL = 'deepseek-chat' as const;
 export const DOUBAO_SEED_LITE_MODEL = 'doubao-seed-2-0-lite-260215' as const;
-export const DOUBAO_SEED_PRO_MODEL = 'doubao-seed-2.0-pro' as const;
+export const DOUBAO_SEED_PRO_MODEL = 'doubao-seed-2-0-pro-260215' as const;
 
 export type AnalysisModel =
   | typeof DEEPSEEK_REASONER_MODEL
