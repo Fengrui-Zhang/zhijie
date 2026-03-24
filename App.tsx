@@ -5551,19 +5551,19 @@ const App: React.FC = () => {
             onPointerCancel={handleKlinePointerUp}
             title={isTyping ? '请等待ai运行完毕' : '人生K线'}
             disabled={isTyping}
-            className={`group relative h-[76px] w-[76px] rounded-full border font-bold transition cursor-grab active:cursor-grabbing backdrop-blur-2xl ${
+            className={`group relative h-[74px] w-[74px] rounded-full border font-bold transition cursor-grab active:cursor-grabbing backdrop-blur-[18px] ${
               isTyping
-                ? 'border-white/45 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.45),rgba(255,239,193,0.3)_55%,rgba(245,158,11,0.18)_100%)] text-stone-400 shadow-[0_20px_55px_rgba(231,229,228,0.2)] cursor-not-allowed'
-                : 'border-amber-100/70 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.68),rgba(255,244,208,0.38)_42%,rgba(252,211,77,0.24)_72%,rgba(245,158,11,0.16)_100%)] text-stone-900 shadow-[0_24px_60px_rgba(245,158,11,0.18)] hover:scale-[1.03] hover:border-amber-100/90'
+                ? 'border-white/35 bg-[radial-gradient(circle_at_30%_28%,rgba(255,255,255,0.32),rgba(255,247,224,0.18)_52%,rgba(245,158,11,0.08)_100%)] text-stone-400 shadow-[0_18px_42px_rgba(231,229,228,0.16)] cursor-not-allowed'
+                : 'border-amber-100/45 bg-[radial-gradient(circle_at_30%_22%,rgba(255,255,255,0.34),rgba(255,247,224,0.22)_42%,rgba(252,211,77,0.12)_72%,rgba(245,158,11,0.08)_100%)] text-stone-700 shadow-[0_18px_46px_rgba(245,158,11,0.12)] hover:scale-[1.03] hover:border-amber-100/65'
             }`}
           >
-            <span className="absolute inset-0 rounded-full bg-white/10" />
-            <span className="absolute inset-[3px] rounded-full border border-white/35 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]" />
-            <span className="absolute inset-[10px] rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.3),rgba(255,255,255,0.08)_55%,rgba(255,255,255,0.02)_100%)]" />
-            <span className="pointer-events-none absolute inset-x-3 top-2 h-5 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0.02))] blur-[1px] opacity-80" />
+            <span className="absolute inset-0 rounded-full bg-white/6" />
+            <span className="absolute inset-[2px] rounded-full border border-white/22 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]" />
+            <span className="absolute inset-[8px] rounded-full border border-amber-100/25 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
+            <span className="pointer-events-none absolute inset-x-4 top-2.5 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
             <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
-              <span className="text-[11px] font-medium tracking-[0.22em] text-stone-700/70">人生</span>
-              <span className="mt-1 text-[29px] font-black tracking-[-0.04em] text-stone-900">K线</span>
+              <span className="text-[10px] font-medium tracking-[0.28em] text-stone-600/70">人生</span>
+              <span className="mt-1 text-[23px] font-semibold tracking-[-0.03em] text-stone-700/90">K线</span>
             </span>
           </button>
         </div>
