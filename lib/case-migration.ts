@@ -5,6 +5,7 @@ import {
   buildCaseIdentityKey,
   buildCaseTitle,
   isCaseModelType,
+  normalizeInitialAnalysisData,
 } from './divination-cases';
 import { deriveInitialAnalysisFromSession } from './initial-analysis';
 
@@ -90,14 +91,19 @@ export async function backfillDivinationCases(userId: string) {
     );
   }
 
-  const casesNeedingInitialAnalysis = await prisma.divinationCase.findMany({
+  const allCases = await prisma.divinationCase.findMany({
     where: {
       userId,
       modelType: { in: [...CASE_MODEL_TYPES] },
-      initialAnalysisData: null,
     },
-    select: { id: true },
+    select: {
+      id: true,
+      initialAnalysisData: true,
+    },
   });
+  const casesNeedingInitialAnalysis = allCases.filter(
+    (item) => !normalizeInitialAnalysisData(item.initialAnalysisData)
+  );
 
   if (casesNeedingInitialAnalysis.length === 0) return;
 
