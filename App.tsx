@@ -4616,73 +4616,6 @@ const App: React.FC = () => {
                   />
                 )}
 
-                {activeCase.modelType === ModelType.BAZI && (
-                  <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 space-y-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-base font-bold text-stone-700">人生K线</div>
-                        <div className="mt-1 text-xs leading-5 text-stone-500">
-                          以当前八字命例为基础生成七步大运与七十年流年的运势曲线。
-                          {activeCase.klineData
-                            ? ' 当前命例已保存 K 线结果，可直接查看或重新生成。'
-                            : ' 首次运行会先自动补齐一条有效的八字分析，再继续生成 K 线。'}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleOpenKline}
-                          disabled={klineStatus === 'analyzing'}
-                          className="glass-chip rounded-2xl px-4 py-2 text-sm text-stone-600 hover:text-stone-800 disabled:opacity-50"
-                        >
-                          {activeCase.klineData ? '查看K线' : '推求K线'}
-                        </button>
-                        {activeCase.klineData && (
-                          <button
-                            type="button"
-                            onClick={() => void handleRunKline(true)}
-                            disabled={klineStatus === 'analyzing'}
-                            className="glass-panel-dark rounded-2xl px-4 py-2 text-sm text-amber-200 hover:brightness-105 disabled:opacity-60"
-                          >
-                            重新生成
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">状态</div>
-                        <div className="mt-2 text-sm font-semibold text-stone-700">
-                          {klineStatus === 'analyzing'
-                            ? '推演中'
-                            : activeCase.klineData
-                              ? '已生成'
-                              : '未生成'}
-                        </div>
-                      </div>
-                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">初始化</div>
-                        <div className="mt-2 text-sm font-semibold text-stone-700">
-                          {activeCase.sessions.length > 0 ? '优先复用最近成功分析' : '自动运行默认分析'}
-                        </div>
-                      </div>
-                      <div className="rounded-[22px] border border-white/60 bg-white/55 px-4 py-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-stone-400">记忆</div>
-                        <div className="mt-2 text-sm font-semibold text-stone-700">
-                          保存到当前命例
-                        </div>
-                      </div>
-                    </div>
-
-                    {klineStatus === 'error' && (
-                      <div className="rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm text-red-600">
-                        {klineError || 'K线分析失败，请稍后重试'}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
                   <textarea
@@ -4971,7 +4904,7 @@ const App: React.FC = () => {
       )}
 
       {/* K线浮球 */}
-      {modelType === ModelType.BAZI && step === 'chart' && klinePos && !isCaseModel && (
+      {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
         <div className="fixed z-40 select-none" style={{ left: klinePos.x, top: klinePos.y }}>
           <button
             type="button"
@@ -4981,18 +4914,25 @@ const App: React.FC = () => {
             onPointerCancel={handleKlinePointerUp}
             title={isTyping ? '请等待ai运行完毕' : '人生K线'}
             disabled={isTyping}
-            className={`relative h-14 w-14 rounded-full border-2 font-bold transition cursor-grab active:cursor-grabbing ${
+            className={`group relative h-16 w-16 rounded-full border font-bold transition cursor-grab active:cursor-grabbing backdrop-blur-xl ${
               isTyping
-                ? 'bg-stone-200 text-stone-400 border-stone-200 cursor-not-allowed'
-                : 'bg-gradient-to-br from-yellow-200 via-amber-300 to-yellow-400 text-stone-900 border-yellow-100 shadow-2xl hover:scale-105'
+                ? 'bg-stone-200/80 text-stone-400 border-stone-200/80 cursor-not-allowed'
+                : 'border-amber-100/90 bg-[radial-gradient(circle_at_30%_30%,rgba(255,247,214,0.96),rgba(245,179,65,0.92)_58%,rgba(217,119,6,0.9)_100%)] text-stone-900 shadow-[0_22px_60px_rgba(217,119,6,0.28)] hover:scale-[1.03]'
             }`}
           >
-            <span className="absolute inset-0 rounded-full ring-2 ring-yellow-100/70 animate-pulse"></span>
-            <span className="relative z-10">K线</span>
+            <span className="absolute inset-0 rounded-full ring-2 ring-amber-100/70 animate-pulse"></span>
+            <span className="absolute inset-[4px] rounded-full border border-white/35 bg-white/10" />
+            <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
+              <span className="text-[10px] font-medium tracking-[0.18em] text-stone-700/80">人生</span>
+              <span className="mt-1 text-lg font-black">K线</span>
+            </span>
+            {activeCase?.modelType === ModelType.BAZI && activeCase.klineData && !isTyping && (
+              <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border border-white/80 bg-emerald-500 shadow-[0_0_0_4px_rgba(255,255,255,0.22)]" />
+            )}
           </button>
-          {isTyping && (
-            <div className="mt-2 text-[10px] text-stone-400 text-center">请等待ai运行完毕</div>
-          )}
+          <div className={`mt-2 text-center text-[10px] ${isTyping ? 'text-stone-400' : 'text-stone-500'}`}>
+            {isTyping ? '请等待ai运行完毕' : activeCase?.modelType === ModelType.BAZI && activeCase.klineData ? '查看人生K线' : '推求人生K线'}
+          </div>
         </div>
       )}
 
@@ -5000,12 +4940,19 @@ const App: React.FC = () => {
       {klineModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6">
           <div className="glass-panel w-full max-w-6xl max-h-[90vh] rounded-[32px] border border-white/55 overflow-hidden flex flex-col shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
-            <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-white/50">
+            <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-white/50 bg-[radial-gradient(circle_at_top_left,rgba(255,245,220,0.88),rgba(255,255,255,0.52)_55%,rgba(255,255,255,0.2)_100%)]">
               <div>
                 <div className="text-sm font-bold text-stone-800">人生K线</div>
                 <div className="text-[11px] text-stone-500">当前八字命例的七步大运与七十流年运势曲线</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-white/60 bg-white/55 px-3 py-1 text-[11px] text-stone-600">
+                  {klineStatus === 'analyzing'
+                    ? '状态：推演中'
+                    : klineResult
+                      ? '状态：已生成'
+                      : '状态：未生成'}
+                </span>
                 {klineResult && (
                   <button
                     type="button"
@@ -5037,8 +4984,8 @@ const App: React.FC = () => {
 
             <div className="glass-chat-bg p-6 overflow-y-auto">
               {klineStatus === 'idle' && !klineResult && (
-                <div className="glass-panel-soft rounded-[30px] border border-dashed border-amber-200/70 h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center">
+                <div className="glass-panel-soft rounded-[30px] border border-dashed border-amber-200/70 bg-[radial-gradient(circle_at_top,rgba(255,248,225,0.92),rgba(255,255,255,0.48)_62%,rgba(255,255,255,0.16)_100%)] h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shadow-[0_12px_35px_rgba(245,158,11,0.22)]">
                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3h18v18H3V3zm4 12l3-3 4 4 5-5" />
                     </svg>
@@ -5060,7 +5007,7 @@ const App: React.FC = () => {
               )}
 
               {klineStatus === 'analyzing' && (
-                <div className="h-[360px] flex flex-col items-center justify-center text-stone-600 space-y-4">
+                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top,rgba(255,247,214,0.82),rgba(255,255,255,0.42)_60%,rgba(255,255,255,0.14)_100%)] flex flex-col items-center justify-center text-stone-600 space-y-4">
                   <div className="flex items-center gap-3 text-lg font-semibold">
                     <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-600"></span>
                     AI正在分析，请勿刷新界面……
@@ -5068,9 +5015,9 @@ const App: React.FC = () => {
                   <div className="text-xs text-stone-400">
                     正在推演第 {Math.min(70, Math.max(0, klineYearProgress))} 年 / 70 年
                   </div>
-                  <div className="w-full max-w-md h-2 rounded-full bg-stone-100 overflow-hidden">
+                  <div className="w-full max-w-md h-2 rounded-full bg-white/60 overflow-hidden border border-white/60">
                     <div
-                      className="h-2 bg-amber-400 transition-all"
+                      className="h-2 bg-[linear-gradient(90deg,rgba(245,158,11,0.8),rgba(217,119,6,0.95))] transition-all"
                       style={{ width: `${klineProgress}%` }}
                     />
                   </div>
@@ -5079,7 +5026,7 @@ const App: React.FC = () => {
               )}
 
               {klineStatus === 'error' && (
-                <div className="h-[360px] flex flex-col items-center justify-center text-red-600">
+                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-red-200/70 bg-[radial-gradient(circle_at_top,rgba(254,242,242,0.95),rgba(255,255,255,0.52)_60%,rgba(255,255,255,0.2)_100%)] flex flex-col items-center justify-center text-red-600">
                   <div className="text-sm font-semibold mb-2">K线分析失败</div>
                   <div className="text-xs text-red-500">{klineError}</div>
                   <button
@@ -5094,7 +5041,7 @@ const App: React.FC = () => {
 
               {klineStatus === 'ready' && klineResult && (
                 <div className="space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-100 bg-stone-50/60 px-4 py-3">
+                  <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-white/60 bg-[radial-gradient(circle_at_top_left,rgba(255,247,214,0.55),rgba(255,255,255,0.55)_42%,rgba(255,255,255,0.24)_100%)] px-4 py-3">
                     <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-100）</div>
                     <div className="flex items-center gap-3 text-xs text-stone-500">
                       <span className="font-medium text-stone-600">缩放</span>
@@ -5111,7 +5058,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
-                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.overall ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1.5 backdrop-blur-md ${klineSeries.overall ? 'border-amber-200 bg-amber-50/85 text-stone-700 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/70 bg-white/55'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.overall}
@@ -5122,7 +5069,7 @@ const App: React.FC = () => {
                       <span className="text-stone-700">总体趋势</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-amber-700"></span>
                     </label>
-                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.wealth ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1.5 backdrop-blur-md ${klineSeries.wealth ? 'border-amber-200 bg-amber-50/85 text-stone-700 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/70 bg-white/55'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.wealth}
@@ -5133,7 +5080,7 @@ const App: React.FC = () => {
                       <span>财富</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-yellow-500"></span>
                     </label>
-                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.love ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1.5 backdrop-blur-md ${klineSeries.love ? 'border-amber-200 bg-amber-50/85 text-stone-700 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/70 bg-white/55'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.love}
@@ -5144,7 +5091,7 @@ const App: React.FC = () => {
                       <span>感情</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-pink-400"></span>
                     </label>
-                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.career ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1.5 backdrop-blur-md ${klineSeries.career ? 'border-amber-200 bg-amber-50/85 text-stone-700 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/70 bg-white/55'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.career}
@@ -5155,7 +5102,7 @@ const App: React.FC = () => {
                       <span>事业</span>
                       <span className="inline-block h-2 w-6 rounded-full bg-blue-500"></span>
                     </label>
-                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1 ${klineSeries.health ? 'border-amber-200 bg-amber-50 text-stone-700' : 'border-stone-200 bg-white'}`}>
+                    <label className={`flex items-center gap-2 cursor-pointer rounded-full border px-3 py-1.5 backdrop-blur-md ${klineSeries.health ? 'border-amber-200 bg-amber-50/85 text-stone-700 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/70 bg-white/55'}`}>
                       <input
                         type="checkbox"
                         checked={klineSeries.health}
@@ -5168,7 +5115,8 @@ const App: React.FC = () => {
                     </label>
                   </div>
 
-                  <div className="relative rounded-2xl border border-stone-100 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] overflow-hidden">
+                  <div className="relative overflow-hidden rounded-[28px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(255,251,235,0.52))] shadow-[0_20px_60px_rgba(120,113,108,0.16)] backdrop-blur-xl">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,248,225,0.88),rgba(255,255,255,0.2)_38%,rgba(255,255,255,0.08)_100%)]" />
                     <div className="overflow-x-auto">
                       {(() => {
                         const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 70);
@@ -5198,7 +5146,7 @@ const App: React.FC = () => {
                         const careerPoints = buildLinePoints((s) => s.career);
                         const healthPoints = buildLinePoints((s) => s.health);
                         return (
-                          <svg width={width} height={height} className="bg-white">
+                          <svg width={width} height={height} className="bg-transparent">
                             {/* Y axis grid */}
                             {[0, 20, 40, 60, 80, 100].map((tick) => (
                               <g key={tick}>
@@ -5207,7 +5155,7 @@ const App: React.FC = () => {
                                   y1={yScale(tick)}
                                   x2={width - padding.right}
                                   y2={yScale(tick)}
-                                  stroke="#f1f5f9"
+                                  stroke="rgba(148,163,184,0.18)"
                                   strokeWidth="1"
                                 />
                                 <text
@@ -5228,7 +5176,7 @@ const App: React.FC = () => {
                               y1={axisY}
                               x2={width - padding.right}
                               y2={axisY}
-                              stroke="#e2e8f0"
+                              stroke="rgba(148,163,184,0.3)"
                               strokeWidth="1"
                             />
 
@@ -5246,8 +5194,8 @@ const App: React.FC = () => {
                                     y={barTop}
                                     width={endX - startX}
                                     height={barHeight}
-                                    fill="#fffbeb"
-                                    stroke="#fde68a"
+                                    fill="rgba(255,251,235,0.72)"
+                                    stroke="rgba(253,230,138,0.75)"
                                     strokeWidth="1"
                                     opacity="0.95"
                                     onClick={() => setKlineSelected({ kind: 'dayun', start_year: item.start_year })}
@@ -5363,7 +5311,7 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-stone-100 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] p-4">
+                  <div className="glass-panel-soft rounded-[28px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.5))] shadow-[0_18px_55px_rgba(120,113,108,0.14)] p-4 backdrop-blur-xl">
                     {!klineSelected && (
                       <div className="text-xs text-stone-500">点击大运柱或流年点，可查看单项评分。</div>
                     )}
@@ -5376,7 +5324,7 @@ const App: React.FC = () => {
                       const renderScoreOverview = (scores: KlineScores) => {
                         const avg = scoreAverage(scores);
                         return (
-                          <div className="relative rounded-2xl border border-stone-100 bg-stone-50 px-4 py-6">
+                          <div className="relative rounded-[24px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] px-4 py-6 backdrop-blur-md">
                             <div className="grid grid-cols-2 gap-6 text-center text-xs font-semibold">
                               <div className="space-y-1">
                                 <div className="text-lg font-bold text-yellow-600">{scores.wealth}</div>
@@ -5396,7 +5344,7 @@ const App: React.FC = () => {
                               </div>
                             </div>
                             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                              <div className="h-20 w-20 rounded-full border-2 border-emerald-100 bg-white shadow-lg shadow-emerald-50 flex flex-col items-center justify-center">
+                              <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full border border-white/80 bg-white/82 shadow-[0_14px_30px_rgba(16,185,129,0.14)] backdrop-blur-md">
                                 <div className="text-[10px] text-stone-400">平均分</div>
                                 <div className="text-lg font-bold text-emerald-700">{avg}</div>
                               </div>
@@ -5412,7 +5360,7 @@ const App: React.FC = () => {
                         );
                         return (
                           <div className="grid gap-4 lg:grid-cols-2">
-                            <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                            <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="text-sm font-bold text-stone-800">流年透视</div>
@@ -5422,13 +5370,13 @@ const App: React.FC = () => {
                                   {liunianItem.year}
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-sm font-bold text-stone-800">
+                              <div className="rounded-[22px] border border-amber-100/80 bg-amber-50/75 px-4 py-3 text-sm font-bold text-stone-800 shadow-[0_10px_25px_rgba(245,158,11,0.08)]">
                                 {liunianItem.tag}
                               </div>
                               {renderScoreOverview(liunianItem.scores)}
                             </div>
 
-                            <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                            <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="text-sm font-bold text-stone-800">大运周期</div>
@@ -5441,11 +5389,11 @@ const App: React.FC = () => {
                               {relatedDayun ? (
                                 <>
                                   <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                    <div className="rounded-[20px] border border-white/65 bg-white/55 px-3 py-2">
                                       <div className="text-[10px] text-stone-500">大运关键词</div>
                                       <div className="text-sm font-bold text-stone-800">{relatedDayun.tag}</div>
                                     </div>
-                                    <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                                    <div className="rounded-[20px] border border-white/65 bg-white/55 px-3 py-2">
                                       <div className="text-[10px] text-stone-500">周期跨度</div>
                                       <div className="text-sm font-bold text-stone-800">
                                         {relatedDayun.start_year} - {relatedDayun.end_year}
@@ -5503,7 +5451,7 @@ const App: React.FC = () => {
 
                       return (
                         <div className="grid gap-4 lg:grid-cols-2">
-                          <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                          <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm font-bold text-stone-800">十年趋势细节</div>
@@ -5513,7 +5461,7 @@ const App: React.FC = () => {
                                 {dayunItem.start_year}-{dayunItem.end_year}
                               </div>
                             </div>
-                            <div className="rounded-2xl border border-stone-100 bg-stone-50 p-3">
+                            <div className="rounded-[22px] border border-white/65 bg-white/55 p-3 backdrop-blur-md">
                               <svg width="100%" height={trendHeight} viewBox={`0 0 ${trendWidth} ${trendHeight}`}>
                                 {tickValues.map((value) => (
                                   <g key={`trend-tick-${value}`}>
@@ -5580,7 +5528,7 @@ const App: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-stone-100 bg-white p-4 space-y-3">
+                          <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm font-bold text-stone-800">大运周期</div>
@@ -5591,11 +5539,11 @@ const App: React.FC = () => {
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                              <div className="rounded-[20px] border border-white/65 bg-white/55 px-3 py-2">
                                 <div className="text-[10px] text-stone-500">大运关键词</div>
                                 <div className="text-sm font-bold text-stone-800">{dayunItem.tag}</div>
                               </div>
-                              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-3 py-2">
+                              <div className="rounded-[20px] border border-white/65 bg-white/55 px-3 py-2">
                                 <div className="text-[10px] text-stone-500">周期跨度</div>
                                 <div className="text-sm font-bold text-stone-800">
                                   {dayunItem.start_year} - {dayunItem.end_year}
