@@ -5551,25 +5551,21 @@ const App: React.FC = () => {
             onPointerCancel={handleKlinePointerUp}
             title={isTyping ? '请等待ai运行完毕' : '人生K线'}
             disabled={isTyping}
-            className={`group relative h-16 w-16 rounded-full border font-bold transition cursor-grab active:cursor-grabbing backdrop-blur-xl ${
+            className={`group relative h-[76px] w-[76px] rounded-full border font-bold transition cursor-grab active:cursor-grabbing backdrop-blur-2xl ${
               isTyping
-                ? 'bg-stone-200/80 text-stone-400 border-stone-200/80 cursor-not-allowed'
-                : 'border-amber-100/90 bg-[radial-gradient(circle_at_30%_30%,rgba(255,247,214,0.96),rgba(245,179,65,0.92)_58%,rgba(217,119,6,0.9)_100%)] text-stone-900 shadow-[0_22px_60px_rgba(217,119,6,0.28)] hover:scale-[1.03]'
+                ? 'border-white/45 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.45),rgba(255,239,193,0.3)_55%,rgba(245,158,11,0.18)_100%)] text-stone-400 shadow-[0_20px_55px_rgba(231,229,228,0.2)] cursor-not-allowed'
+                : 'border-amber-100/70 bg-[radial-gradient(circle_at_30%_25%,rgba(255,255,255,0.68),rgba(255,244,208,0.38)_42%,rgba(252,211,77,0.24)_72%,rgba(245,158,11,0.16)_100%)] text-stone-900 shadow-[0_24px_60px_rgba(245,158,11,0.18)] hover:scale-[1.03] hover:border-amber-100/90'
             }`}
           >
-            <span className="absolute inset-0 rounded-full ring-2 ring-amber-100/70 animate-pulse"></span>
-            <span className="absolute inset-[4px] rounded-full border border-white/35 bg-white/10" />
+            <span className="absolute inset-0 rounded-full bg-white/10" />
+            <span className="absolute inset-[3px] rounded-full border border-white/35 bg-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]" />
+            <span className="absolute inset-[10px] rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.3),rgba(255,255,255,0.08)_55%,rgba(255,255,255,0.02)_100%)]" />
+            <span className="pointer-events-none absolute inset-x-3 top-2 h-5 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.45),rgba(255,255,255,0.02))] blur-[1px] opacity-80" />
             <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
-              <span className="text-[10px] font-medium tracking-[0.18em] text-stone-700/80">人生</span>
-              <span className="mt-1 text-lg font-black">K线</span>
+              <span className="text-[11px] font-medium tracking-[0.22em] text-stone-700/70">人生</span>
+              <span className="mt-1 text-[29px] font-black tracking-[-0.04em] text-stone-900">K线</span>
             </span>
-            {activeCase?.modelType === ModelType.BAZI && activeCase.klineData && !isTyping && (
-              <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full border border-white/80 bg-emerald-500 shadow-[0_0_0_4px_rgba(255,255,255,0.22)]" />
-            )}
           </button>
-          <div className={`mt-2 text-center text-[10px] ${isTyping ? 'text-stone-400' : 'text-stone-500'}`}>
-            {isTyping ? '请等待ai运行完毕' : activeCase?.modelType === ModelType.BAZI && activeCase.klineData ? '查看人生K线' : '推求人生K线'}
-          </div>
         </div>
       )}
 
