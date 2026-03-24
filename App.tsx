@@ -69,6 +69,21 @@ const Spinner = () => (
 );
 const SendIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>);
 const ReportIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25V6.75A2.25 2.25 0 0017.25 4.5H6.75A2.25 2.25 0 004.5 6.75v10.5A2.25 2.25 0 006.75 19.5h4.5m4.5-5.25v5.25m0 0l-2.25-2.25m2.25 2.25l2.25-2.25M8.25 9h7.5M8.25 12h4.5" /></svg>);
+const RefreshIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m11.18-2.872a7.5 7.5 0 0 0-12.232-2.679M4.843 14.22a7.5 7.5 0 0 0 12.232 2.679" />
+  </svg>
+);
+const CopyIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125H4.875A1.125 1.125 0 0 1 3.75 20.625V8.625c0-.621.504-1.125 1.125-1.125H8.25m7.5 9.75H19.125c.621 0 1.125-.504 1.125-1.125V4.125C20.25 3.504 19.746 3 19.125 3H9.375c-.621 0-1.125.504-1.125 1.125v3.375m7.5 9.75H9.375A1.125 1.125 0 0 1 8.25 16.125V8.625c0-.621.504-1.125 1.125-1.125h5.25c.298 0 .584.118.795.33l2.625 2.625c.211.211.33.497.33.795v4.875c0 .621-.504 1.125-1.125 1.125Z" />
+  </svg>
+);
+const HistoryIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m5.25 0A9.75 9.75 0 1 1 18 5.756L21.75 9M21.75 4.5v4.5h-4.5" />
+  </svg>
+);
 const SessionIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
     <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v5.5A2.25 2.25 0 0 0 3.25 14h2.63l2.66 2.28a.75.75 0 0 0 1.24-.57V14h7.02A2.25 2.25 0 0 0 19 11.75v-5.5A2.25 2.25 0 0 0 16.75 4H3.25Zm1.5 3.25a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Zm0 3.5a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5H5.5a.75.75 0 0 1-.75-.75Z" />
@@ -356,6 +371,17 @@ interface ChatMessage {
 type PersistedChatMessage = {
   role: string;
   content: string;
+};
+
+type MessageVersionEntry = {
+  id: string;
+  content: string;
+  createdAt: string;
+};
+
+type MessageVersionState = {
+  entries: MessageVersionEntry[];
+  activeId: string;
 };
 
 type GuestStoredSession = {
@@ -814,6 +840,8 @@ const App: React.FC = () => {
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const isCaseModel = isCaseModelType(modelType);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
+  const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
   const [klineUnlocked, setKlineUnlocked] = useState(false);
@@ -865,6 +893,20 @@ const App: React.FC = () => {
 
     return () => window.cancelAnimationFrame(frameId);
   }, [chatHistory, isTyping]);
+
+  useEffect(() => {
+    const messageIds = new Set(chatHistory.map((msg) => msg.id));
+    setMessageVersionMap((current) => {
+      const nextEntries = Object.entries(current).filter(([messageId]) => messageIds.has(messageId));
+      if (nextEntries.length === Object.keys(current).length) {
+        return current;
+      }
+      return Object.fromEntries(nextEntries);
+    });
+    if (openVersionMenuId && !messageIds.has(openVersionMenuId)) {
+      setOpenVersionMenuId(null);
+    }
+  }, [chatHistory, openVersionMenuId]);
 
   useEffect(() => {
     try {
@@ -1487,6 +1529,7 @@ const App: React.FC = () => {
           timestamp: new Date(m.createdAt),
         })
       );
+      resetMessageVersions();
       setChatHistory(msgs);
 
       if (msgs.length > 0) {
@@ -1546,6 +1589,7 @@ const App: React.FC = () => {
       content: msg.content,
       timestamp: new Date(msg.timestamp),
     }));
+    resetMessageVersions();
     setChatHistory(msgs);
     setGuestFollowUpCount(storedSession.guestFollowUpCount || 0);
 
@@ -1571,6 +1615,17 @@ const App: React.FC = () => {
     setChatHistory(prev =>
       prev.map(msg => (msg.id === id ? { ...msg, content } : msg))
     );
+  };
+
+  const buildMessageVersionEntry = (messageId: string, content: string, timestamp?: Date): MessageVersionEntry => ({
+    id: `${messageId}-${timestamp?.getTime() ?? Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    content,
+    createdAt: (timestamp ?? new Date()).toISOString(),
+  });
+
+  const resetMessageVersions = () => {
+    setMessageVersionMap({});
+    setOpenVersionMenuId(null);
   };
 
   const buildChartInfoLines = () => {
@@ -2138,6 +2193,7 @@ const App: React.FC = () => {
     setStep('input');
     setChartData(null);
     setChatHistory([]);
+    resetMessageVersions();
     clearChatSession();
     setError('');
     setQuestion('');
@@ -2674,6 +2730,7 @@ const App: React.FC = () => {
         question
       );
 
+      resetMessageVersions();
       setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
       setIsTyping(true);
 
@@ -2743,10 +2800,54 @@ const App: React.FC = () => {
   const toPersistedMessages = (messages: ChatMessage[]): PersistedChatMessage[] =>
     messages.map((msg) => ({ role: msg.role, content: msg.content }));
 
+  const persistCurrentMessages = useCallback(async (messages: ChatMessage[]) => {
+    if (isLoggedIn) {
+      await replaceMessagesInDb(activeSessionId, toPersistedMessages(messages));
+      fetchSessions();
+      return;
+    }
+
+    if (activeSessionId && activeCase) {
+      updateGuestCaseSessionMessages(activeSessionId, messages);
+      refreshGuestActiveCase(activeCase.id);
+    }
+  }, [activeCase, activeSessionId, isLoggedIn, refreshGuestActiveCase]);
+
+  const applyMessageVersion = useCallback(async (messageId: string, versionId: string) => {
+    const versionState = messageVersionMap[messageId];
+    const selectedVersion = versionState?.entries.find((entry) => entry.id === versionId);
+    if (!selectedVersion) return;
+
+    const nextMessages = chatHistory.map((message) =>
+      message.id === messageId
+        ? { ...message, content: selectedVersion.content }
+        : message
+    );
+
+    setChatHistory(nextMessages);
+    setMessageVersionMap((current) => ({
+      ...current,
+      [messageId]: {
+        entries: current[messageId]?.entries ?? [],
+        activeId: versionId,
+      },
+    }));
+    setOpenVersionMenuId(null);
+
+    try {
+      await persistCurrentMessages(nextMessages);
+    } catch {
+      setError('切换历史生成记录失败，请稍后重试');
+    }
+  }, [chatHistory, messageVersionMap, persistCurrentMessages]);
+
   const handleRerunAnalysis = async () => {
     if (!chartData || !chatHistory.length) return;
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
+      return;
+    }
+    if (!window.confirm('基于当前排盘信息和原始问题重新分析，会覆盖当前会话内容。\n\n是否重新分析？')) {
       return;
     }
 
@@ -2767,6 +2868,7 @@ const App: React.FC = () => {
     setIsTyping(true);
     setError('');
     setKnowledgeHint(null);
+    resetMessageVersions();
     clearChatSession();
     await startQimenChat(bundle.systemInstruction);
 
@@ -2868,6 +2970,7 @@ const App: React.FC = () => {
 
     const targetIndex = chatHistory.findIndex((msg) => msg.id === messageId);
     if (targetIndex < 0 || chatHistory[targetIndex]?.role !== 'model') return;
+    const targetMessage = chatHistory[targetIndex];
 
     let userIndex = -1;
     for (let idx = targetIndex - 1; idx >= 0; idx -= 1) {
@@ -2959,8 +3062,23 @@ const App: React.FC = () => {
           timestamp: new Date(),
         },
       ];
+      const nextVersionState = (() => {
+        const existingEntries = messageVersionMap[messageId]?.entries ?? [
+          buildMessageVersionEntry(messageId, targetMessage.content, targetMessage.timestamp),
+        ];
+        const latestEntry = buildMessageVersionEntry(messageId, finalContent);
+        return {
+          entries: [...existingEntries, latestEntry],
+          activeId: latestEntry.id,
+        };
+      })();
 
       setChatHistory(finalMessages);
+      setMessageVersionMap((current) => ({
+        ...current,
+        [messageId]: nextVersionState,
+      }));
+      setOpenVersionMenuId(null);
 
       if (isInitialResponse && modelType === ModelType.BAZI) {
         setBaziInitialAnalysis(stripDisclaimer(finalState.content));
@@ -3407,6 +3525,19 @@ const App: React.FC = () => {
       // Ignore clipboard errors
     }
   };
+
+  const getMessageVersionLabel = (index: number) => {
+    if (index === 0) return '初版';
+    return `重生成 ${index}`;
+  };
+
+  const formatVersionTime = (value: string) =>
+    new Date(value).toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
 
   const scoreAverage = (scores: KlineScores) =>
     Math.round(((scores.wealth + scores.career + scores.love + scores.health) / 4) * 10) / 10;
@@ -4460,39 +4591,11 @@ const App: React.FC = () => {
                  {chatHistory.map((msg) => {
                    const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
                    const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
+                   const versionState = messageVersionMap[msg.id];
+                   const hasVersionHistory = (versionState?.entries.length ?? 0) > 1;
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
-                        {msg.role === 'model' && (
-                          <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleRegenerateMessage(msg.id)}
-                              disabled={isTyping}
-                              title="从当前回复处重新生成，后续对话会被替换"
-                              className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
-                                isTyping
-                                  ? 'border-stone-200 text-stone-300 cursor-not-allowed'
-                                  : 'border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300'
-                              }`}
-                            >
-                              重生成
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                await handleCopyText(copyText);
-                                setCopiedMessageId(msg.id);
-                                window.setTimeout(() => {
-                                  setCopiedMessageId((current) => (current === msg.id ? null : current));
-                                }, 1200);
-                              }}
-                              className="text-[10px] px-2 py-0.5 rounded-full border transition border-stone-200 text-stone-500 hover:text-stone-700 hover:border-stone-300"
-                            >
-                              {copiedMessageId === msg.id ? '已复制' : '复制'}
-                            </button>
-                          </div>
-                        )}
+                     <div className={`group max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
                         {msg.role === 'model' && parsed?.reasoning && (
                           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
                             <div className="mb-1 font-semibold">思考过程</div>
@@ -4506,6 +4609,91 @@ const App: React.FC = () => {
                             {msg.role === 'model' && parsed ? parsed.answer : msg.content}
                           </ReactMarkdown>
                         </div>
+                        {msg.role === 'model' && (
+                          <div className="mt-4 flex justify-end">
+                            <div className="relative flex items-center gap-2">
+                              {hasVersionHistory && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenVersionMenuId((current) => (current === msg.id ? null : msg.id));
+                                    }}
+                                    title="切换历史生成记录"
+                                    className="group/action flex items-center gap-1.5 rounded-full border border-white/55 bg-white/60 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm transition hover:border-amber-200 hover:bg-white/80 hover:text-stone-800"
+                                  >
+                                    <HistoryIcon className="h-3.5 w-3.5" />
+                                    <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-20 group-hover/action:opacity-100">
+                                      历史版本
+                                    </span>
+                                  </button>
+                                  {openVersionMenuId === msg.id && (
+                                    <div className="absolute bottom-full right-0 z-20 mb-2 min-w-[176px] rounded-2xl border border-white/70 bg-white/88 p-2 shadow-[0_18px_50px_rgba(120,113,108,0.22)] backdrop-blur-xl">
+                                      <div className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.18em] text-stone-400">
+                                        生成记录
+                                      </div>
+                                      <div className="space-y-1">
+                                        {versionState?.entries.map((entry, index) => {
+                                          const active = versionState.activeId === entry.id;
+                                          return (
+                                            <button
+                                              key={entry.id}
+                                              type="button"
+                                              onClick={() => void applyMessageVersion(msg.id, entry.id)}
+                                              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs transition ${
+                                                active
+                                                  ? 'bg-stone-900 text-white'
+                                                  : 'text-stone-600 hover:bg-stone-100/90 hover:text-stone-900'
+                                              }`}
+                                            >
+                                              <span>{getMessageVersionLabel(index)}</span>
+                                              <span className={`${active ? 'text-stone-200' : 'text-stone-400'}`}>
+                                                {formatVersionTime(entry.createdAt)}
+                                              </span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRegenerateMessage(msg.id)}
+                                disabled={isTyping}
+                                title="从当前回复处重新生成，后续对话会被替换"
+                                className={`group/action flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] shadow-sm transition ${
+                                  isTyping
+                                    ? 'border-stone-200/90 bg-white/45 text-stone-300 cursor-not-allowed'
+                                    : 'border-white/55 bg-white/60 text-stone-500 hover:border-amber-200 hover:bg-white/80 hover:text-stone-800'
+                                }`}
+                              >
+                                <RefreshIcon className="h-3.5 w-3.5" />
+                                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
+                                  重新生成
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await handleCopyText(copyText);
+                                  setCopiedMessageId(msg.id);
+                                  window.setTimeout(() => {
+                                    setCopiedMessageId((current) => (current === msg.id ? null : current));
+                                  }, 1200);
+                                }}
+                                title="复制当前回复"
+                                className="group/action flex items-center gap-1.5 rounded-full border border-white/55 bg-white/60 px-2.5 py-1 text-[11px] text-stone-500 shadow-sm transition hover:border-amber-200 hover:bg-white/80 hover:text-stone-800"
+                              >
+                                <CopyIcon className="h-3.5 w-3.5" />
+                                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
+                                  {copiedMessageId === msg.id ? '已复制' : '复制'}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                      </div>
                    </div>
                  )})}
