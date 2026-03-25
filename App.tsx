@@ -1021,6 +1021,7 @@ const App: React.FC = () => {
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
+  const [showInitialAnalysisRegenerateConfirm, setShowInitialAnalysisRegenerateConfirm] = useState(false);
   const [confirmCaseSessionDeleteId, setConfirmCaseSessionDeleteId] = useState<string | null>(null);
   const [initialAnalysisBusy, setInitialAnalysisBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
@@ -1393,6 +1394,7 @@ const App: React.FC = () => {
       showAccountSettings ||
       showChangePassword ||
       showInitialAnalysisModal ||
+      showInitialAnalysisRegenerateConfirm ||
       showRerunConfirm ||
       professionalModalOpen ||
       klineModalOpen;
@@ -1413,6 +1415,7 @@ const App: React.FC = () => {
     showAuth,
     showChangePassword,
     showInitialAnalysisModal,
+    showInitialAnalysisRegenerateConfirm,
     showRerunConfirm,
   ]);
 
@@ -6077,18 +6080,20 @@ const App: React.FC = () => {
                           查看初始化分析
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => void handleRegenerateCaseInitialAnalysis()}
-                        disabled={initialAnalysisBusy || loading || isTyping}
-                        className={`rounded-full px-3 py-1.5 text-xs transition ${
-                          initialAnalysisBusy || loading || isTyping
-                            ? 'glass-chip text-stone-300 cursor-not-allowed'
-                            : 'glass-panel-dark text-amber-200 hover:brightness-105'
-                        }`}
-                      >
-                        {currentCaseInitialAnalysis ? '重新生成初始化分析' : '生成初始化分析'}
-                      </button>
+                      {!currentCaseInitialAnalysis && (
+                        <button
+                          type="button"
+                          onClick={() => void handleRegenerateCaseInitialAnalysis()}
+                          disabled={initialAnalysisBusy || loading || isTyping}
+                          className={`rounded-full px-3 py-1.5 text-xs transition ${
+                            initialAnalysisBusy || loading || isTyping
+                              ? 'glass-chip text-stone-300 cursor-not-allowed'
+                              : 'glass-panel-dark text-amber-200 hover:brightness-105'
+                          }`}
+                        >
+                          生成初始化分析
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -6472,12 +6477,12 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void handleRegenerateCaseInitialAnalysis()}
+                    onClick={() => setShowInitialAnalysisRegenerateConfirm(true)}
                     disabled={initialAnalysisBusy || loading || isTyping}
                     className={`rounded-full px-3 py-1.5 text-xs transition ${
                       initialAnalysisBusy || loading || isTyping
                         ? 'glass-chip text-stone-300 cursor-not-allowed'
-                        : 'glass-panel-dark text-amber-200 hover:brightness-105'
+                        : 'glass-chip text-stone-500 hover:text-stone-700'
                     }`}
                   >
                     {initialAnalysisBusy ? '生成中...' : '重新生成'}
@@ -6538,6 +6543,49 @@ const App: React.FC = () => {
                   className="glass-panel-dark rounded-2xl px-4 py-2 text-sm text-amber-200 hover:brightness-105"
                 >
                   确认重新分析
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInitialAnalysisRegenerateConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
+          onClick={() => setShowInitialAnalysisRegenerateConfirm(false)}
+        >
+          <div
+            className="glass-panel w-full max-w-md overflow-hidden rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
+              <div className="text-lg font-bold text-stone-800">重新生成初始化分析</div>
+              <div className="mt-1 text-sm text-stone-500">
+                初始化分析结果是该命例下其他会话的分析依据，如初始化分析无误，不建议重新生成。
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <div className="glass-panel-soft rounded-[24px] border border-white/60 px-4 py-4 text-sm leading-6 text-stone-600">
+                重新生成后，后续新开的会话会以新的初始化分析作为命例基线；已有历史会话仍保留各自的基线快照。
+              </div>
+              <div className="mt-5 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInitialAnalysisRegenerateConfirm(false)}
+                  className="glass-chip rounded-2xl px-4 py-2 text-sm text-stone-600 hover:text-stone-800"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInitialAnalysisRegenerateConfirm(false);
+                    void handleRegenerateCaseInitialAnalysis();
+                  }}
+                  className="glass-panel-dark rounded-2xl px-4 py-2 text-sm text-amber-200 hover:brightness-105"
+                >
+                  确认重新生成
                 </button>
               </div>
             </div>
