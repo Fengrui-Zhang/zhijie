@@ -5550,7 +5550,7 @@ const App: React.FC = () => {
                                       : 'bg-white text-stone-800 hover:bg-amber-50'
                                   }`}
                                 >
-                                  提交并重跑
+                                  提交
                                 </button>
                               </div>
                             </div>
