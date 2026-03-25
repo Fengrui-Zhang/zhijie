@@ -901,8 +901,10 @@ const App: React.FC = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isKlineRunning, setIsKlineRunning] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  const pendingCaseSessionScrollRef = useRef(false);
   const reportChartRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
@@ -917,6 +919,7 @@ const App: React.FC = () => {
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
+  const [confirmCaseSessionDeleteId, setConfirmCaseSessionDeleteId] = useState<string | null>(null);
   const [initialAnalysisBusy, setInitialAnalysisBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
@@ -969,6 +972,19 @@ const App: React.FC = () => {
 
     return () => window.cancelAnimationFrame(frameId);
   }, [chatHistory, isTyping]);
+
+  useEffect(() => {
+    if (!pendingCaseSessionScrollRef.current) return;
+    const panel = chatPanelRef.current;
+    if (!panel) return;
+
+    pendingCaseSessionScrollRef.current = false;
+    const frameId = window.requestAnimationFrame(() => {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeSessionId, chatHistory.length, isCaseModel]);
 
   useEffect(() => {
     const messageIds = new Set(chatHistory.map((msg) => msg.id));
@@ -1696,6 +1712,7 @@ const App: React.FC = () => {
       );
       resetMessageVersions();
       setChatHistory(msgs);
+      pendingCaseSessionScrollRef.current = true;
 
       if (msgs.length > 0) {
         const systemInstruction = buildSystemInstruction(
@@ -1781,6 +1798,7 @@ const App: React.FC = () => {
     resetMessageVersions();
     setChatHistory(msgs);
     setGuestFollowUpCount(storedSession.guestFollowUpCount || 0);
+    pendingCaseSessionScrollRef.current = true;
 
     if (msgs.length > 0) {
       const systemInstruction = buildSystemInstruction(
@@ -2453,6 +2471,32 @@ const App: React.FC = () => {
   const handleReset = () => {
     clearViewState();
   };
+
+  const handleDeleteGuestSession = useCallback((id: string) => {
+    const nextSessions = readGuestCaseSessions().filter((item) => item.id !== id);
+    writeGuestCaseSessions(nextSessions);
+
+    setActiveCase((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        sessions: prev.sessions.filter((session) => session.id !== id),
+      };
+    });
+
+    if (activeSessionId === id) {
+      setActiveSessionId(null);
+      clearViewState();
+    }
+  }, [activeSessionId, clearViewState, readGuestCaseSessions, writeGuestCaseSessions]);
+
+  const handleDeleteCaseSessionEntry = useCallback((id: string) => {
+    if (isLoggedIn) {
+      void handleDeleteSession(id);
+      return;
+    }
+    handleDeleteGuestSession(id);
+  }, [handleDeleteGuestSession, isLoggedIn]);
 
   useEffect(() => {
     if (supportsKnowledge) {
@@ -5435,9 +5479,8 @@ const App: React.FC = () => {
                       </div>
                     )}
                     {activeCase.sessions.map((session) => (
-                      <button
+                      <div
                         key={session.id}
-                        type="button"
                         onClick={() => {
                           if (isLoggedIn) {
                             handleLoadSession(session.id);
@@ -5445,17 +5488,44 @@ const App: React.FC = () => {
                             handleLoadGuestCaseSession(session.id);
                           }
                         }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                        className={`group flex w-full cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                           activeSessionId === session.id
                             ? 'glass-panel-dark border-transparent text-amber-200'
-                            : 'glass-panel bg-white/70 text-stone-700 border-white/60 hover:bg-white/85'
+                            : 'glass-panel border-white/60 bg-white/70 text-stone-700 hover:bg-white/85'
                         }`}
                       >
-                        <div className="text-sm font-semibold">{session.title}</div>
-                        <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
-                          {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold">{session.title}</div>
+                          <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
+                            {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                          </div>
                         </div>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (confirmCaseSessionDeleteId === session.id) {
+                              handleDeleteCaseSessionEntry(session.id);
+                              setConfirmCaseSessionDeleteId(null);
+                            } else {
+                              setConfirmCaseSessionDeleteId(session.id);
+                              setTimeout(() => setConfirmCaseSessionDeleteId((current) => (current === session.id ? null : current)), 3000);
+                            }
+                          }}
+                          className={`flex-shrink-0 rounded-lg p-1.5 transition-colors ${
+                            confirmCaseSessionDeleteId === session.id
+                              ? 'bg-red-50 text-red-500'
+                              : activeSessionId === session.id
+                                ? 'text-amber-100/75 hover:text-red-200'
+                                : 'text-stone-300 opacity-0 group-hover:opacity-100 hover:text-red-400'
+                          }`}
+                          title={confirmCaseSessionDeleteId === session.id ? '再次点击确认删除' : '删除'}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                            <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.31l.461 6.15A1.5 1.5 0 005.02 13h5.96a1.5 1.5 0 001.499-1.35l.46-6.15h.311a.75.75 0 000-1.5H11v-.75A1.75 1.75 0 009.25 1.5h-2.5A1.75 1.75 0 005 3.25zm1.5 0a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V4h-3v-.75z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -5464,7 +5534,7 @@ const App: React.FC = () => {
 
             {/* Chat */}
             {(!isCaseModel || chatHistory.length > 0) && (
-            <div className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
+            <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> 大师解读</h3>
                  <div className="flex items-center gap-3">
@@ -5841,8 +5911,11 @@ const App: React.FC = () => {
       {/* K线弹窗 */}
       {klineModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6">
-          <div className="glass-panel w-full max-w-6xl max-h-[90vh] rounded-[32px] border border-white/55 overflow-hidden flex flex-col shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
-            <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-white/50 bg-[radial-gradient(circle_at_top_left,rgba(255,245,220,0.88),rgba(255,255,255,0.52)_55%,rgba(255,255,255,0.2)_100%)]">
+          <div className="glass-panel relative isolate flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(250,250,249,0.72))] shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+            <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(248,250,252,0.64))]" />
+            <div className="pointer-events-none absolute left-[-8%] top-[-6%] -z-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(253,230,138,0.12),rgba(255,255,255,0)_70%)] blur-2xl" />
+            <div className="pointer-events-none absolute bottom-[-10%] right-[-4%] -z-10 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(226,232,240,0.16),rgba(255,255,255,0)_70%)] blur-3xl" />
+            <div className="glass-panel-soft relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(252,252,251,0.64))] px-6 py-4">
               <div>
                 <div className="text-sm font-bold text-stone-800">人生K线</div>
                 <div className="text-[11px] text-stone-500">当前八字命例的七步大运与七十流年运势曲线</div>
@@ -5884,9 +5957,11 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="glass-chat-bg p-6 overflow-y-auto">
+            <div className="relative z-10 overflow-y-auto bg-[linear-gradient(180deg,rgba(255,255,255,0.54),rgba(248,250,252,0.42))] p-6">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.04))]" />
+              <div className="relative z-10">
               {klineStatus === 'idle' && !klineResult && (
-                <div className="glass-panel-soft rounded-[30px] border border-dashed border-amber-200/70 bg-[radial-gradient(circle_at_top,rgba(255,248,225,0.92),rgba(255,255,255,0.48)_62%,rgba(255,255,255,0.16)_100%)] h-[360px] flex flex-col items-center justify-center text-stone-500 space-y-4">
+                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-dashed border-amber-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.74),rgba(255,250,240,0.54))] flex flex-col items-center justify-center text-stone-500 space-y-4">
                   <div className="w-16 h-16 rounded-full bg-amber-100/80 text-amber-700 flex items-center justify-center shadow-[0_12px_35px_rgba(245,158,11,0.22)]">
                     <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3h18v18H3V3zm4 12l3-3 4 4 5-5" />
@@ -5909,7 +5984,7 @@ const App: React.FC = () => {
               )}
 
               {klineStatus === 'analyzing' && (
-                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-white/60 bg-[radial-gradient(circle_at_top,rgba(255,247,214,0.82),rgba(255,255,255,0.42)_60%,rgba(255,255,255,0.14)_100%)] flex flex-col items-center justify-center text-stone-600 space-y-4">
+                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.74),rgba(255,250,240,0.48))] flex flex-col items-center justify-center text-stone-600 space-y-4">
                   <div className="flex items-center gap-3 text-lg font-semibold">
                     <span className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-amber-500/40 border-t-amber-600"></span>
                     AI正在分析，请勿刷新界面……
@@ -5928,7 +6003,7 @@ const App: React.FC = () => {
               )}
 
               {klineStatus === 'error' && (
-                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-red-200/70 bg-[radial-gradient(circle_at_top,rgba(254,242,242,0.95),rgba(255,255,255,0.52)_60%,rgba(255,255,255,0.2)_100%)] flex flex-col items-center justify-center text-red-600">
+                <div className="glass-panel-soft h-[360px] rounded-[30px] border border-red-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.8),rgba(254,242,242,0.56))] flex flex-col items-center justify-center text-red-600">
                   <div className="text-sm font-semibold mb-2">K线分析失败</div>
                   <div className="text-xs text-red-500">{klineError}</div>
                   <button
@@ -5943,7 +6018,7 @@ const App: React.FC = () => {
 
               {klineStatus === 'ready' && klineResult && (
                 <div className="space-y-6">
-                  <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-white/60 bg-[radial-gradient(circle_at_top_left,rgba(255,247,214,0.55),rgba(255,255,255,0.55)_42%,rgba(255,255,255,0.24)_100%)] px-4 py-3">
+                  <div className="glass-panel-soft flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(250,250,249,0.56))] px-4 py-3">
                     <div className="text-xs text-stone-500">横坐标为年份，纵坐标为分数（0-100）</div>
                     <div className="flex items-center gap-3 text-xs text-stone-500">
                       <span className="font-medium text-stone-600">缩放</span>
@@ -6017,9 +6092,11 @@ const App: React.FC = () => {
                     </label>
                   </div>
 
-                  <div className="relative overflow-hidden rounded-[28px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.76),rgba(255,251,235,0.52))] shadow-[0_20px_60px_rgba(120,113,108,0.16)] backdrop-blur-xl">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,248,225,0.88),rgba(255,255,255,0.2)_38%,rgba(255,255,255,0.08)_100%)]" />
-                    <div className="overflow-x-auto">
+                  <div className="relative overflow-hidden rounded-[28px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(250,250,249,0.62))] shadow-[0_20px_60px_rgba(120,113,108,0.16)] backdrop-blur-xl">
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.2),rgba(255,255,255,0.06))]" />
+                    <div className="pointer-events-none absolute -left-16 top-10 h-52 w-52 rounded-full bg-[radial-gradient(circle,rgba(253,230,138,0.08),rgba(255,255,255,0)_72%)] blur-2xl" />
+                    <div className="pointer-events-none absolute bottom-0 right-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(254,243,199,0.06),rgba(255,255,255,0)_72%)] blur-2xl" />
+                    <div className="relative z-10 overflow-x-auto">
                       {(() => {
                         const liunianSorted = [...klineResult.liunian].sort((a, b) => a.year - b.year).slice(0, 70);
                         const dayunSorted = [...klineResult.dayun].sort((a, b) => a.start_year - b.start_year).slice(0, 7);
@@ -6462,6 +6539,7 @@ const App: React.FC = () => {
                   <div className="text-[11px] text-stone-400 text-center">{KLINE_DEV_NOTE}</div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
