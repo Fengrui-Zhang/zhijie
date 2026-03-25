@@ -32,6 +32,7 @@ const HexagramSymbol = ({ mark }: { mark: string }) => {
 
 const GuaCard = ({ title, gua }: { title: string, gua: GuaDetails }) => {
   if (!gua || !gua.gua_name) return null;
+  const [expanded, setExpanded] = React.useState(false);
 
   // Try to determine color from Name (e.g., Qian, Dui = Metal)
   // This is a heuristic based on the presence of Trigram names in the Hexagram name
@@ -45,9 +46,14 @@ const GuaCard = ({ title, gua }: { title: string, gua: GuaDetails }) => {
       <HexagramSymbol mark={gua.gua_mark} />
       <div className={`font-bold text-lg mt-2 ${nameColor}`}>{gua.gua_name}</div>
       <div className="text-xs text-stone-500 mt-1">{gua.gua_xiongji}</div>
-      <div className="text-[10px] text-stone-400 mt-2 text-center line-clamp-2" title={gua.gua_qian}>
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className={`mt-2 w-full text-center text-[10px] text-stone-400 transition hover:text-stone-500 ${expanded ? '' : 'line-clamp-2'}`}
+        title={gua.gua_qian}
+      >
         {gua.gua_qian}
-      </div>
+      </button>
     </div>
   );
 };
