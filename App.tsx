@@ -859,6 +859,7 @@ const App: React.FC = () => {
   const [sessionAnalysisModel, setSessionAnalysisModel] = useState<AnalysisModel | null>(null);
 
   // --- State ---
+  const [hasSelectedModel, setHasSelectedModel] = useState(false);
   const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'chart'>('input');
@@ -1143,6 +1144,7 @@ const App: React.FC = () => {
       if (!detail) return;
       const storedSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
       clearChatSession();
+      setHasSelectedModel(true);
       setActiveCase(detail);
       setChartData(detail.chartData);
       setActiveChartParams((detail.chartParams || {}) as Record<string, unknown>);
@@ -1163,6 +1165,7 @@ const App: React.FC = () => {
       if (!res.ok) return;
       const data = await res.json();
       clearChatSession();
+      setHasSelectedModel(true);
       setActiveCase(data);
       setChartData(data.chartData);
       setActiveChartParams((data.chartParams || {}) as Record<string, unknown>);
@@ -1660,6 +1663,7 @@ const App: React.FC = () => {
 
       clearChatSession();
       setActiveSessionId(id);
+      setHasSelectedModel(true);
       setModelType(data.modelType as ModelType);
       setChartData(effectiveChartData);
       setActiveChartParams((data.chartParams || {}) as Record<string, unknown>);
@@ -1749,6 +1753,7 @@ const App: React.FC = () => {
     const detail = getGuestCaseDetail(storedSession.caseId);
     const effectiveChartData = detail?.chartData ?? storedSession.chartData;
     clearChatSession();
+    setHasSelectedModel(true);
     setModelType(storedSession.modelType);
     setChartData(effectiveChartData);
     setActiveChartParams(storedSession.chartParams || {});
@@ -2431,6 +2436,7 @@ const App: React.FC = () => {
 
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
+    setHasSelectedModel(true);
     setModelType(type);
     clearViewState();
     if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
@@ -2447,6 +2453,12 @@ const App: React.FC = () => {
   const handleReset = () => {
     clearViewState();
   };
+
+  useEffect(() => {
+    if (supportsKnowledge) {
+      setUseKnowledge(true);
+    }
+  }, [supportsKnowledge, modelType]);
 
   const beginCaseCreate = () => {
     setEditingCaseId(null);
@@ -4733,22 +4745,23 @@ const App: React.FC = () => {
                       [ModelType.LIUYAO, '六爻纳甲']
                     ].map(([type, label]) => {
                       const isRecommended = recommendedModels.has(type as ModelType);
+                      const isSelected = hasSelectedModel && modelType === type;
                       return (
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
                         className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
-                          modelType === type 
+                          isSelected
                             ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
                             : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
                         }`}
                       >
-                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${modelType === type ? 'bg-white/50' : 'bg-white/80'}`}></span>
-                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${modelType === type ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
+                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
+                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
                         {label}
                         {isRecommended && (
                           <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            推荐
+                            古籍
                           </span>
                         )}
                       </button>
@@ -4772,26 +4785,27 @@ const App: React.FC = () => {
                       [ModelType.ZIWEI, '紫微斗数']
                     ].map(([type, label]) => {
                       const isRecommended = recommendedModels.has(type as ModelType);
+                      const isSelected = hasSelectedModel && modelType === type;
                       return (
                       <button
                         key={type}
                         onClick={() => handleModelChange(type as ModelType)}
                         className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
-                          modelType === type 
+                          isSelected
                             ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
                             : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
                         }`}
                       >
-                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${modelType === type ? 'bg-white/50' : 'bg-white/80'}`}></span>
-                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${modelType === type ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
+                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
+                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
                         {label}
                         {isRecommended && type === ModelType.BAZI && (
                           <span className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
                             <span className="bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                              推荐
+                              古籍
                             </span>
                             <span className={`text-[10px] px-2.5 py-0.5 rounded-full border shadow-[0_10px_20px_rgba(28,25,23,0.16)] ${
-                              modelType === type
+                              isSelected
                                 ? 'border-white/35 bg-white/14 text-amber-100'
                                 : 'border-amber-200/80 bg-white/78 text-amber-700'
                             }`}>
@@ -4806,14 +4820,14 @@ const App: React.FC = () => {
                </div>
             </div>
 
-            {supportsKnowledge && !isCaseModel && (
+            {hasSelectedModel && supportsKnowledge && !isCaseModel && (
               <KnowledgeToggleCard
                 useKnowledge={useKnowledge}
                 onToggle={() => setUseKnowledge((prev) => !prev)}
               />
             )}
 
-            {isCaseModel ? (
+            {hasSelectedModel && (isCaseModel ? (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -5264,7 +5278,7 @@ const App: React.FC = () => {
                 {loading ? <Spinner /> : '开始排盘'}
               </button>
               </div>
-            )}
+            ))}
           </div>
         )}
 
