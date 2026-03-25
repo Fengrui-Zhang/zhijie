@@ -1383,7 +1383,7 @@ const App: React.FC = () => {
     if (professionalPos) return;
     const width = window.innerWidth;
     const height = window.innerHeight;
-    setProfessionalPos(clampProfessionalPos(width - 124, Math.round(height * 0.2)));
+    setProfessionalPos(clampProfessionalPos(width - 108, Math.round(height * 0.22)));
   }, [professionalPos]);
 
   useEffect(() => {
@@ -2870,6 +2870,7 @@ const App: React.FC = () => {
     setKnowledgeHint(null);
     setLoading(true);
     setIsTyping(true);
+    setProfessionalModalOpen(false);
     resetMessageVersions();
     clearChatSession();
     setChatHistory([]);
@@ -4680,7 +4681,7 @@ const App: React.FC = () => {
 
   const clampKlinePos = (x: number, y: number) => clampFloatingOrbPos(x, y, 74);
 
-  const clampProfessionalPos = (x: number, y: number) => clampFloatingOrbPos(x, y, 82);
+  const clampProfessionalPos = (x: number, y: number) => clampFloatingOrbPos(x, y, 68);
 
   const handleKlinePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!klinePos) return;
@@ -5991,7 +5992,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 text-xs font-semibold text-amber-700">
-                      进阶预测
+                      进阶功能
                     </span>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -6544,7 +6545,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {professionalPos && (
+      {professionalPos && step === 'input' && !hasSelectedModel && (
         <div className="fixed z-40 select-none" style={{ left: professionalPos.x, top: professionalPos.y }}>
           <button
             type="button"
@@ -6552,16 +6553,15 @@ const App: React.FC = () => {
             onPointerMove={handleProfessionalPointerMove}
             onPointerUp={handleProfessionalPointerUp}
             onPointerCancel={handleProfessionalPointerUp}
-            className="group relative h-[82px] w-[82px] overflow-hidden rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.42),rgba(255,248,225,0.2)_44%,rgba(252,211,77,0.12)_72%,rgba(245,158,11,0.08)_100%)] text-stone-700 shadow-[0_18px_46px_rgba(245,158,11,0.12)] backdrop-blur-[18px] transition cursor-grab active:cursor-grabbing hover:scale-[1.03] hover:border-amber-100/65"
-            title="进阶预测"
+            className="group relative h-[68px] w-[68px] overflow-hidden rounded-full border border-white/35 bg-white/10 text-stone-700 shadow-[0_18px_46px_rgba(255,255,255,0.12)] backdrop-blur-[22px] transition cursor-grab active:cursor-grabbing hover:scale-[1.03] hover:border-white/55"
+            title="进阶"
           >
-            <span className="absolute inset-0 rounded-full bg-white/6" />
-            <span className="absolute inset-[2px] rounded-full border border-white/22 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]" />
-            <span className="absolute inset-[8px] rounded-full border border-amber-100/25 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
-            <span className="pointer-events-none absolute inset-x-4 top-2.5 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
+            <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.22),rgba(255,255,255,0.08)_58%,rgba(255,255,255,0.03)_100%)]" />
+            <span className="absolute inset-[2px] rounded-full border border-white/24 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.26)]" />
+            <span className="absolute inset-[7px] rounded-full border border-white/18 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
+            <span className="pointer-events-none absolute inset-x-3 top-2 h-3 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
             <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
-              <span className="text-[17px] font-semibold tracking-[0.04em] text-stone-700/88">进阶</span>
-              <span className="mt-1 text-[17px] font-semibold tracking-[0.04em] text-stone-700/88">预测</span>
+              <span className="text-[14px] font-medium tracking-[0.18em] text-stone-700/82">进阶</span>
             </span>
           </button>
         </div>
@@ -6579,7 +6579,8 @@ const App: React.FC = () => {
             <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-lg font-bold text-stone-800">进阶预测</div>
+                  <div className="text-lg font-bold text-stone-800">进阶功能</div>
+                  <div className="mt-1 text-sm text-stone-500">更新、更专业的 VIP 功能体验</div>
                 </div>
                 <button
                   type="button"
