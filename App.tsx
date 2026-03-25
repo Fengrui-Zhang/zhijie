@@ -947,6 +947,14 @@ const App: React.FC = () => {
   const [professionalCustomDate, setProfessionalCustomDate] = useState('');
   const [professionalProvince, setProfessionalProvince] = useState('');
   const [professionalCity, setProfessionalCity] = useState('');
+  const [professionalPos, setProfessionalPos] = useState<{ x: number; y: number } | null>(null);
+  const professionalDragRef = useRef<{
+    offsetX: number;
+    offsetY: number;
+    moved: boolean;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const activeProfessionalFeature = getProfessionalFeature(activeChartParams);
 
   // --- State ---
@@ -1372,12 +1380,41 @@ const App: React.FC = () => {
   }, [modelType, step, klinePos]);
 
   useEffect(() => {
-    if (!klineModalOpen) return;
-    document.body.classList.add('overflow-hidden');
+    if (professionalPos) return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    setProfessionalPos(clampProfessionalPos(width - 124, Math.round(height * 0.2)));
+  }, [professionalPos]);
+
+  useEffect(() => {
+    const hasModalOpen =
+      showAuth ||
+      showAdminPanel ||
+      showAccountSettings ||
+      showChangePassword ||
+      showInitialAnalysisModal ||
+      showRerunConfirm ||
+      professionalModalOpen ||
+      klineModalOpen;
+    if (!hasModalOpen) return;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.classList.remove('overflow-hidden');
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
     };
-  }, [klineModalOpen]);
+  }, [
+    klineModalOpen,
+    professionalModalOpen,
+    showAccountSettings,
+    showAdminPanel,
+    showAuth,
+    showChangePassword,
+    showInitialAnalysisModal,
+    showRerunConfirm,
+  ]);
 
   // --- Session Persistence ---
   const fetchSessions = useCallback(async () => {
@@ -4631,8 +4668,7 @@ const App: React.FC = () => {
     return isOddHour ? minutes <= 30 : minutes >= 30;
   };
 
-  const clampKlinePos = (x: number, y: number) => {
-    const size = 56;
+  const clampFloatingOrbPos = (x: number, y: number, size: number) => {
     const padding = 8;
     const maxX = window.innerWidth - size - padding;
     const maxY = window.innerHeight - size - padding;
@@ -4641,6 +4677,10 @@ const App: React.FC = () => {
       y: Math.min(Math.max(padding, y), Math.max(padding, maxY)),
     };
   };
+
+  const clampKlinePos = (x: number, y: number) => clampFloatingOrbPos(x, y, 74);
+
+  const clampProfessionalPos = (x: number, y: number) => clampFloatingOrbPos(x, y, 82);
 
   const handleKlinePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!klinePos) return;
@@ -4678,6 +4718,50 @@ const App: React.FC = () => {
     }
     if (!moved && !isTyping) {
       handleOpenKline();
+    }
+  };
+
+  const openProfessionalModal = useCallback(() => {
+    resetProfessionalComposer();
+    setProfessionalModalOpen(true);
+  }, [resetProfessionalComposer]);
+
+  const handleProfessionalPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!professionalPos) return;
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    professionalDragRef.current = {
+      offsetX: event.clientX - professionalPos.x,
+      offsetY: event.clientY - professionalPos.y,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+  };
+
+  const handleProfessionalPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!professionalDragRef.current) return;
+    const dx = Math.abs(event.clientX - professionalDragRef.current.startX);
+    const dy = Math.abs(event.clientY - professionalDragRef.current.startY);
+    const nextX = event.clientX - professionalDragRef.current.offsetX;
+    const nextY = event.clientY - professionalDragRef.current.offsetY;
+    const clamped = clampProfessionalPos(nextX, nextY);
+    setProfessionalPos(clamped);
+    if (dx > 3 || dy > 3) {
+      professionalDragRef.current.moved = true;
+    }
+  };
+
+  const handleProfessionalPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!professionalDragRef.current) return;
+    const moved = professionalDragRef.current.moved;
+    professionalDragRef.current = null;
+    const target = event.currentTarget;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+    if (!moved) {
+      openProfessionalModal();
     }
   };
 
@@ -5907,7 +5991,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 text-xs font-semibold text-amber-700">
-                      专业功能
+                      进阶预测
                     </span>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -6460,27 +6544,28 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          type="button"
-          onClick={() => {
-            resetProfessionalComposer();
-            setProfessionalModalOpen(true);
-          }}
-          className="group relative h-[82px] w-[82px] overflow-hidden rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.38),rgba(255,248,225,0.18)_44%,rgba(252,211,77,0.12)_72%,rgba(245,158,11,0.08)_100%)] text-stone-700 shadow-[0_18px_46px_rgba(245,158,11,0.12)] backdrop-blur-[18px] transition hover:scale-[1.03] hover:border-amber-100/65"
-          title="专业功能"
-        >
-          <span className="absolute inset-0 rounded-full bg-white/6" />
-          <span className="absolute inset-[2px] rounded-full border border-white/22 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]" />
-          <span className="absolute inset-[8px] rounded-full border border-amber-100/25 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
-          <span className="pointer-events-none absolute inset-x-4 top-2.5 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
-          <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
-            <span className="text-[10px] font-medium tracking-[0.24em] text-stone-600/70">专项</span>
-            <span className="mt-1 text-[20px] font-semibold tracking-[-0.03em] text-stone-700/90">专业</span>
-            <span className="mt-1 text-[10px] font-medium tracking-[0.2em] text-stone-600/70">功能</span>
-          </span>
-        </button>
-      </div>
+      {professionalPos && (
+        <div className="fixed z-40 select-none" style={{ left: professionalPos.x, top: professionalPos.y }}>
+          <button
+            type="button"
+            onPointerDown={handleProfessionalPointerDown}
+            onPointerMove={handleProfessionalPointerMove}
+            onPointerUp={handleProfessionalPointerUp}
+            onPointerCancel={handleProfessionalPointerUp}
+            className="group relative h-[82px] w-[82px] overflow-hidden rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.42),rgba(255,248,225,0.2)_44%,rgba(252,211,77,0.12)_72%,rgba(245,158,11,0.08)_100%)] text-stone-700 shadow-[0_18px_46px_rgba(245,158,11,0.12)] backdrop-blur-[18px] transition cursor-grab active:cursor-grabbing hover:scale-[1.03] hover:border-amber-100/65"
+            title="进阶预测"
+          >
+            <span className="absolute inset-0 rounded-full bg-white/6" />
+            <span className="absolute inset-[2px] rounded-full border border-white/22 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]" />
+            <span className="absolute inset-[8px] rounded-full border border-amber-100/25 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
+            <span className="pointer-events-none absolute inset-x-4 top-2.5 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
+            <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
+              <span className="text-[17px] font-semibold tracking-[0.04em] text-stone-700/88">进阶</span>
+              <span className="mt-1 text-[17px] font-semibold tracking-[0.04em] text-stone-700/88">预测</span>
+            </span>
+          </button>
+        </div>
+      )}
 
       {professionalModalOpen && (
         <div
@@ -6488,14 +6573,13 @@ const App: React.FC = () => {
           onClick={() => setProfessionalModalOpen(false)}
         >
           <div
-            className="glass-panel w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-[32px] border border-white/60 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
+            className="glass-panel flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[32px] border border-white/60 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-lg font-bold text-stone-800">专业功能</div>
-                  <div className="mt-1 text-sm text-stone-500">用于承载更深度的专项分析，结果会保存到会话或关联命例中。</div>
+                  <div className="text-lg font-bold text-stone-800">进阶预测</div>
                 </div>
                 <button
                   type="button"
@@ -6507,7 +6591,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="glass-chat-bg max-h-[calc(88vh-104px)] overflow-y-auto px-6 py-5">
+            <div className="glass-chat-bg flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5">
               {!professionalSelectedProject && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <button
@@ -6534,7 +6618,7 @@ const App: React.FC = () => {
                     <div>
                       <div className="text-base font-bold text-stone-700">八字 + 紫微联合分析</div>
                       <div className="mt-1 text-xs text-stone-500">
-                        可直接选已有命例，也可新建联合命例。首次分析默认做全盘解读，不带专项提问。
+                        可直接选已有命例，也可新建联合命例。首次分析默认做全盘解读。
                       </div>
                     </div>
                     <button
@@ -6575,10 +6659,8 @@ const App: React.FC = () => {
                     <div className="space-y-4">
                       <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4">
                         <div className="text-sm font-bold text-stone-700">已有命例</div>
-                        <div className="mt-1 text-xs text-stone-500">
-                          优先使用现有命例；系统会自动补齐另一套命盘，并给对应命例打上“八字+紫薇”标签。
-                        </div>
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <div className="mt-4 max-h-[44vh] overflow-y-auto overscroll-contain pr-1">
+                          <div className="grid gap-3 md:grid-cols-2">
                           {professionalCasesLoading && (
                             <div className="col-span-full text-sm text-stone-400">正在读取命例...</div>
                           )}
@@ -6615,18 +6697,21 @@ const App: React.FC = () => {
                               </div>
                             </button>
                           ))}
+                          </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleRunJointProfessionalFromExisting()}
-                        disabled={professionalBusy || !professionalSelectedCaseId}
-                        className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                          professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
-                        }`}
-                      >
-                        {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
-                      </button>
+                      <div className="sticky bottom-0 z-10 -mx-1 rounded-[24px] bg-[linear-gradient(180deg,rgba(248,250,252,0),rgba(255,255,255,0.85)_18%,rgba(255,255,255,0.94))] px-1 pb-1 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleRunJointProfessionalFromExisting()}
+                          disabled={professionalBusy || !professionalSelectedCaseId}
+                          className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+                            professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                          }`}
+                        >
+                          {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
