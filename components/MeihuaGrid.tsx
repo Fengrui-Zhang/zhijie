@@ -60,19 +60,24 @@ const GuaCard = ({ title, gua }: { title: string, gua: GuaDetails }) => {
 
 const MeihuaGrid: React.FC<Props> = ({ data }) => {
   const { gua_info, dongyao, sizhu_info } = data;
+  const pillarLabels = [
+    { key: 'year', label: '年柱' },
+    { key: 'month', label: '月柱' },
+    { key: 'day', label: '日柱' },
+    { key: 'hour', label: '时柱' },
+  ] as const;
 
   return (
     <div className="w-full max-w-2xl mx-auto my-6">
        {/* Four Pillars Visualization for Meihua */}
        <div className="glass-panel-soft grid grid-cols-4 gap-2 mb-6 p-3 rounded-[24px] text-center">
-         {['year', 'month', 'day', 'hour'].map((t, i) => {
-            const k = t as keyof typeof sizhu_info;
+         {pillarLabels.map(({ key, label }, i) => {
             // The API for Meihua returns flattened sizhu_info keys like year_gan, year_zhi
-            const gan = (sizhu_info as any)[`${t}_gan`];
-            const zhi = (sizhu_info as any)[`${t}_zhi`];
+            const gan = (sizhu_info as any)[`${key}_gan`];
+            const zhi = (sizhu_info as any)[`${key}_zhi`];
             return (
                <div key={i} className="flex flex-col items-center">
-                  <div className="text-[10px] text-stone-400 uppercase">{t}</div>
+                  <div className="text-[10px] text-stone-400">{label}</div>
                   <div className="font-bold font-serif text-lg flex gap-1">
                      <span className={getWuxingColor(gan)}>{gan}</span>
                      <span className={getWuxingColor(zhi)}>{zhi}</span>

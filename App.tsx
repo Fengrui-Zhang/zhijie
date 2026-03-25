@@ -6266,7 +6266,7 @@ const App: React.FC = () => {
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="text-sm font-bold text-stone-800">流年透视</div>
-                                  <div className="text-[11px] text-stone-500">YEARLY INSIGHT</div>
+                                  <div className="text-[11px] text-stone-500">流年解读</div>
                                 </div>
                                 <div className="text-xl font-bold text-stone-800">
                                   {liunianItem.year}
@@ -6282,7 +6282,7 @@ const App: React.FC = () => {
                               <div className="flex items-center justify-between">
                                 <div>
                                   <div className="text-sm font-bold text-stone-800">大运周期</div>
-                                  <div className="text-[11px] text-stone-500">DECADE CYCLE</div>
+                                  <div className="text-[11px] text-stone-500">十年周期</div>
                                 </div>
                                 <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
                                   {relatedDayun ? relatedDayun.name : '未知'}
@@ -6355,9 +6355,9 @@ const App: React.FC = () => {
                         <div className="grid gap-4 lg:grid-cols-2">
                           <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-sm font-bold text-stone-800">十年趋势细节</div>
-                                <div className="text-[11px] text-stone-500">DECADE TREND</div>
+                                <div>
+                                  <div className="text-sm font-bold text-stone-800">十年趋势细节</div>
+                                  <div className="text-[11px] text-stone-500">十年趋势</div>
                               </div>
                               <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
                                 {dayunItem.start_year}-{dayunItem.end_year}
@@ -6432,9 +6432,9 @@ const App: React.FC = () => {
 
                           <div className="glass-panel-soft rounded-[26px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.48))] p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-sm font-bold text-stone-800">大运周期</div>
-                                <div className="text-[11px] text-stone-500">DECADE CYCLE</div>
+                                <div>
+                                  <div className="text-sm font-bold text-stone-800">大运周期</div>
+                                  <div className="text-[11px] text-stone-500">十年周期</div>
                               </div>
                               <div className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
                                 {dayunItem.name}

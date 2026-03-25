@@ -101,7 +101,7 @@ export default function SessionSidebar({
     }`}>
       <div className="px-4 py-4 border-b border-stone-200/70 bg-gradient-to-r from-white/70 to-stone-50/40 flex items-center justify-between">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Sessions</div>
+          <div className="text-[11px] tracking-[0.24em] text-stone-400">会话</div>
           <span className="text-sm font-semibold text-stone-700">历史记录</span>
         </div>
         <div className="flex items-center gap-1">

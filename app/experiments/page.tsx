@@ -125,7 +125,7 @@ export default function ExperimentsPage() {
         <section className="glass-panel rounded-[28px] p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.24em] text-stone-400">Experiments</div>
+              <div className="text-xs tracking-[0.24em] text-stone-400">实验</div>
               <h1 className="text-3xl font-bold text-stone-800">八字消融实验 Demo</h1>
               <p className="max-w-3xl text-sm leading-7 text-stone-600">
                 该页面复用“实验”目录下的共享引擎，对同一案例运行 A-E 五组方法，比较结构化提示词、普通切块检索和层次化知识增强的效果差异。
@@ -301,4 +301,3 @@ export default function ExperimentsPage() {
     </main>
   );
 }
-

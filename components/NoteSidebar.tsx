@@ -48,7 +48,7 @@ export default function NoteSidebar({
     >
       <div className="flex items-center justify-between border-b border-stone-200/70 bg-gradient-to-l from-white/70 to-stone-50/40 px-4 py-4">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.24em] text-stone-400">Notes</div>
+          <div className="text-[11px] tracking-[0.24em] text-stone-400">笔记</div>
           <span className="text-sm font-semibold text-stone-700">笔记</span>
         </div>
         <button
