@@ -12,6 +12,30 @@ type KnowledgeOptions = {
   topK?: number;
 };
 
+const extractResponseError = (raw: string, fallback: string) => {
+  if (!raw.trim()) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as { error?: unknown; message?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim()) {
+      return parsed.error.trim();
+    }
+    if (parsed.error && typeof parsed.error === 'object') {
+      const nested = parsed.error as { message?: unknown };
+      if (typeof nested.message === 'string' && nested.message.trim()) {
+        return nested.message.trim();
+      }
+    }
+    if (typeof parsed.message === 'string' && parsed.message.trim()) {
+      return parsed.message.trim();
+    }
+  } catch {
+    return raw.trim();
+  }
+
+  return fallback;
+};
+
 let chatMessages: ChatMessage[] = [];
 
 export const startQimenChat = async (systemInstruction: string) => {
@@ -54,7 +78,7 @@ export const sendMessageToDeepseek = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Failed to reach DeepSeek API.');
+    throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
   }
 
   const data = await response.json();
@@ -96,7 +120,7 @@ export const sendMessageToDeepseekStream = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'Failed to reach DeepSeek API.');
+    throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
   }
 
   const knowledgeFailed = response.headers.get('X-Knowledge-Failed')

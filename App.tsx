@@ -4018,10 +4018,11 @@ const App: React.FC = () => {
           refreshGuestActiveCase(caseId);
         }
       }
-    } catch {
+    } catch (err: any) {
+      const message = err?.message?.trim?.() ? err.message.trim() : '请求失败，请稍后重试。';
       setChatHistory((prev) => [
         ...prev,
-        { id: Date.now().toString(), role: 'model', content: '⚠️ 网络错误，请重试。', timestamp: new Date() },
+        { id: Date.now().toString(), role: 'model', content: `⚠️ ${message}`, timestamp: new Date() },
       ]);
     } finally {
       setIsTyping(false);

@@ -21,6 +21,35 @@ type KnowledgeRequest = {
   topK?: number;
 };
 
+const extractErrorMessage = (input: unknown): string => {
+  if (!input) return '';
+  if (typeof input === 'string') {
+    try {
+      return extractErrorMessage(JSON.parse(input));
+    } catch {
+      return input.trim();
+    }
+  }
+  if (typeof input === 'object') {
+    const record = input as Record<string, unknown>;
+    if (typeof record.error === 'string') {
+      const nested = extractErrorMessage(record.error);
+      return nested || record.error;
+    }
+    if (record.error && typeof record.error === 'object') {
+      const nestedError = record.error as Record<string, unknown>;
+      if (typeof nestedError.message === 'string' && nestedError.message.trim()) {
+        return nestedError.message.trim();
+      }
+      return extractErrorMessage(nestedError);
+    }
+    if (typeof record.message === 'string' && record.message.trim()) {
+      return record.message.trim();
+    }
+  }
+  return '';
+};
+
 export async function POST(request: Request) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -116,18 +145,30 @@ export async function POST(request: Request) {
     requestBody.thinking = { type: 'enabled' };
   }
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch (error) {
+    const message = error instanceof Error && error.message
+      ? `模型服务连接失败：${error.message}`
+      : '模型服务连接失败，请稍后重试';
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
-    return NextResponse.json({ error: errorText }, { status: response.status });
+    const providerMessage = extractErrorMessage(errorText);
+    return NextResponse.json(
+      { error: providerMessage || '模型服务请求失败，请稍后重试' },
+      { status: response.status }
+    );
   }
 
   if (userId) {
