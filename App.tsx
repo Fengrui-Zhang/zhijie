@@ -6593,7 +6593,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {professionalPos && !activeSessionId && (
+      {professionalPos && !activeSessionId && !activeCase && (
         <div className="fixed z-40 select-none" style={{ left: professionalPos.x, top: professionalPos.y }}>
           <button
             type="button"
