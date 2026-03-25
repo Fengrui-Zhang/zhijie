@@ -5523,61 +5523,71 @@ const App: React.FC = () => {
                             </div>
                           </div>
                         )}
-                        <div className="markdown-body text-sm leading-relaxed">
-                          {isEditingUserMessage ? (
-                            <div className="space-y-3">
-                              <textarea
-                                value={editingUserMessageDraft}
-                                onChange={(event) => setEditingUserMessageDraft(event.target.value)}
-                                className="min-h-[96px] w-full rounded-2xl border border-white/25 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
-                                placeholder="修改后重新提交"
-                              />
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={handleCancelEditUserMessage}
-                                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white/80 transition hover:bg-white/15"
-                                >
-                                  取消
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSubmitEditedUserMessage(msg.id)}
-                                  disabled={isTyping}
-                                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                                    isTyping
-                                      ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                                      : 'bg-white text-stone-800 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  提交
-                                </button>
+                        {msg.role === 'user' && !isEditingUserMessage ? (
+                          <div className="flex items-end gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="markdown-body text-sm leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {msg.content}
+                                </ReactMarkdown>
                               </div>
                             </div>
-                          ) : (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.role === 'model' && parsed ? parsed.answer : msg.content}
-                            </ReactMarkdown>
-                          )}
-                        </div>
-                        {msg.role === 'user' && !isEditingUserMessage && (
-                          <div className="mt-4 flex justify-end">
                             <button
                               type="button"
                               onClick={() => handleStartEditUserMessage(msg.id, msg.content)}
                               disabled={isTyping}
                               title="修改已发送的问题并重新运行该条"
-                              className={`group/action flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] shadow-sm transition ${
+                              className={`group/action shrink-0 self-center rounded-full border p-2 text-[11px] shadow-sm transition ${
                                 isTyping
                                   ? 'border-white/10 bg-white/5 text-white/35 cursor-not-allowed'
                                   : 'border-white/20 bg-white/10 text-white/75 hover:border-white/35 hover:bg-white/15 hover:text-white'
                               }`}
                             >
-                              <EditIcon className="h-3.5 w-3.5" />
-                              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
-                                修改问题
+                              <span className="flex items-center gap-1.5">
+                                <EditIcon className="h-3.5 w-3.5" />
+                                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
+                                  修改问题
+                                </span>
                               </span>
                             </button>
+                          </div>
+                        ) : (
+                          <div className="markdown-body text-sm leading-relaxed">
+                            {isEditingUserMessage ? (
+                              <div className="space-y-3">
+                                <textarea
+                                  value={editingUserMessageDraft}
+                                  onChange={(event) => setEditingUserMessageDraft(event.target.value)}
+                                  className="min-h-[96px] w-full rounded-2xl border border-white/25 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
+                                  placeholder="修改后重新提交"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEditUserMessage}
+                                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white/80 transition hover:bg-white/15"
+                                  >
+                                    取消
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleSubmitEditedUserMessage(msg.id)}
+                                    disabled={isTyping}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                                      isTyping
+                                        ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                                        : 'bg-white text-stone-800 hover:bg-amber-50'
+                                    }`}
+                                  >
+                                    提交
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {msg.role === 'model' && parsed ? parsed.answer : msg.content}
+                              </ReactMarkdown>
+                            )}
                           </div>
                         )}
                         {msg.role === 'model' && (
