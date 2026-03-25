@@ -1368,7 +1368,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const hasModalOpen =
       showAuth ||
-      showAdminPanel ||
       showAccountSettings ||
       showChangePassword ||
       showInitialAnalysisModal ||
@@ -1389,7 +1388,6 @@ const App: React.FC = () => {
     klineModalOpen,
     professionalModalOpen,
     showAccountSettings,
-    showAdminPanel,
     showAuth,
     showChangePassword,
     showInitialAnalysisModal,

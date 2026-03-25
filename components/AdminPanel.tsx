@@ -242,42 +242,53 @@ export default function AdminPanel({ onBack }: Props) {
   );
 
   return (
-    <div className="min-h-screen bg-stone-50 font-serif">
-      <header className="bg-stone-900 text-stone-100 py-4 px-4 shadow-lg border-b-4 border-red-700 sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto flex justify-between items-center">
+    <div className="app-shell relative min-h-screen overflow-x-hidden font-serif text-stone-800">
+      <div className="pointer-events-none absolute inset-0 -z-20 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))]" />
+      <div className="pointer-events-none absolute left-[-14%] top-[6%] -z-10 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(253,230,138,0.12),rgba(255,255,255,0)_72%)] blur-3xl" />
+      <div className="pointer-events-none absolute right-[-10%] top-[28%] -z-10 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(254,243,199,0.1),rgba(255,255,255,0)_72%)] blur-3xl" />
+      <div className="pointer-events-none absolute left-[18%] bottom-[10%] -z-10 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(226,232,240,0.14),rgba(255,255,255,0)_72%)] blur-3xl" />
+
+      <header className="glass-topbar sticky top-0 z-20 border-b border-amber-500/35 px-4 py-4 text-stone-100">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBack}
-              className="text-xs px-3 py-1 rounded border border-stone-600 text-stone-300 hover:text-white hover:border-stone-400 transition"
+              className="rounded-full border border-stone-600/70 px-3 py-1.5 text-xs text-stone-300 transition hover:border-stone-400 hover:text-white"
             >
               ← 返回
             </button>
             <h1 className="text-lg font-bold tracking-wider">管理系统</h1>
           </div>
-          <span className="text-xs text-stone-400">共 {users.length} 位用户</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-stone-300">
+            共 {users.length} 位用户
+          </span>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2 mb-4">{error}</div>}
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {error && (
+          <div className="glass-panel-soft mb-4 rounded-[24px] border border-red-200/70 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-        <div className="mb-4 p-4 border border-stone-200 rounded-lg bg-white">
-          <h4 className="text-xs font-bold text-stone-500 uppercase mb-3">快速添加账号</h4>
+        <div className="glass-panel-soft mb-4 rounded-[28px] border border-white/60 p-4 md:p-5">
+          <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">快速添加账号</h4>
           <div className="flex flex-wrap gap-2 items-end">
             <input
               type="text"
               value={addName}
               onChange={(e) => { setAddName(e.target.value); setAddError(''); }}
               placeholder="昵称"
-              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-28 focus:ring-2 focus:ring-amber-400 outline-none"
+              className="glass-input w-28 rounded-2xl px-3 py-2 text-sm outline-none"
             />
             <input
               type="email"
               value={addEmail}
               onChange={(e) => { setAddEmail(e.target.value); setAddError(''); }}
               placeholder="邮箱"
-              className="border border-stone-300 rounded-lg px-3 py-2 text-sm w-40 focus:ring-2 focus:ring-amber-400 outline-none"
+              className="glass-input w-40 rounded-2xl px-3 py-2 text-sm outline-none"
             />
             <div className="relative inline-block">
               <input
@@ -285,7 +296,7 @@ export default function AdminPanel({ onBack }: Props) {
                 value={addPassword}
                 onChange={(e) => { setAddPassword(e.target.value); setAddError(''); }}
                 placeholder="密码（至少6位）"
-                className="border border-stone-300 rounded-lg px-3 py-2 pr-8 text-sm w-36 focus:ring-2 focus:ring-amber-400 outline-none"
+                className="glass-input w-36 rounded-2xl px-3 py-2 pr-8 text-sm outline-none"
               />
               <button
                 type="button"
@@ -300,7 +311,7 @@ export default function AdminPanel({ onBack }: Props) {
               type="button"
               onClick={handleAddUser}
               disabled={addLoading}
-              className="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm hover:bg-amber-700 disabled:opacity-50"
+              className="glass-cta rounded-2xl px-4 py-2 text-sm text-amber-300 transition hover:brightness-105 disabled:opacity-50"
             >
               {addLoading ? '添加中...' : '添加'}
             </button>
@@ -314,17 +325,17 @@ export default function AdminPanel({ onBack }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索邮箱或昵称..."
-            className="w-full max-w-xs border border-stone-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none"
+            className="glass-input w-full max-w-xs rounded-2xl px-3 py-2 text-sm outline-none"
           />
         </div>
 
         {loading ? (
           <p className="text-sm text-stone-500">加载中...</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="glass-panel-soft overflow-x-auto rounded-[30px] border border-white/60 p-2 shadow-[0_20px_60px_rgba(120,113,108,0.14)]">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-stone-100 text-stone-600 text-xs uppercase tracking-wider">
+                <tr className="bg-white/55 text-stone-600 text-xs uppercase tracking-wider">
                   <th className="text-left px-3 py-2">邮箱</th>
                   <th className="text-left px-3 py-2">昵称</th>
                   <th className="text-center px-3 py-2">角色</th>
@@ -336,11 +347,11 @@ export default function AdminPanel({ onBack }: Props) {
               </thead>
               <tbody>
                 {filtered.map(user => (
-                  <tr key={user.id} className="border-b border-stone-100 hover:bg-stone-50">
+                  <tr key={user.id} className="border-b border-white/70 hover:bg-white/45">
                     <td className="px-3 py-2 text-stone-700">{user.email}</td>
                     <td className="px-3 py-2 text-stone-700">{user.name}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${user.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-stone-100 text-stone-600'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${user.role === 'admin' ? 'bg-red-100/85 text-red-700' : 'bg-white/70 text-stone-600'}`}>
                         {user.role === 'admin' ? '管理员' : '用户'}
                       </span>
                     </td>
@@ -422,11 +433,11 @@ export default function AdminPanel({ onBack }: Props) {
 
       {detailUser && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 px-4 py-6 backdrop-blur-md"
           onClick={() => { setDetailUser(null); setShowPasswordModal(false); setRevealPasswordId(null); }}
         >
           <div
-            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-xl border border-stone-200 p-6"
+            className="glass-panel glass-scrollbar w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[30px] border border-white/60 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -436,27 +447,27 @@ export default function AdminPanel({ onBack }: Props) {
                   <button
                     type="button"
                     onClick={() => handleCopyAccount(detailUser)}
-                    className="text-xs px-2 py-1 rounded border border-stone-300 text-stone-600 hover:bg-stone-50"
+                    className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600 hover:text-stone-800"
                   >
                     复制账号信息
                   </button>
                 )}
-                <button type="button" onClick={() => { setDetailUser(null); setRevealPasswordId(null); }} className="text-sm text-stone-400 hover:text-stone-600">关闭</button>
+                <button type="button" onClick={() => { setDetailUser(null); setRevealPasswordId(null); }} className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700">关闭</button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm mb-6">
-              <div><span className="text-stone-400">邮箱</span><span className="ml-2">{detailUser.email}</span></div>
-              <div><span className="text-stone-400">昵称</span><span className="ml-2">{detailUser.name}</span></div>
-              <div><span className="text-stone-400">角色</span>
-                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${detailUser.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-stone-100 text-stone-600'}`}>
+            <div className="mb-6 grid gap-3 text-sm md:grid-cols-2">
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">邮箱</span><span className="ml-2">{detailUser.email}</span></div>
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">昵称</span><span className="ml-2">{detailUser.name}</span></div>
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">角色</span>
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${detailUser.role === 'admin' ? 'bg-red-100/85 text-red-700' : 'bg-white/70 text-stone-600'}`}>
                   {detailUser.role === 'admin' ? '管理员' : '用户'}
                 </span>
               </div>
-              <div><span className="text-stone-400">额度</span>
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">额度</span>
                 {editingId === detailUser.id ? (
                   <span className="ml-2 flex items-center gap-1">
-                    <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className="w-16 border rounded px-1 text-xs" min={0} />
+                    <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className="glass-input w-16 rounded-xl px-2 py-1 text-xs" min={0} />
                     <button type="button" onClick={() => handleUpdateQuota(detailUser.id)} className="text-xs text-green-600">✓</button>
                     <button type="button" onClick={() => setEditingId(null)} className="text-xs text-stone-400">✕</button>
                   </span>
@@ -464,7 +475,7 @@ export default function AdminPanel({ onBack }: Props) {
                   <button type="button" onClick={() => { setEditingId(detailUser.id); setEditQuota(String(detailUser.quota)); }} className="ml-2 text-amber-600 hover:text-amber-800">{detailUser.quota}</button>
                 )}
               </div>
-              <div><span className="text-stone-400">密码</span>
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">密码</span>
                 <span className="ml-2 font-mono text-stone-400">
                   {detailUser && revealPasswordId === detailUser.id && plainPasswordCache[detailUser.id]
                     ? plainPasswordCache[detailUser.id]
@@ -484,11 +495,11 @@ export default function AdminPanel({ onBack }: Props) {
                 )}
                 <button type="button" onClick={() => setShowPasswordModal(true)} className="ml-2 text-xs text-amber-600 hover:text-amber-800">修改密码</button>
               </div>
-              <div><span className="text-stone-400">注册时间</span><span className="ml-2">{new Date(detailUser.createdAt).toLocaleString('zh-CN')}</span></div>
+              <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">注册时间</span><span className="ml-2">{new Date(detailUser.createdAt).toLocaleString('zh-CN')}</span></div>
             </div>
 
             {showPasswordModal && (
-              <div className="mb-4 p-4 border border-amber-200 rounded-lg bg-amber-50">
+              <div className="glass-panel-soft mb-4 rounded-[24px] border border-amber-200/70 bg-amber-50/55 p-4">
                 <p className="text-xs text-stone-600 mb-2">输入新密码（至少6位）</p>
                 <div className="relative">
                   <input
@@ -496,7 +507,7 @@ export default function AdminPanel({ onBack }: Props) {
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
                     placeholder="新密码"
-                    className="w-full border border-stone-300 rounded px-3 py-1.5 pr-16 text-sm mb-2"
+                    className="glass-input mb-2 w-full rounded-2xl px-3 py-2 pr-16 text-sm"
                   />
                   <button
                     type="button"
@@ -509,14 +520,14 @@ export default function AdminPanel({ onBack }: Props) {
                 </div>
                 {passwordError && <p className="text-xs text-red-600 mb-2">{passwordError}</p>}
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setPasswordError(''); }} className="text-xs px-2 py-1 rounded border border-stone-300 text-stone-600">取消</button>
-                  <button type="button" onClick={() => handleChangePassword(detailUser.id)} className="text-xs px-2 py-1 rounded bg-amber-600 text-white">确认</button>
+                  <button type="button" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setPasswordError(''); }} className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600">取消</button>
+                  <button type="button" onClick={() => handleChangePassword(detailUser.id)} className="glass-cta rounded-full px-3 py-1.5 text-xs text-amber-300">确认</button>
                 </div>
               </div>
             )}
 
-            <div className="border-t border-stone-100 pt-4">
-              <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">会话列表</h4>
+            <div className="border-t border-white/60 pt-4">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">会话列表</h4>
               {sessionsLoading ? (
                 <p className="text-xs text-stone-400">加载中...</p>
               ) : detailSessions.length === 0 ? (
@@ -528,7 +539,7 @@ export default function AdminPanel({ onBack }: Props) {
                       key={s.id}
                       type="button"
                       onClick={() => setSelectedSessionId(prev => prev === s.id ? null : s.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition ${selectedSessionId === s.id ? 'border-amber-500 bg-amber-50' : 'border-stone-200 hover:bg-stone-50'}`}
+                      className={`w-full rounded-[20px] border px-3 py-2 text-left text-xs transition ${selectedSessionId === s.id ? 'border-amber-200 bg-amber-50/70 shadow-[0_10px_25px_rgba(245,158,11,0.08)]' : 'border-white/65 bg-white/48 hover:bg-white/62'}`}
                     >
                       <span className="font-medium">{s.title}</span>
                       <span className="text-stone-400 ml-2">({s.modelType})</span>
@@ -540,16 +551,16 @@ export default function AdminPanel({ onBack }: Props) {
               )}
 
               {selectedSessionId && (
-                <div className="border border-stone-200 rounded-lg p-3">
+                <div className="glass-panel-soft rounded-[24px] border border-white/60 p-3">
                   <h5 className="text-xs font-bold text-stone-500 mb-2">对话消息</h5>
                   {messagesLoading ? (
                     <p className="text-xs text-stone-400">加载中...</p>
                   ) : messages.length === 0 ? (
                     <p className="text-xs text-stone-400">暂无消息</p>
                   ) : (
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                    <div className="glass-scrollbar max-h-60 space-y-3 overflow-y-auto">
                       {messages.map(m => (
-                        <div key={m.id} className="flex gap-2 items-start border-b border-stone-100 pb-2 last:border-0">
+                        <div key={m.id} className="flex items-start gap-2 border-b border-white/55 pb-2 last:border-0">
                           <div className="flex-1 min-w-0">
                             <span className="text-xs font-medium text-stone-500">{m.role === 'user' ? '用户' : m.role === 'assistant' ? 'AI' : '系统'}</span>
                             <p className="text-xs text-stone-700 mt-0.5 break-words line-clamp-3">{m.content}</p>
