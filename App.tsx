@@ -7,12 +7,10 @@ import remarkGfm from 'remark-gfm';
 import { useSession, signOut } from 'next-auth/react';
 import updates from './data/updates.json';
 import {
-  ANALYSIS_MODEL_OPTIONS,
   DEFAULT_ANALYSIS_MODEL,
   DOUBAO_SEED_PRO_MODEL,
   type AnalysisModel,
   type ChatModel,
-  isAnalysisModel,
 } from './lib/analysis-models';
 import {
   buildCaseDateTimeValue,
@@ -146,7 +144,6 @@ const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
 const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
-const ANALYSIS_MODEL_STORAGE_KEY = 'analysis-model:v1';
 const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
@@ -760,7 +757,7 @@ const buildCaseInitialAnalysisSnapshot = (
 
   return {
     baseAnalysisContent: initialAnalysis.content,
-    baseAnalysisModel: initialAnalysis.model,
+    baseAnalysisModel: DEFAULT_ANALYSIS_MODEL,
     baseAnalysisGeneratedAt: initialAnalysis.generatedAt,
     isInitialAnalysisSession,
   };
@@ -931,7 +928,7 @@ const App: React.FC = () => {
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const [noteContent, setNoteContent] = useState('');
   const [noteSaveState, setNoteSaveState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
-  const [analysisModel, setAnalysisModel] = useState<AnalysisModel>(DEFAULT_ANALYSIS_MODEL);
+  const analysisModel = DEFAULT_ANALYSIS_MODEL;
   const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
   const [sessionAnalysisModel, setSessionAnalysisModel] = useState<AnalysisModel | null>(null);
   const [professionalModalOpen, setProfessionalModalOpen] = useState(false);
@@ -1106,25 +1103,6 @@ const App: React.FC = () => {
       setEditingUserMessageDraft('');
     }
   }, [chatHistory, editingUserMessageId, openVersionMenuId]);
-
-  useEffect(() => {
-    try {
-      const savedModel = localStorage.getItem(ANALYSIS_MODEL_STORAGE_KEY);
-      if (isAnalysisModel(savedModel)) {
-        setAnalysisModel(savedModel);
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ANALYSIS_MODEL_STORAGE_KEY, analysisModel);
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [analysisModel]);
 
   const readGuestCases = useCallback((): CaseItem[] => {
     try {
@@ -1828,14 +1806,9 @@ const App: React.FC = () => {
         const p = data.chartParams as Record<string, unknown>;
         if (p.name) setName(p.name as string);
         if (p.question) setQuestion(p.question as string);
-        if (isAnalysisModel(p.analysisModel)) {
-          setAnalysisModel(p.analysisModel);
-          setSessionAnalysisModel(p.analysisModel);
-        } else {
-          setSessionAnalysisModel(null);
-        }
+        setSessionAnalysisModel(DEFAULT_ANALYSIS_MODEL);
       } else {
-        setSessionAnalysisModel(null);
+        setSessionAnalysisModel(DEFAULT_ANALYSIS_MODEL);
       }
 
       const msgs: ChatMessage[] = (data.messages || []).map(
@@ -1920,13 +1893,7 @@ const App: React.FC = () => {
     setCaseFormOpen(false);
     setEditingCaseId(null);
     setQuestion('');
-    const storedAnalysisModel = isAnalysisModel(storedSession.chartParams?.analysisModel)
-      ? storedSession.chartParams.analysisModel
-      : null;
-    setSessionAnalysisModel(storedAnalysisModel);
-    if (storedAnalysisModel) {
-      setAnalysisModel(storedAnalysisModel);
-    }
+    setSessionAnalysisModel(DEFAULT_ANALYSIS_MODEL);
 
     const msgs: ChatMessage[] = storedSession.messages.map((msg) => ({
       id: msg.id,
@@ -3231,11 +3198,10 @@ const App: React.FC = () => {
   };
 
   const buildInitialAnalysisDataPayload = (
-    content: string,
-    model: AnalysisModel
+    content: string
   ): InitialAnalysisData => ({
     content: content.trim(),
-    model,
+    model: DEFAULT_ANALYSIS_MODEL,
     generatedAt: new Date().toISOString(),
   });
 
@@ -3349,7 +3315,7 @@ const App: React.FC = () => {
     const sessionChartParams = {
       ...chartParams,
       question: '',
-      analysisModel: initialAnalysis.model,
+      analysisModel: DEFAULT_ANALYSIS_MODEL,
       ...buildCaseInitialAnalysisSnapshot(initialAnalysis, true),
     };
     const userContent = buildInitialUserContent(targetCase.modelType, chartParams, '');
@@ -3371,8 +3337,7 @@ const App: React.FC = () => {
     setChatHistory([userMsg, modelMsg]);
     setChartData(targetCase.chartData);
     setActiveChartParams(sessionChartParams);
-    setSessionAnalysisModel(initialAnalysis.model);
-    setAnalysisModel(initialAnalysis.model);
+    setSessionAnalysisModel(DEFAULT_ANALYSIS_MODEL);
     setQuestion('');
     setKnowledgeHint(null);
     setStep('chart');
@@ -3522,7 +3487,7 @@ const App: React.FC = () => {
       }
 
       const cleanContent = stripDisclaimer(finalState.content);
-      const initialAnalysis = buildInitialAnalysisDataPayload(cleanContent, analysisModel);
+      const initialAnalysis = buildInitialAnalysisDataPayload(cleanContent);
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       const finalMessages: ChatMessage[] = [
@@ -4963,7 +4928,6 @@ const App: React.FC = () => {
       setBaziInitialAnalysis(initializationAnalysis);
 
       const prompt = buildKlinePrompt(chartData as BaziResponse, initializationAnalysis);
-      // const finalState = await sendMessageToDeepseekStream(prompt, onKlineDelta, undefined, 'deepseek-chat');
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
@@ -4983,12 +4947,10 @@ const App: React.FC = () => {
         } catch {
           try {
             const repairPrompt = buildKlineRepairPrompt(finalState.content);
-            // const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, 'deepseek-chat');
             const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
             parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
           } catch {
             const strictPrompt = buildKlinePromptStrict(chartData as BaziResponse);
-            // const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, 'deepseek-chat');
             const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
             parsed = parseKlineResult(sanitizeKlineJson(retryState.content));
           }
@@ -5074,10 +5036,6 @@ const App: React.FC = () => {
   const currentCaseInitialAnalysis = activeCase
     ? normalizeInitialAnalysisData(activeCase.initialAnalysisData)
     : null;
-  const currentInitialAnalysisModelLabel = currentCaseInitialAnalysis
-    ? ANALYSIS_MODEL_OPTIONS.find((option) => option.value === currentCaseInitialAnalysis.model)?.label
-      ?? currentCaseInitialAnalysis.model
-    : '';
   const currentInitialAnalysisStatus = initialAnalysisBusy
     ? '生成中'
     : currentCaseInitialAnalysis
@@ -5134,23 +5092,6 @@ const App: React.FC = () => {
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
-            <label className="flex max-w-[128px] items-center gap-1.5 rounded border border-stone-700/70 bg-stone-800/90 px-2 py-1 text-[10px] text-stone-300">
-              <select
-                value={analysisModel}
-                onChange={(e) => {
-                  if (isAnalysisModel(e.target.value)) {
-                    setAnalysisModel(e.target.value);
-                  }
-                }}
-                className="min-w-0 bg-transparent text-stone-100 outline-none"
-              >
-                {ANALYSIS_MODEL_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-stone-900 text-stone-100">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               type="button"
               onClick={() => setShowUpdates(true)}
@@ -6096,16 +6037,10 @@ const App: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
                     <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
                       <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">状态</div>
                       <div className="mt-2 text-base font-bold text-stone-700">{currentInitialAnalysisStatus}</div>
-                    </div>
-                    <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">模型</div>
-                      <div className="mt-2 text-base font-bold text-stone-700">
-                        {currentInitialAnalysisModelLabel || '尚未生成'}
-                      </div>
                     </div>
                     <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
                       <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">更新时间</div>
@@ -6467,11 +6402,8 @@ const App: React.FC = () => {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-bold text-stone-800">初始化分析</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                    <span className="rounded-full border border-white/60 bg-white/55 px-2.5 py-1">
-                      {currentInitialAnalysisModelLabel}
-                    </span>
-                    <span>生成于 {new Date(currentCaseInitialAnalysis.generatedAt).toLocaleString('zh-CN', { hour12: false })}</span>
+                  <div className="mt-1 text-xs text-stone-500">
+                    生成于 {new Date(currentCaseInitialAnalysis.generatedAt).toLocaleString('zh-CN', { hour12: false })}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

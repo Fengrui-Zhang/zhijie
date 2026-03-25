@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import {
-  DEEPSEEK_REASONER_MODEL,
   DOUBAO_SEED_LITE_MODEL,
   DOUBAO_SEED_PRO_MODEL,
   isChatModel,
@@ -66,7 +65,7 @@ export async function POST(request: Request) {
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
   const stream = body.stream === true;
   const knowledge = body.knowledge as KnowledgeRequest | undefined;
-  const requestedModel = isChatModel(body.model) ? body.model : DEEPSEEK_REASONER_MODEL;
+  const requestedModel = isChatModel(body.model) ? body.model : DOUBAO_SEED_LITE_MODEL;
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
@@ -115,25 +114,16 @@ export async function POST(request: Request) {
     }
   }
 
-  const isDoubaoModel =
-    requestedModel === DOUBAO_SEED_LITE_MODEL ||
-    requestedModel === DOUBAO_SEED_PRO_MODEL;
-  const apiKey = isDoubaoModel ? process.env.ARK_API_KEY : process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.ARK_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
-      {
-        error: isDoubaoModel
-          ? 'ARK_API_KEY is missing.'
-          : 'DeepSeek API key is missing.',
-      },
+      { error: 'ARK_API_KEY is missing.' },
       { status: 500 }
     );
   }
 
-  const apiUrl = isDoubaoModel
-    ? 'https://ark.cn-beijing.volces.com/api/v3/chat/completions'
-    : 'https://api.deepseek.com/v1/chat/completions';
+  const apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
   const requestBody: Record<string, unknown> = {
     model: requestedModel,
     messages: finalMessages,
@@ -141,9 +131,7 @@ export async function POST(request: Request) {
     stream,
   };
 
-  if (isDoubaoModel) {
-    requestBody.thinking = { type: 'enabled' };
-  }
+  requestBody.thinking = { type: 'enabled' };
 
   let response: Response;
   try {

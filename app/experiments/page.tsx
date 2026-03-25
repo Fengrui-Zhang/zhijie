@@ -287,7 +287,7 @@ export default function ExperimentsPage() {
                   </details>
 
                   <div className="mt-4 rounded-2xl border border-stone-200 bg-white/60 p-4">
-                    <div className="mb-2 text-sm font-semibold text-stone-800">模型输出</div>
+                    <div className="mb-2 text-sm font-semibold text-stone-800">输出结果</div>
                     <pre className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-700">
                       {item.output}
                     </pre>
