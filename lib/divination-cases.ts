@@ -15,6 +15,7 @@ export type CaseChartParams = {
   minute?: number;
   province?: string;
   city?: string;
+  specialTags?: string[];
 };
 
 export interface CaseSessionItem {
@@ -78,6 +79,9 @@ export const isCaseModelType = (value: unknown): value is CaseModelType =>
 
 export const normalizeCaseChartParams = (value: unknown): CaseChartParams => {
   const input = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const specialTags = Array.isArray(input.specialTags)
+    ? input.specialTags.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : undefined;
   return {
     name: toText(input.name),
     sex: toNumber(input.sex),
@@ -88,6 +92,7 @@ export const normalizeCaseChartParams = (value: unknown): CaseChartParams => {
     minute: toNumber(input.minute),
     province: toText(input.province),
     city: toText(input.city),
+    specialTags,
   };
 };
 

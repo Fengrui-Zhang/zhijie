@@ -29,6 +29,17 @@ import {
   normalizeCaseChartParams,
 } from './lib/divination-cases';
 import { deriveInitialAnalysisFromSession } from './lib/initial-analysis';
+import {
+  appendCaseSpecialTag,
+  getCaseSpecialTags,
+  getProfessionalFeature,
+  getProfessionalSourceModel,
+  isJointChartData,
+  JOINT_BAZI_ZIWEI_SESSION_TYPE,
+  JOINT_CASE_TAG,
+  PROFESSIONAL_FEATURE_JOINT,
+  type JointChartData,
+} from './lib/professional-features';
 
 // Services
 import { 
@@ -47,6 +58,7 @@ import ChangePasswordModal from './components/ChangePasswordModal';
 
 // Types
 import {
+  BaseParams,
   ModelType,
   LiuyaoMode,
   BaziResponse,
@@ -356,6 +368,40 @@ const isSameCaseChartIdentity = (left: unknown, right: unknown) => {
   );
 };
 
+const buildJointAnalysisPrompt = (jointData: JointChartData) => {
+  const baziBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, jointData.baziChartData, '');
+  const ziweiBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, jointData.ziweiChartData, '');
+
+  return [
+    '请你进行八字与紫微斗数的联合全盘分析。',
+    '要求：先分别提炼两套命盘的核心结论，再说明二者互相印证或互补的位置，最后给出整合后的性格、事业、财运、婚恋、家庭与未来趋势判断。',
+    '如果两套体系的侧重点不同，请解释差异来源，不要只做简单拼接。',
+    '',
+    '【八字分析任务】',
+    baziBundle.prompt,
+    '',
+    '【紫微斗数分析任务】',
+    ziweiBundle.prompt,
+  ].join('\n');
+};
+
+const buildJointAnalysisSystemInstruction = (jointData: JointChartData) => {
+  return [
+    '你是同时精通盲派八字与紫微斗数的高级命理顾问。',
+    '回答时要先分别读取两套命盘，再做交叉验证与综合判断，避免只用其中一套体系下结论。',
+    '',
+    '【八字命盘系统上下文】',
+    buildBaziSystemInstruction(jointData.baziChartData),
+    '',
+    '【紫微斗数命盘系统上下文】',
+    `${buildZiweiSystemInstruction(jointData.ziweiChartData)}\n\n${formatZiweiPrompt(jointData.ziweiChartData)}`,
+  ].join('\n');
+};
+
+const buildJointInitialUserContent = (jointData: JointChartData) => {
+  return `请为“${jointData.summaryTitle}”做八字与紫微斗数联合全盘分析。`;
+};
+
 const buildReportHeadAssets = () =>
   Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
     .map((node) => node.outerHTML)
@@ -397,7 +443,7 @@ type MessageVersionState = {
 type GuestStoredSession = {
   id: string;
   caseId: string;
-  modelType: CaseModelType;
+  modelType: string;
   title: string;
   chartParams: Record<string, unknown>;
   chartData: unknown;
@@ -654,6 +700,13 @@ const buildInitialUserContent = (
   question: string
 ) => {
   const trimmedQuestion = question.trim();
+  const professionalFeature = getProfessionalFeature(chartParams);
+  if (professionalFeature === PROFESSIONAL_FEATURE_JOINT && isJointChartData((chartParams as Record<string, unknown>).jointChartData)) {
+    const jointData = (chartParams as Record<string, unknown>).jointChartData as JointChartData;
+    return trimmedQuestion
+      ? `请结合八字与紫微斗数联合命盘回答我的问题。\n问题: ${trimmedQuestion}`
+      : buildJointInitialUserContent(jointData);
+  }
   const params = normalizeCaseChartParams(chartParams);
   const birthText =
     params.year !== undefined &&
@@ -718,6 +771,15 @@ const buildSystemInstruction = (
   cData: unknown,
   chartParams?: Record<string, unknown>
 ): string => {
+  const professionalFeature = chartParams ? getProfessionalFeature(chartParams) : null;
+  if (
+    professionalFeature === PROFESSIONAL_FEATURE_JOINT &&
+    chartParams &&
+    isJointChartData(chartParams.jointChartData)
+  ) {
+    return buildJointAnalysisSystemInstruction(chartParams.jointChartData);
+  }
+
   const snapshot = chartParams ? getSessionInitialAnalysisSnapshot(chartParams) : null;
   const baseAnalysisContent =
     snapshot && !snapshot.isInitialAnalysisSession ? snapshot.initialAnalysis?.content ?? '' : '';
@@ -775,6 +837,21 @@ const buildInitialAnalysisBundle = (
   chartParams: Record<string, unknown>,
   messages: ChatMessage[]
 ) => {
+  const professionalFeature = getProfessionalFeature(chartParams);
+  if (
+    professionalFeature === PROFESSIONAL_FEATURE_JOINT &&
+    isJointChartData(chartParams.jointChartData)
+  ) {
+    const jointData = chartParams.jointChartData;
+    return {
+      question: '',
+      prompt: buildJointAnalysisPrompt(jointData),
+      systemInstruction: buildJointAnalysisSystemInstruction(jointData),
+      knowledgeQuery: '',
+      userContent: buildJointInitialUserContent(jointData),
+    };
+  }
+
   const question = getInitialAnalysisQuestion(chartParams, messages);
   const snapshot = getSessionInitialAnalysisSnapshot(chartParams);
 
@@ -857,6 +934,20 @@ const App: React.FC = () => {
   const [analysisModel, setAnalysisModel] = useState<AnalysisModel>(DEFAULT_ANALYSIS_MODEL);
   const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
   const [sessionAnalysisModel, setSessionAnalysisModel] = useState<AnalysisModel | null>(null);
+  const [professionalModalOpen, setProfessionalModalOpen] = useState(false);
+  const [professionalSelectedProject, setProfessionalSelectedProject] = useState<string | null>(null);
+  const [professionalMode, setProfessionalMode] = useState<'existing' | 'new'>('existing');
+  const [professionalCaseOptions, setProfessionalCaseOptions] = useState<CaseItem[]>([]);
+  const [professionalCasesLoading, setProfessionalCasesLoading] = useState(false);
+  const [professionalSelectedCaseId, setProfessionalSelectedCaseId] = useState<string | null>(null);
+  const [professionalBusy, setProfessionalBusy] = useState(false);
+  const [professionalResultSummary, setProfessionalResultSummary] = useState('');
+  const [professionalName, setProfessionalName] = useState('');
+  const [professionalGender, setProfessionalGender] = useState<number>(0);
+  const [professionalCustomDate, setProfessionalCustomDate] = useState('');
+  const [professionalProvince, setProfessionalProvince] = useState('');
+  const [professionalCity, setProfessionalCity] = useState('');
+  const activeProfessionalFeature = getProfessionalFeature(activeChartParams);
 
   // --- State ---
   const [hasSelectedModel, setHasSelectedModel] = useState(false);
@@ -910,9 +1001,12 @@ const App: React.FC = () => {
   const [showUpdates, setShowUpdates] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const supportsKnowledge = modelType === ModelType.QIMEN || modelType === ModelType.BAZI;
+  const supportsKnowledge =
+    modelType === ModelType.QIMEN ||
+    modelType === ModelType.BAZI ||
+    activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
-  const isCaseModel = isCaseModelType(modelType);
+  const isCaseModel = isCaseModelType(modelType) && !activeProfessionalFeature;
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null);
   const [editingUserMessageDraft, setEditingUserMessageDraft] = useState('');
@@ -1662,10 +1756,12 @@ const App: React.FC = () => {
       const res = await fetch(`/api/sessions/${id}`);
       if (!res.ok) return;
       const data = await res.json();
+      const sessionChartParams = (data.chartParams || {}) as Record<string, unknown>;
+      const sessionProfessionalFeature = getProfessionalFeature(sessionChartParams);
       let effectiveChartData = data.chartData;
       let matchedCase: CaseDetail | null = null;
 
-      if (isCaseModelType(data.modelType) && data.caseId) {
+      if (!sessionProfessionalFeature && isCaseModelType(data.modelType) && data.caseId) {
         try {
           const detailRes = await fetch(`/api/cases/${data.caseId}`);
           if (detailRes.ok) {
@@ -1680,9 +1776,9 @@ const App: React.FC = () => {
       clearChatSession();
       setActiveSessionId(id);
       setHasSelectedModel(true);
-      setModelType(data.modelType as ModelType);
+      setModelType(sessionProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? ModelType.BAZI : (data.modelType as ModelType));
       setChartData(effectiveChartData);
-      setActiveChartParams((data.chartParams || {}) as Record<string, unknown>);
+      setActiveChartParams(sessionChartParams);
       setStep('chart');
       setError('');
       setCaseFormOpen(false);
@@ -1757,7 +1853,7 @@ const App: React.FC = () => {
         }
       }
 
-      setActiveCase(matchedCase);
+      setActiveCase(sessionProfessionalFeature ? null : matchedCase);
     } catch {
       // silently ignore
     }
@@ -1768,14 +1864,17 @@ const App: React.FC = () => {
     if (!storedSession) return;
 
     const detail = getGuestCaseDetail(storedSession.caseId);
-    const effectiveChartData = detail?.chartData ?? storedSession.chartData;
+    const sessionProfessionalFeature = getProfessionalFeature(storedSession.chartParams || {});
+    const effectiveChartData = sessionProfessionalFeature
+      ? storedSession.chartData
+      : (detail?.chartData ?? storedSession.chartData);
     clearChatSession();
     setHasSelectedModel(true);
-    setModelType(storedSession.modelType);
+    setModelType(sessionProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? ModelType.BAZI : (storedSession.modelType as ModelType));
     setChartData(effectiveChartData);
     setActiveChartParams(storedSession.chartParams || {});
     setActiveSessionId(storedSession.id);
-    setActiveCase(detail);
+    setActiveCase(sessionProfessionalFeature ? null : detail);
     setStep('chart');
     setError('');
     setCaseFormOpen(false);
@@ -1801,8 +1900,12 @@ const App: React.FC = () => {
     pendingCaseSessionScrollRef.current = true;
 
     if (msgs.length > 0) {
+      const restoreModelType =
+        sessionProfessionalFeature === PROFESSIONAL_FEATURE_JOINT
+          ? ModelType.BAZI
+          : (storedSession.modelType as ModelType);
       const systemInstruction = buildSystemInstruction(
-        storedSession.modelType,
+        restoreModelType,
         effectiveChartData,
         storedSession.chartParams || {}
       );
@@ -2527,6 +2630,425 @@ const App: React.FC = () => {
       setChartData(detail.chartData);
     }
   }, [getGuestCaseDetail]);
+
+  const resetProfessionalComposer = useCallback(() => {
+    setProfessionalSelectedProject(null);
+    setProfessionalMode('existing');
+    setProfessionalSelectedCaseId(null);
+    setProfessionalResultSummary('');
+    setProfessionalName('');
+    setProfessionalGender(0);
+    setProfessionalCustomDate('');
+    setProfessionalProvince('');
+    setProfessionalCity('');
+  }, []);
+
+  const syncProfessionalCaseOption = useCallback((nextCase: CaseItem) => {
+    setProfessionalCaseOptions((current) => {
+      const merged = [nextCase, ...current.filter((item) => item.id !== nextCase.id)];
+      return merged.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    });
+    if (nextCase.modelType === modelType) {
+      setCaseItems((current) => {
+        const merged = [nextCase, ...current.filter((item) => item.id !== nextCase.id)];
+        return merged.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      });
+    }
+  }, [modelType]);
+
+  const fetchProfessionalCaseOptions = useCallback(async () => {
+    setProfessionalCasesLoading(true);
+    try {
+      if (isLoggedIn) {
+        const [baziRes, ziweiRes] = await Promise.all([
+          fetch('/api/cases?modelType=bazi'),
+          fetch('/api/cases?modelType=ziwei'),
+        ]);
+        const [baziData, ziweiData] = await Promise.all([
+          baziRes.ok ? baziRes.json() : [],
+          ziweiRes.ok ? ziweiRes.json() : [],
+        ]);
+        setProfessionalCaseOptions([...(baziData as CaseItem[]), ...(ziweiData as CaseItem[])]);
+        return;
+      }
+
+      const allGuestCases = readGuestCases().filter((item) => isCaseModelType(item.modelType));
+      setProfessionalCaseOptions(allGuestCases);
+    } finally {
+      setProfessionalCasesLoading(false);
+    }
+  }, [isLoggedIn, readGuestCases]);
+
+  useEffect(() => {
+    if (!professionalModalOpen) return;
+    void fetchProfessionalCaseOptions();
+  }, [fetchProfessionalCaseOptions, professionalModalOpen]);
+
+  const buildProfessionalBirthChartParams = useCallback(() => {
+    if (!professionalCustomDate) return null;
+    const date = new Date(professionalCustomDate);
+    return {
+      name: professionalName || '',
+      sex: professionalGender,
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+      hours: date.getHours(),
+      minute: date.getMinutes(),
+      province: professionalProvince || '',
+      city: professionalCity || '',
+    } as BaseParams;
+  }, [professionalCity, professionalCustomDate, professionalGender, professionalName, professionalProvince]);
+
+  const toFullBaseParams = useCallback((chartParams: ReturnType<typeof normalizeCaseChartParams>) => {
+    if (
+      chartParams.sex === undefined ||
+      chartParams.year === undefined ||
+      chartParams.month === undefined ||
+      chartParams.day === undefined ||
+      chartParams.hours === undefined ||
+      chartParams.minute === undefined
+    ) {
+      return null;
+    }
+
+    return {
+      name: chartParams.name,
+      sex: chartParams.sex,
+      year: chartParams.year,
+      month: chartParams.month,
+      day: chartParams.day,
+      hours: chartParams.hours,
+      minute: chartParams.minute,
+      province: chartParams.province,
+      city: chartParams.city,
+      specialTags: chartParams.specialTags,
+    } satisfies BaseParams;
+  }, []);
+
+  const persistProfessionalCase = useCallback(async (
+    type: CaseModelType,
+    chartParams: Record<string, unknown>,
+    chartData: unknown,
+    existingCase?: CaseItem | CaseDetail | null
+  ): Promise<CaseDetail | null> => {
+    const nextChartParams = appendCaseSpecialTag(chartParams, JOINT_CASE_TAG);
+
+    if (isLoggedIn) {
+      const detail = existingCase
+        ? await updateCaseInDb(
+            existingCase.id,
+            type,
+            nextChartParams,
+            chartData,
+            existingCase.klineData,
+            existingCase.initialAnalysisData
+          )
+        : await createCaseInDb(type, nextChartParams, chartData);
+      if (detail) {
+        syncProfessionalCaseOption(detail);
+        if (activeCase?.id === detail.id) {
+          setActiveCase(detail);
+        }
+      }
+      return detail;
+    }
+
+    const nowIso = new Date().toISOString();
+    const nextCase: CaseItem = existingCase
+      ? {
+          id: existingCase.id,
+          modelType: type,
+          title: buildCaseTitle(type, nextChartParams, existingCase.title),
+          chartParams: nextChartParams,
+          chartData,
+          klineData: existingCase.klineData,
+          initialAnalysisData: existingCase.initialAnalysisData,
+          createdAt: existingCase.createdAt,
+          updatedAt: nowIso,
+        }
+      : {
+          id: `guest-case-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          modelType: type,
+          title: buildCaseTitle(type, nextChartParams),
+          chartParams: nextChartParams,
+          chartData,
+          klineData: null,
+          initialAnalysisData: null,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+
+    saveGuestCase(nextCase);
+    syncProfessionalCaseOption(nextCase);
+    return getGuestCaseDetail(nextCase.id);
+  }, [activeCase?.id, createCaseInDb, getGuestCaseDetail, isLoggedIn, saveGuestCase, syncProfessionalCaseOption, updateCaseInDb]);
+
+  const findProfessionalMatchingCase = useCallback((
+    targetType: CaseModelType,
+    chartParams: Record<string, unknown>
+  ) => {
+    return professionalCaseOptions.find(
+      (item) => item.modelType === targetType && isSameCaseChartIdentity(item.chartParams, chartParams)
+    ) || null;
+  }, [professionalCaseOptions]);
+
+  const fetchLoggedCaseDetail = useCallback(async (caseId: string) => {
+    const res = await fetch(`/api/cases/${caseId}`);
+    if (!res.ok) return null;
+    return await res.json() as CaseDetail;
+  }, []);
+
+  const buildJointSummaryTitle = useCallback((chartParams: Record<string, unknown>) => {
+    const fullTitle = buildCaseTitle(ModelType.BAZI, chartParams);
+    return fullTitle.replace(/^八字命例\s*·\s*/, '') || '联合命盘';
+  }, []);
+
+  const runJointProfessionalSession = useCallback(async (
+    jointData: JointChartData,
+    sourceChartParams: Record<string, unknown>
+  ) => {
+    const sessionChartParams = {
+      ...sourceChartParams,
+      professionalFeature: PROFESSIONAL_FEATURE_JOINT,
+      sourceModelType: ModelType.BAZI,
+      jointChartData: jointData,
+      question: '',
+      analysisModel,
+    };
+    const systemInstruction = buildJointAnalysisSystemInstruction(jointData);
+    const prompt = buildJointAnalysisPrompt(jointData);
+    const userContent = buildJointInitialUserContent(jointData);
+    const sessionTitle = `联合分析 · ${jointData.summaryTitle}`;
+
+    setHasSelectedModel(true);
+    setModelType(ModelType.BAZI);
+    setStep('chart');
+    setChartData(jointData);
+    setActiveChartParams(sessionChartParams);
+    setSessionAnalysisModel(analysisModel);
+    setActiveCase(null);
+    setQuestion('');
+    setError('');
+    setKnowledgeHint(null);
+    setLoading(true);
+    setIsTyping(true);
+    resetMessageVersions();
+    clearChatSession();
+    setChatHistory([]);
+
+    try {
+      let currentSessionId: string | null = null;
+
+      if (isLoggedIn) {
+        currentSessionId = await saveSessionToDb(
+          JOINT_BAZI_ZIWEI_SESSION_TYPE,
+          sessionTitle,
+          sessionChartParams,
+          jointData,
+          jointData.baziCaseId ?? null
+        );
+      } else {
+        const nowIso = new Date().toISOString();
+        const guestSession: GuestStoredSession = {
+          id: `guest-case-session-${Date.now()}`,
+          caseId: jointData.baziCaseId || jointData.ziweiCaseId || `joint-${Date.now()}`,
+          modelType: JOINT_BAZI_ZIWEI_SESSION_TYPE,
+          title: sessionTitle,
+          chartParams: sessionChartParams,
+          chartData: jointData,
+          messages: [],
+          guestFollowUpCount: 0,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        saveGuestCaseSession(guestSession);
+        currentSessionId = guestSession.id;
+      }
+
+      if (currentSessionId) {
+        setActiveSessionId(currentSessionId);
+      }
+
+      await startQimenChat(systemInstruction);
+
+      const userMsg: ChatMessage = {
+        id: 'joint-init-u',
+        role: 'user',
+        content: userContent,
+        timestamp: new Date(),
+      };
+      const modelId = 'joint-init-m';
+      setChatHistory([
+        userMsg,
+        { id: modelId, role: 'model', content: '', timestamp: new Date() },
+      ]);
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
+        },
+        undefined,
+        analysisModel
+      );
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalMessages: ChatMessage[] = [
+        userMsg,
+        {
+          id: modelId,
+          role: 'model',
+          content: finalContent,
+          timestamp: new Date(),
+        },
+      ];
+
+      setChatHistory(finalMessages);
+      setProfessionalResultSummary(stripDisclaimer(finalState.content).slice(0, 120));
+
+      if (isLoggedIn) {
+        await saveMessagesToDb(currentSessionId, [
+          { role: 'user', content: userContent },
+          { role: 'model', content: finalContent },
+        ]);
+        fetchSessions();
+        fetchUserProfile();
+      } else if (currentSessionId) {
+        updateGuestCaseSessionMessages(currentSessionId, finalMessages, 0);
+      }
+    } finally {
+      setLoading(false);
+      setIsTyping(false);
+    }
+  }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
+
+  const handleRunJointProfessionalFromExisting = useCallback(async () => {
+    if (!professionalSelectedCaseId) {
+      setError('请先选择一个已有命例');
+      return;
+    }
+
+    const selectedCase = professionalCaseOptions.find((item) => item.id === professionalSelectedCaseId);
+    if (!selectedCase) {
+      setError('未找到所选命例');
+      return;
+    }
+
+    setProfessionalBusy(true);
+    setError('');
+
+    try {
+      const sourceDetail = isLoggedIn
+        ? await fetchLoggedCaseDetail(selectedCase.id)
+        : getGuestCaseDetail(selectedCase.id);
+      if (!sourceDetail) {
+        throw new Error('命例读取失败，请稍后重试');
+      }
+
+      const sourceParams = normalizeCaseChartParams(sourceDetail.chartParams);
+      const sourceBaseParams = toFullBaseParams(sourceParams);
+      if (!sourceBaseParams) {
+        throw new Error('命例出生信息不完整，无法进行联合分析');
+      }
+      const sourceCase = await persistProfessionalCase(
+        sourceDetail.modelType,
+        sourceParams,
+        sourceDetail.chartData,
+        sourceDetail
+      );
+      if (!sourceCase) {
+        throw new Error('命例标签更新失败，请稍后重试');
+      }
+
+      const counterpartType =
+        sourceCase.modelType === ModelType.BAZI ? ModelType.ZIWEI : ModelType.BAZI;
+      const existingCounterpart = findProfessionalMatchingCase(counterpartType, sourceParams);
+      const counterpartChartData = existingCounterpart
+        ? existingCounterpart.chartData
+        : counterpartType === ModelType.BAZI
+          ? await fetchBazi(sourceBaseParams)
+          : await fetchZiwei(sourceBaseParams);
+      const counterpartCase = await persistProfessionalCase(
+        counterpartType,
+        sourceParams,
+        counterpartChartData,
+        existingCounterpart
+      );
+      if (!counterpartCase) {
+        throw new Error('另一套命盘保存失败，请稍后重试');
+      }
+
+      const jointData: JointChartData = {
+        feature: PROFESSIONAL_FEATURE_JOINT,
+        summaryTitle: buildJointSummaryTitle(sourceParams),
+        baziCaseId: sourceCase.modelType === ModelType.BAZI ? sourceCase.id : counterpartCase.id,
+        ziweiCaseId: sourceCase.modelType === ModelType.ZIWEI ? sourceCase.id : counterpartCase.id,
+        baziChartData: (sourceCase.modelType === ModelType.BAZI ? sourceCase.chartData : counterpartCase.chartData) as BaziResponse,
+        ziweiChartData: (sourceCase.modelType === ModelType.ZIWEI ? sourceCase.chartData : counterpartCase.chartData) as ZiweiResponse,
+      };
+
+      await runJointProfessionalSession(jointData, sourceParams);
+    } catch (err: any) {
+      setError(err?.message || '联合分析启动失败，请稍后重试');
+    } finally {
+      setProfessionalBusy(false);
+    }
+  }, [buildJointSummaryTitle, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalCase, professionalCaseOptions, professionalSelectedCaseId, runJointProfessionalSession]);
+
+  const handleRunJointProfessionalFromNew = useCallback(async () => {
+    const sourceParams = buildProfessionalBirthChartParams();
+    if (!sourceParams) {
+      setError('请选择出生日期');
+      return;
+    }
+
+    setProfessionalBusy(true);
+    setError('');
+
+    try {
+      const sourceChartParams = sourceParams as unknown as Record<string, unknown>;
+      const [baziChartData, ziweiChartData] = await Promise.all([
+        fetchBazi(sourceParams),
+        fetchZiwei(sourceParams),
+      ]);
+
+      const [baziCase, ziweiCase] = await Promise.all([
+        persistProfessionalCase(
+          ModelType.BAZI,
+          sourceChartParams,
+          baziChartData,
+          findProfessionalMatchingCase(ModelType.BAZI, sourceChartParams)
+        ),
+        persistProfessionalCase(
+          ModelType.ZIWEI,
+          sourceChartParams,
+          ziweiChartData,
+          findProfessionalMatchingCase(ModelType.ZIWEI, sourceChartParams)
+        ),
+      ]);
+
+      if (!baziCase || !ziweiCase) {
+        throw new Error('联合命例保存失败，请稍后重试');
+      }
+
+      const jointData: JointChartData = {
+        feature: PROFESSIONAL_FEATURE_JOINT,
+        summaryTitle: buildJointSummaryTitle(sourceChartParams),
+        baziCaseId: baziCase.id,
+        ziweiCaseId: ziweiCase.id,
+        baziChartData,
+        ziweiChartData,
+      };
+
+      await runJointProfessionalSession(jointData, sourceChartParams);
+    } catch (err: any) {
+      setError(err?.message || '联合分析启动失败，请稍后重试');
+    } finally {
+      setProfessionalBusy(false);
+    }
+  }, [buildJointSummaryTitle, buildProfessionalBirthChartParams, findProfessionalMatchingCase, persistProfessionalCase, runJointProfessionalSession]);
 
   const handleDeleteCase = async () => {
     if (!activeCase) return;
@@ -4898,6 +5420,7 @@ const App: React.FC = () => {
                     {caseItems.map((item) => {
                       const params = normalizeCaseChartParams(item.chartParams);
                       const pillarPreview = getCasePillarsPreview(item.modelType, item.chartData);
+                      const specialTags = getCaseSpecialTags(item.chartParams);
                       const datetimeText = buildCaseDateTimeValue(item.chartParams)
                         ? buildCaseDateTimeValue(item.chartParams).replace('T', ' ')
                         : '未填写出生时间';
@@ -4935,6 +5458,22 @@ const App: React.FC = () => {
                               {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
                             </span>
                           </div>
+                          {specialTags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {specialTags.map((tag) => (
+                                <span
+                                  key={`${item.id}-${tag}`}
+                                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                    activeCase?.id === item.id
+                                      ? 'border-amber-200/30 bg-white/10 text-amber-100'
+                                      : 'border-amber-200/80 bg-amber-50/90 text-amber-700'
+                                  }`}
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {solarText && (
                             <div className={`mt-2 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
                               {solarText}
@@ -5354,11 +5893,49 @@ const App: React.FC = () => {
               </div>
 
               {/* Visualization Components */}
-              {modelType === ModelType.QIMEN && <QimenGrid data={chartData} />}
-              {modelType === ModelType.BAZI && <BaziGrid data={chartData} />}
-              {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
-              {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
-              {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+              {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT && isJointChartData(chartData) ? (
+                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-bold text-stone-700">八字 + 紫微联合分析</div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        已同步载入两套命盘，后续追问会以联合命盘为基础进行解读。
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 text-xs font-semibold text-amber-700">
+                      专业功能
+                    </span>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="glass-panel rounded-[24px] border border-white/60 p-4">
+                      <div className="text-sm font-bold text-stone-700">八字命盘</div>
+                      <div className="mt-2 text-xs text-stone-500">
+                        四柱：{getCasePillarsPreview(ModelType.BAZI, chartData.baziChartData) || '未获取'}
+                      </div>
+                      <div className="mt-3 text-xs leading-6 text-stone-600">
+                        {chartData.baziChartData.base_info?.gongli || '出生信息已同步'}
+                      </div>
+                    </div>
+                    <div className="glass-panel rounded-[24px] border border-white/60 p-4">
+                      <div className="text-sm font-bold text-stone-700">紫微命盘</div>
+                      <div className="mt-2 text-xs text-stone-500">
+                        四柱：{getCasePillarsPreview(ModelType.ZIWEI, chartData.ziweiChartData) || '未获取'}
+                      </div>
+                      <div className="mt-3 text-xs leading-6 text-stone-600">
+                        {chartData.ziweiChartData.base_info?.gongli || '出生信息已同步'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {modelType === ModelType.QIMEN && <QimenGrid data={chartData} />}
+                  {modelType === ModelType.BAZI && <BaziGrid data={chartData} />}
+                  {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
+                  {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
+                  {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+                </>
+              )}
             </div>
 
             {isCaseModel && activeCase && (
@@ -5536,7 +6113,7 @@ const App: React.FC = () => {
             {(!isCaseModel || chatHistory.length > 0) && (
             <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
-                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> 大师解读</h3>
+                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : '大师解读'}</h3>
                  <div className="flex items-center gap-3">
                    <button
                      type="button"
@@ -5879,8 +6456,266 @@ const App: React.FC = () => {
         </div>
       )}
 
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
+          type="button"
+          onClick={() => {
+            resetProfessionalComposer();
+            setProfessionalModalOpen(true);
+          }}
+          className="group relative h-[82px] w-[82px] overflow-hidden rounded-full border border-amber-100/45 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.38),rgba(255,248,225,0.18)_44%,rgba(252,211,77,0.12)_72%,rgba(245,158,11,0.08)_100%)] text-stone-700 shadow-[0_18px_46px_rgba(245,158,11,0.12)] backdrop-blur-[18px] transition hover:scale-[1.03] hover:border-amber-100/65"
+          title="专业功能"
+        >
+          <span className="absolute inset-0 rounded-full bg-white/6" />
+          <span className="absolute inset-[2px] rounded-full border border-white/22 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]" />
+          <span className="absolute inset-[8px] rounded-full border border-amber-100/25 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
+          <span className="pointer-events-none absolute inset-x-4 top-2.5 h-4 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.28),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
+          <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
+            <span className="text-[10px] font-medium tracking-[0.24em] text-stone-600/70">专项</span>
+            <span className="mt-1 text-[20px] font-semibold tracking-[-0.03em] text-stone-700/90">专业</span>
+            <span className="mt-1 text-[10px] font-medium tracking-[0.2em] text-stone-600/70">功能</span>
+          </span>
+        </button>
+      </div>
+
+      {professionalModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6"
+          onClick={() => setProfessionalModalOpen(false)}
+        >
+          <div
+            className="glass-panel w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-[32px] border border-white/60 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-bold text-stone-800">专业功能</div>
+                  <div className="mt-1 text-sm text-stone-500">用于承载更深度的专项分析，结果会保存到会话或关联命例中。</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfessionalModalOpen(false)}
+                  className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-chat-bg max-h-[calc(88vh-104px)] overflow-y-auto px-6 py-5">
+              {!professionalSelectedProject && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setProfessionalSelectedProject(PROFESSIONAL_FEATURE_JOINT)}
+                    className="glass-panel-soft rounded-[28px] border border-white/60 p-5 text-left transition hover:bg-white/75"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-base font-bold text-stone-700">八字 + 紫微联合分析</div>
+                      <span className="rounded-full border border-amber-200 bg-amber-50/90 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        首发
+                      </span>
+                    </div>
+                    <div className="mt-3 text-sm leading-7 text-stone-600">
+                      同步读取八字与紫微两套命盘，交叉印证后给出整合判断，适合做全局命例诊断。
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT && (
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-bold text-stone-700">八字 + 紫微联合分析</div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        可直接选已有命例，也可新建联合命例。首次分析默认做全盘解读，不带专项提问。
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetProfessionalComposer}
+                      className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+                    >
+                      重新选择
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setProfessionalMode('existing')}
+                      className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                        professionalMode === 'existing'
+                          ? 'glass-panel-dark border-transparent text-amber-200'
+                          : 'glass-chip text-stone-600'
+                      }`}
+                    >
+                      选择已有命例
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProfessionalMode('new')}
+                      className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                        professionalMode === 'new'
+                          ? 'glass-panel-dark border-transparent text-amber-200'
+                          : 'glass-chip text-stone-600'
+                      }`}
+                    >
+                      新建联合命例
+                    </button>
+                  </div>
+
+                  {professionalMode === 'existing' && (
+                    <div className="space-y-4">
+                      <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4">
+                        <div className="text-sm font-bold text-stone-700">已有命例</div>
+                        <div className="mt-1 text-xs text-stone-500">
+                          优先使用现有命例；系统会自动补齐另一套命盘，并给对应命例打上“八字+紫薇”标签。
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          {professionalCasesLoading && (
+                            <div className="col-span-full text-sm text-stone-400">正在读取命例...</div>
+                          )}
+                          {!professionalCasesLoading && professionalCaseOptions.length === 0 && (
+                            <div className="col-span-full rounded-2xl border border-dashed border-stone-200 px-4 py-6 text-center text-sm text-stone-400">
+                              暂无可用命例，请切换到“新建联合命例”。
+                            </div>
+                          )}
+                          {professionalCaseOptions.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setProfessionalSelectedCaseId(item.id)}
+                              className={`rounded-[24px] border px-4 py-3 text-left transition ${
+                                professionalSelectedCaseId === item.id
+                                  ? 'glass-panel-dark border-transparent text-amber-200'
+                                  : 'glass-panel bg-white/70 border-white/60 text-stone-700 hover:bg-white/85'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-bold">{item.title}</div>
+                                  <div className={`mt-1 text-xs ${professionalSelectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                    四柱：{getCasePillarsPreview(item.modelType, item.chartData) || '未获取'}
+                                  </div>
+                                </div>
+                                <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                  professionalSelectedCaseId === item.id
+                                    ? 'border-amber-200/30 text-amber-100'
+                                    : 'border-stone-200 text-stone-500'
+                                }`}>
+                                  {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleRunJointProfessionalFromExisting()}
+                        disabled={professionalBusy || !professionalSelectedCaseId}
+                        className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+                          professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                        }`}
+                      >
+                        {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
+                      </button>
+                    </div>
+                  )}
+
+                  {professionalMode === 'new' && (
+                    <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="block text-sm font-semibold text-stone-700">姓名（可选）</span>
+                          <input
+                            type="text"
+                            value={professionalName}
+                            onChange={(event) => setProfessionalName(event.target.value)}
+                            className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                            placeholder="请输入姓名"
+                          />
+                        </label>
+                        <div>
+                          <span className="block text-sm font-semibold text-stone-700">性别</span>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setProfessionalGender(0)}
+                              className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                            >
+                              男
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setProfessionalGender(1)}
+                              className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                            >
+                              女
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <label className="block">
+                        <span className="block text-sm font-semibold text-stone-700">出生时间</span>
+                        <input
+                          type="datetime-local"
+                          value={professionalCustomDate}
+                          onChange={(event) => setProfessionalCustomDate(event.target.value)}
+                          className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                        />
+                      </label>
+
+                      <LocationSelector
+                        province={professionalProvince}
+                        city={professionalCity}
+                        setProvince={setProfessionalProvince}
+                        setCity={setProfessionalCity}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => void handleRunJointProfessionalFromNew()}
+                        disabled={professionalBusy || !professionalCustomDate}
+                        className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+                          professionalBusy || !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                        }`}
+                      >
+                        {professionalBusy ? '双盘排盘中...' : '排盘并开始联合分析'}
+                      </button>
+                    </div>
+                  )}
+
+                  {professionalResultSummary && (
+                    <div className="glass-panel-soft rounded-[26px] border border-white/60 px-4 py-4">
+                      <div className="text-sm font-bold text-stone-700">已载入主界面</div>
+                      <div className="mt-2 text-sm leading-7 text-stone-600">
+                        {professionalResultSummary}...
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setProfessionalModalOpen(false)}
+                          className="glass-panel-dark rounded-full px-4 py-2 text-xs text-amber-200 hover:brightness-105"
+                        >
+                          查看当前结果
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* K线浮球 */}
-      {modelType === ModelType.BAZI && step === 'chart' && klinePos && (
+      {modelType === ModelType.BAZI && step === 'chart' && klinePos && !activeProfessionalFeature && (
         <div className="fixed z-40 select-none" style={{ left: klinePos.x, top: klinePos.y }}>
           <button
             type="button"

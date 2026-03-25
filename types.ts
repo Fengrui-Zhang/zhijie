@@ -28,6 +28,7 @@ export interface BaseParams {
   born_year?: number;
   province?: string;
   city?: string;
+  specialTags?: string[];
   
   // Liuyao Specifics
   pan_model?: number;

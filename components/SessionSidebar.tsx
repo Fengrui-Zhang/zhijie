@@ -8,6 +8,7 @@ const MODEL_LABELS: Record<string, string> = {
   ziwei: '紫微斗数',
   meihua: '梅花易数',
   liuyao: '六爻纳甲',
+  joint_bazi_ziwei: '八字+紫微联合',
 };
 
 const MODEL_ICONS: Record<string, string> = {
@@ -16,6 +17,7 @@ const MODEL_ICONS: Record<string, string> = {
   ziwei: '紫',
   meihua: '梅',
   liuyao: '爻',
+  joint_bazi_ziwei: '专',
 };
 
 export interface SessionItem {
