@@ -84,6 +84,11 @@ const CopyIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125H4.875A1.125 1.125 0 0 1 3.75 20.625V8.625c0-.621.504-1.125 1.125-1.125H8.25m7.5 9.75H19.125c.621 0 1.125-.504 1.125-1.125V4.125C20.25 3.504 19.746 3 19.125 3H9.375c-.621 0-1.125.504-1.125 1.125v3.375m7.5 9.75H9.375A1.125 1.125 0 0 1 8.25 16.125V8.625c0-.621.504-1.125 1.125-1.125h5.25c.298 0 .584.118.795.33l2.625 2.625c.211.211.33.497.33.795v4.875c0 .621-.504 1.125-1.125 1.125Z" />
   </svg>
 );
+const EditIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a2.25 2.25 0 1 1 3.182 3.182l-10.5 10.5a4.5 4.5 0 0 1-1.897 1.092l-2.685.805.804-2.685a4.5 4.5 0 0 1 1.093-1.897l10.316-10.309Z" />
+  </svg>
+);
 const HistoryIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m5.25 0A9.75 9.75 0 1 1 18 5.756L21.75 9M21.75 4.5v4.5h-4.5" />
@@ -906,6 +911,8 @@ const App: React.FC = () => {
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const isCaseModel = isCaseModelType(modelType);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null);
+  const [editingUserMessageDraft, setEditingUserMessageDraft] = useState('');
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
@@ -974,7 +981,11 @@ const App: React.FC = () => {
     if (openVersionMenuId && !messageIds.has(openVersionMenuId)) {
       setOpenVersionMenuId(null);
     }
-  }, [chatHistory, openVersionMenuId]);
+    if (editingUserMessageId && !messageIds.has(editingUserMessageId)) {
+      setEditingUserMessageId(null);
+      setEditingUserMessageDraft('');
+    }
+  }, [chatHistory, editingUserMessageId, openVersionMenuId]);
 
   useEffect(() => {
     try {
@@ -3736,6 +3747,177 @@ const App: React.FC = () => {
     }
   };
 
+  const handleStartEditUserMessage = useCallback((messageId: string, content: string) => {
+    if (isTyping) return;
+    setOpenVersionMenuId(null);
+    setEditingUserMessageId(messageId);
+    setEditingUserMessageDraft(content);
+  }, [isTyping]);
+
+  const handleCancelEditUserMessage = useCallback(() => {
+    setEditingUserMessageId(null);
+    setEditingUserMessageDraft('');
+  }, []);
+
+  const handleSubmitEditedUserMessage = async (messageId: string) => {
+    if (!chartData || isTyping) return;
+    const editedContent = editingUserMessageDraft.trim();
+    if (!editedContent) {
+      setError('问题不能为空');
+      return;
+    }
+    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+
+    const userIndex = chatHistory.findIndex((msg) => msg.id === messageId);
+    if (userIndex < 0 || chatHistory[userIndex]?.role !== 'user') return;
+
+    const modelIndex = chatHistory.findIndex((msg, index) => index > userIndex && msg.role === 'model');
+    const targetModelMessage = modelIndex >= 0 ? chatHistory[modelIndex] : null;
+    const lockedModel = sessionAnalysisModel ?? DEFAULT_ANALYSIS_MODEL;
+    const editedUserMessage: ChatMessage = {
+      ...chatHistory[userIndex],
+      content: editedContent,
+      timestamp: new Date(),
+    };
+
+    setError('');
+    setKnowledgeHint(null);
+    setIsTyping(true);
+    setEditingUserMessageId(null);
+    setEditingUserMessageDraft('');
+
+    try {
+      let prompt = '';
+      let knowledgeQuery = '';
+      let nextMessagesBase: ChatMessage[] = [];
+      let nextChartParams = activeChartParams;
+
+      if (userIndex === 0) {
+        const editedHistory = chatHistory.map((msg, index) =>
+          index === userIndex ? editedUserMessage : msg
+        );
+        const bundle = buildInitialAnalysisBundle(
+          modelType,
+          chartData,
+          activeChartParams,
+          editedHistory
+        );
+        nextChartParams = {
+          ...activeChartParams,
+          question: bundle.question,
+          analysisModel: lockedModel,
+        };
+        clearChatSession();
+        await startQimenChat(bundle.systemInstruction);
+        prompt = bundle.prompt;
+        knowledgeQuery = bundle.knowledgeQuery || bundle.question || editedContent;
+        nextMessagesBase = [editedUserMessage];
+        setActiveChartParams(nextChartParams);
+        setSessionAnalysisModel(lockedModel);
+      } else {
+        const prefixHistory = chatHistory.slice(0, userIndex);
+        restoreChatSession(
+          buildSystemInstruction(modelType, chartData, activeChartParams),
+          prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
+        );
+        prompt = editedContent;
+        knowledgeQuery = editedContent;
+        nextMessagesBase = [...prefixHistory, editedUserMessage];
+      }
+
+      const replyId = targetModelMessage?.id ?? `${messageId}-edited-model`;
+      const placeholder: ChatMessage = {
+        id: replyId,
+        role: 'model',
+        content: '',
+        timestamp: new Date(),
+      };
+      setChatHistory([...nextMessagesBase, placeholder]);
+
+      const knowledge = useKnowledge && supportsKnowledge
+        ? {
+            enabled: true,
+            board: knowledgeBoardMap[modelType],
+            query: knowledgeQuery,
+          }
+        : undefined;
+
+      const finalState = await sendMessageToDeepseekStream(
+        prompt,
+        (state) => {
+          updateChatMessage(replyId, buildModelContent(state.reasoning, state.content));
+        },
+        knowledge,
+        lockedModel
+      );
+
+      if (finalState.knowledgeFailed) {
+        setKnowledgeHint(finalState.knowledgeFailed);
+      }
+
+      const finalAnswer = appendDisclaimer(finalState.content);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      const finalMessages: ChatMessage[] = [
+        ...nextMessagesBase,
+        {
+          ...placeholder,
+          content: finalContent,
+          timestamp: new Date(),
+        },
+      ];
+
+      setChatHistory(finalMessages);
+      setOpenVersionMenuId(null);
+
+      if (targetModelMessage) {
+        const nextVersionState = (() => {
+          const existingEntries = messageVersionMap[replyId]?.entries ?? [
+            buildMessageVersionEntry(replyId, targetModelMessage.content, targetModelMessage.timestamp),
+          ];
+          const latestEntry = buildMessageVersionEntry(replyId, finalContent);
+          return {
+            entries: [...existingEntries, latestEntry],
+            activeId: latestEntry.id,
+          };
+        })();
+
+        setMessageVersionMap((current) => ({
+          ...current,
+          [replyId]: nextVersionState,
+        }));
+      }
+
+      if (isLoggedIn) {
+        await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
+        if (userIndex === 0) {
+          await updateSessionInDb(activeSessionId, { chartParams: nextChartParams });
+        }
+        fetchSessions();
+        fetchUserProfile();
+      } else if (activeSessionId && activeCase) {
+        updateGuestCaseSession(activeSessionId, (session) => ({
+          ...session,
+          chartParams: userIndex === 0 ? nextChartParams : session.chartParams,
+          messages: finalMessages.map((msg) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+          })),
+          updatedAt: new Date().toISOString(),
+        }));
+        refreshGuestActiveCase(activeCase.id);
+      }
+    } catch (err: any) {
+      setError(err.message || '修改问题失败，请稍后重试');
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
   const sendFollowUpMessage = async (
     rawMessage: string,
     options?: {
@@ -5329,6 +5511,7 @@ const App: React.FC = () => {
                    const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
                    const versionState = messageVersionMap[msg.id];
                    const hasVersionHistory = (versionState?.entries.length ?? 0) > 1;
+                   const isEditingUserMessage = msg.role === 'user' && editingUserMessageId === msg.id;
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`group max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
@@ -5341,10 +5524,62 @@ const App: React.FC = () => {
                           </div>
                         )}
                         <div className="markdown-body text-sm leading-relaxed">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {msg.role === 'model' && parsed ? parsed.answer : msg.content}
-                          </ReactMarkdown>
+                          {isEditingUserMessage ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editingUserMessageDraft}
+                                onChange={(event) => setEditingUserMessageDraft(event.target.value)}
+                                className="min-h-[96px] w-full rounded-2xl border border-white/25 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
+                                placeholder="修改后重新提交"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditUserMessage}
+                                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white/80 transition hover:bg-white/15"
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleSubmitEditedUserMessage(msg.id)}
+                                  disabled={isTyping}
+                                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                                    isTyping
+                                      ? 'bg-white/10 text-white/40 cursor-not-allowed'
+                                      : 'bg-white text-stone-800 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  提交并重跑
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {msg.role === 'model' && parsed ? parsed.answer : msg.content}
+                            </ReactMarkdown>
+                          )}
                         </div>
+                        {msg.role === 'user' && !isEditingUserMessage && (
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditUserMessage(msg.id, msg.content)}
+                              disabled={isTyping}
+                              title="修改已发送的问题并重新运行该条"
+                              className={`group/action flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] shadow-sm transition ${
+                                isTyping
+                                  ? 'border-white/10 bg-white/5 text-white/35 cursor-not-allowed'
+                                  : 'border-white/20 bg-white/10 text-white/75 hover:border-white/35 hover:bg-white/15 hover:text-white'
+                              }`}
+                            >
+                              <EditIcon className="h-3.5 w-3.5" />
+                              <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
+                                修改问题
+                              </span>
+                            </button>
+                          </div>
+                        )}
                         {msg.role === 'model' && (
                           <div className="mt-4 flex justify-end">
                             <div className="relative flex items-center gap-2">

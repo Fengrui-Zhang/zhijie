@@ -19,7 +19,7 @@ export const ANALYSIS_MODEL_OPTIONS: Array<{
   label: string;
 }> = [
   { value: DEEPSEEK_REASONER_MODEL, label: 'DeepSeek R1' },
-  { value: DOUBAO_SEED_LITE_MODEL, label: '豆包 Lite' },
+  { value: DOUBAO_SEED_LITE_MODEL, label: '豆包 Lite（推荐）' },
 ];
 
 export const isAnalysisModel = (value: unknown): value is AnalysisModel =>
