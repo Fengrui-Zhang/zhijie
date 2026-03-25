@@ -5455,10 +5455,14 @@ const App: React.FC = () => {
                                 ? 'border-amber-200/30 text-amber-100'
                                 : 'border-stone-200 text-stone-500'
                             }`}>
-                              {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
+                              {specialTags.includes(JOINT_CASE_TAG)
+                                ? JOINT_CASE_TAG
+                                : item.modelType === ModelType.BAZI
+                                  ? '八字'
+                                  : '紫微'}
                             </span>
                           </div>
-                          {specialTags.length > 0 && (
+                          {specialTags.length > 0 && !specialTags.includes(JOINT_CASE_TAG) && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {specialTags.map((tag) => (
                                 <span
