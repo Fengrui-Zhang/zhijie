@@ -66,14 +66,19 @@ export interface PalaceData {
   dipan: { sanqiliuyi: string; jiuxing_tianqin_sanqiliuyi?: string; };
   renpan: { bamen: string; };
   shenpan: { bashen: string; };
-  description: { luo_gong_desc: string; };
+  description: { luo_gong_desc: string; gong_ju?: string; };
   is_kongwang: boolean | number | string;
   is_maxing: boolean | number | string;
+  yingan?: string;
 }
 
 export interface QimenResponse {
+  name?: string;
+  sex?: string;
   gongli: string;
   nongli: string;
+  jieqi_pre?: string;
+  jieqi_next?: string;
   sizhu_info: {
     year_gan: string; year_zhi: string;
     month_gan: string; month_zhi: string;
@@ -81,6 +86,9 @@ export interface QimenResponse {
     hour_gan: string; hour_zhi: string;
   };
   dunju: string;
+  dingju?: string;
+  panlei?: string;
+  fushou?: string;
   xunshou: string;
   zhifu_info: {
     zhifu_name: string; zhifu_luogong: string;
@@ -89,6 +97,18 @@ export interface QimenResponse {
   xunkong_info: {
     year_xunkong: string; month_xunkong: string;
     day_xunkong: string; hour_xunkong: string;
+  };
+  xunshou_info?: {
+    year_xunshou: string; month_xunshou: string;
+    day_xunshou: string; hour_xunshou: string;
+  };
+  maxing_info?: {
+    maxing_name?: string;
+    maxing_luogong?: string;
+  };
+  kongwang_info?: {
+    kongwang_name?: string;
+    kongwang_luogong?: string;
   };
   gong_pan: any[];
 }

@@ -168,23 +168,93 @@ export const fetchLiuyao = async (params: BaseParams) => {
 // --- Prompt Formatters ---
 
 export const formatQimenPrompt = (data: QimenResponse, question: string) => {
-  const { gongli, dunju, zhifu_info, gong_pan } = data;
-  let gridStr = gong_pan.map((g: any) => 
-    `${g.description?.luo_gong_desc}: ${g.shenpan?.bashen} ${g.tianpan?.jiuxing} ${g.renpan?.bamen}`
-  ).join('\n');
+  const {
+    name,
+    sex,
+    gongli,
+    nongli,
+    jieqi_pre,
+    jieqi_next,
+    sizhu_info,
+    xunkong_info,
+    xunshou_info,
+    dunju,
+    dingju,
+    panlei,
+    fushou,
+    xunshou,
+    zhifu_info,
+    maxing_info,
+    kongwang_info,
+    gong_pan,
+  } = data;
 
-  return `
-  【奇门遁甲排盘】
-  时间: ${gongli}
-  局式: ${dunju}
-  值符: ${zhifu_info.zhifu_name}, 值使: ${zhifu_info.zhishi_name}
-  
-  九宫详情:
-  ${gridStr}
+  const palaceLabels = ['一宫', '二宫', '三宫', '四宫', '五宫', '六宫', '七宫', '八宫', '中宫'];
+  const normalizeFlag = (value: unknown) => value === 1 || value === '1' || value === true ? '是' : '否';
+  const fmt = (value?: string) => value && value.trim() ? value : '无';
+  const userQuestion = question.trim() || '无';
 
-  用户问题: "${question}"
-  请以奇门遁甲专家的身份进行详细解读。关注用神、时令、吉凶。
-  `;
+  const palaceLines = gong_pan.map((gong: any, index: number) => {
+    const label = palaceLabels[index] || `宫位${index + 1}`;
+    return `${label}：
+- 八神：${fmt(gong.shenpan?.bashen)}
+- 九星：${fmt(gong.tianpan?.jiuxing)}
+- 八门：${fmt(gong.renpan?.bamen)}
+- 天盘干：${fmt(gong.tianpan?.sanqiliuyi)}
+- 地盘干：${fmt(gong.dipan?.sanqiliuyi)}
+- 隐干：${fmt(gong.yingan)}
+- 宫局：${fmt(gong.description?.gong_ju)}
+- 空亡：${normalizeFlag(gong.is_kongwang)}
+- 马星：${normalizeFlag(gong.is_maxing)}`;
+  }).join('\n\n');
+
+  return `【任务要求】
+你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。
+
+【用户信息】
+姓名：${fmt(name)}
+性别：${fmt(sex)}
+
+【起盘时间】
+公历：${fmt(gongli)}
+农历：${fmt(nongli)}
+上个节气：${fmt(jieqi_pre)}
+下个节气：${fmt(jieqi_next)}
+
+【四柱信息】
+年柱：${fmt(`${sizhu_info?.year_gan || ''}${sizhu_info?.year_zhi || ''}`)}
+月柱：${fmt(`${sizhu_info?.month_gan || ''}${sizhu_info?.month_zhi || ''}`)}
+日柱：${fmt(`${sizhu_info?.day_gan || ''}${sizhu_info?.day_zhi || ''}`)}
+时柱：${fmt(`${sizhu_info?.hour_gan || ''}${sizhu_info?.hour_zhi || ''}`)}
+
+【旬空信息】
+年柱旬空：${fmt(xunkong_info?.year_xunkong)}
+月柱旬空：${fmt(xunkong_info?.month_xunkong)}
+日柱旬空：${fmt(xunkong_info?.day_xunkong)}
+时柱旬空：${fmt(xunkong_info?.hour_xunkong)}
+
+【旬首信息】
+年柱旬首：${fmt(xunshou_info?.year_xunshou)}
+月柱旬首：${fmt(xunshou_info?.month_xunshou)}
+日柱旬首：${fmt(xunshou_info?.day_xunshou)}
+时柱旬首：${fmt(xunshou_info?.hour_xunshou)}
+
+【奇门总览】
+遁局：${fmt(dunju)}
+定局：${fmt(dingju)}
+盘类：${fmt(panlei)}
+符首：${fmt(fushou)}
+旬首：${fmt(xunshou)}
+值符：${fmt(zhifu_info?.zhifu_name)}（落${fmt(zhifu_info?.zhifu_luogong)}宫）
+值使：${fmt(zhifu_info?.zhishi_name)}（落${fmt(zhifu_info?.zhishi_luogong)}宫）
+马星：${fmt(maxing_info?.maxing_name)}（落${fmt(maxing_info?.maxing_luogong)}宫）
+空亡：${fmt(kongwang_info?.kongwang_name)}（落${fmt(kongwang_info?.kongwang_luogong)}宫）
+
+【九宫盘面】
+${palaceLines}
+
+【用户问题】
+${userQuestion}`;
 };
 
 export const formatBaziPrompt = (data: BaziResponse) => {
