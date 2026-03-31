@@ -34,6 +34,34 @@ export async function GET(
           updatedAt: true,
         },
       },
+      relationLinksA: {
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          caseAId: true,
+          caseBId: true,
+          labelAToB: true,
+          labelBToA: true,
+          createdAt: true,
+          updatedAt: true,
+          caseA: { select: { title: true } },
+          caseB: { select: { title: true } },
+        },
+      },
+      relationLinksB: {
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          caseAId: true,
+          caseBId: true,
+          labelAToB: true,
+          labelBToA: true,
+          createdAt: true,
+          updatedAt: true,
+          caseA: { select: { title: true } },
+          caseB: { select: { title: true } },
+        },
+      },
     },
   });
 
@@ -41,7 +69,22 @@ export async function GET(
     return NextResponse.json({ error: '命例不存在' }, { status: 404 });
   }
 
-  return NextResponse.json(divinationCase);
+  const relations = [...divinationCase.relationLinksA, ...divinationCase.relationLinksB].map((relation) => ({
+    id: relation.id,
+    caseAId: relation.caseAId,
+    caseBId: relation.caseBId,
+    labelAToB: relation.labelAToB,
+    labelBToA: relation.labelBToA,
+    caseATitle: relation.caseA.title,
+    caseBTitle: relation.caseB.title,
+    createdAt: relation.createdAt.toISOString(),
+    updatedAt: relation.updatedAt.toISOString(),
+  }));
+
+  return NextResponse.json({
+    ...divinationCase,
+    relations,
+  });
 }
 
 export async function PUT(

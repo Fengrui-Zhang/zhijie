@@ -1,5 +1,6 @@
 import { ModelType } from '../types';
 import { DEFAULT_ANALYSIS_MODEL, isAnalysisModel, type AnalysisModel } from './analysis-models';
+import type { CaseRelationItem } from './case-relations';
 
 export const CASE_MODEL_TYPES = [ModelType.BAZI, ModelType.ZIWEI] as const;
 
@@ -47,6 +48,7 @@ export interface CaseItem {
 
 export interface CaseDetail extends CaseItem {
   sessions: CaseSessionItem[];
+  relations?: CaseRelationItem[];
 }
 
 const toNumber = (value: unknown) => {

@@ -9,6 +9,7 @@ const MODEL_LABELS: Record<string, string> = {
   meihua: '梅花易数',
   liuyao: '六爻纳甲',
   joint_bazi_ziwei: '八字+紫微联合',
+  bazi_compatibility: '八字合盘',
 };
 
 const MODEL_ICONS: Record<string, string> = {
@@ -18,6 +19,7 @@ const MODEL_ICONS: Record<string, string> = {
   meihua: '梅',
   liuyao: '爻',
   joint_bazi_ziwei: '专',
+  bazi_compatibility: '合',
 };
 
 export interface SessionItem {
