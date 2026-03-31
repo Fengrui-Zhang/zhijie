@@ -38,6 +38,7 @@ import { deriveInitialAnalysisFromSession } from './lib/initial-analysis';
 import {
   appendCaseSpecialTag,
   BAZI_COMPATIBILITY_SESSION_TYPE,
+  getBaziCompatibilityCaseIds,
   isBaziCompatibilityChartData,
   getCaseSpecialTags,
   getProfessionalFeature,
@@ -1043,6 +1044,9 @@ const App: React.FC = () => {
   const [caseFormOpen, setCaseFormOpen] = useState(false);
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
   const [caseBusy, setCaseBusy] = useState(false);
+  const [selectedCaseRelationId, setSelectedCaseRelationId] = useState<string | null>(null);
+  const [editingCaseRelationId, setEditingCaseRelationId] = useState<string | null>(null);
+  const [caseRelationEditDraft, setCaseRelationEditDraft] = useState<EditableCaseRelationDraft>({ labelAToB: '', labelBToA: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [noteCollapsed, setNoteCollapsed] = useState(false);
   const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'note' | null>(null);
@@ -1231,6 +1235,12 @@ const App: React.FC = () => {
     }
   }, [chatHistory, editingUserMessageId, openVersionMenuId]);
 
+  useEffect(() => {
+    setSelectedCaseRelationId(null);
+    setEditingCaseRelationId(null);
+    setCaseRelationEditDraft({ labelAToB: '', labelBToA: '' });
+  }, [activeCase?.id]);
+
   const readGuestCases = useCallback((): CaseItem[] => {
     try {
       const raw = localStorage.getItem(GUEST_CASES_STORAGE_KEY);
@@ -1312,7 +1322,11 @@ const App: React.FC = () => {
     if (!matchedCase) return null;
 
     const rawSessions = readGuestCaseSessions()
-      .filter((item) => item.caseId === caseId)
+      .filter((item) => {
+        if (item.caseId === caseId) return true;
+        const compatibilityCaseIds = getBaziCompatibilityCaseIds(item.chartParams);
+        return compatibilityCaseIds?.caseAId === caseId || compatibilityCaseIds?.caseBId === caseId;
+      })
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
     const currentInitialAnalysis = normalizeInitialAnalysisData(matchedCase.initialAnalysisData);
@@ -1837,6 +1851,26 @@ const App: React.FC = () => {
     }
   };
 
+  const updateCaseRelationInDb = async (
+    relationId: string,
+    draft: EditableCaseRelationDraft
+  ): Promise<CaseRelationItem | null> => {
+    try {
+      const res = await fetch(`/api/case-relations/${relationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          labelAToB: draft.labelAToB,
+          labelBToA: draft.labelBToA,
+        }),
+      });
+      if (!res.ok) return null;
+      return normalizeCaseRelationItems([await res.json()])[0] || null;
+    } catch {
+      return null;
+    }
+  };
+
   const saveGuestCase = useCallback((nextCase: CaseItem) => {
     const current = readGuestCases().filter((item) => item.id !== nextCase.id);
     const next = [nextCase, ...current].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -1918,6 +1952,20 @@ const App: React.FC = () => {
 
   const deleteGuestCaseRelation = useCallback((relationId: string) => {
     const next = readGuestCaseRelations().filter((item) => item.id !== relationId);
+    writeGuestCaseRelations(next);
+  }, [readGuestCaseRelations, writeGuestCaseRelations]);
+
+  const updateGuestCaseRelation = useCallback((relationId: string, draft: EditableCaseRelationDraft) => {
+    const next = readGuestCaseRelations().map((item) => (
+      item.id === relationId
+        ? {
+            ...item,
+            labelAToB: draft.labelAToB.trim() || null,
+            labelBToA: draft.labelBToA.trim() || null,
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    ));
     writeGuestCaseRelations(next);
   }, [readGuestCaseRelations, writeGuestCaseRelations]);
 
@@ -3574,19 +3622,18 @@ const App: React.FC = () => {
   const handleConfirmCompatibilityRelations = useCallback(async (skip: boolean) => {
     if (!pendingCompatibilityData || !pendingCompatibilityData.caseAId || !pendingCompatibilityData.caseBId) return;
 
-    const normalizedDrafts = skip
-      ? []
-      : compatRelationDrafts
-          .map((item) => ({
-            id: item.id,
-            labelAToB: item.labelAToB.trim(),
-            labelBToA: item.labelBToA.trim(),
-          }))
-          .filter((item) => item.labelAToB || item.labelBToA);
+    const normalizedDrafts = compatRelationDrafts
+      .map((item) => ({
+        id: item.id,
+        labelAToB: item.labelAToB.trim(),
+        labelBToA: item.labelBToA.trim(),
+      }))
+      .filter((item) => item.labelAToB || item.labelBToA);
+    const hasExistingRelations = compatRelationDrafts.some((item) => item.id || item.labelAToB.trim() || item.labelBToA.trim());
 
-    let finalRelations = normalizedDrafts;
+    let finalRelations = skip ? (hasExistingRelations ? normalizedDrafts : []) : normalizedDrafts;
 
-    if (isLoggedIn) {
+    if (!skip && isLoggedIn) {
       await saveCaseRelationsInDb(
         pendingCompatibilityData.caseAId,
         pendingCompatibilityData.caseBId,
@@ -3596,7 +3643,7 @@ const App: React.FC = () => {
         const detail = await fetchLoggedCaseDetail(activeCase.id);
         if (detail) setActiveCase(detail);
       }
-    } else {
+    } else if (!skip) {
       upsertGuestCaseRelations(
         { id: pendingCompatibilityData.caseAId, title: pendingCompatibilityData.personAName },
         { id: pendingCompatibilityData.caseBId, title: pendingCompatibilityData.personBName },
@@ -3639,8 +3686,33 @@ const App: React.FC = () => {
     setStep('input');
   };
 
+  const openCaseRelationEditor = useCallback((relationId: string) => {
+    if (!activeCase?.relations) return;
+    const relation = activeCase.relations.find((item) => item.id === relationId);
+    if (!relation) return;
+    setSelectedCaseRelationId(relationId);
+    setEditingCaseRelationId(relationId);
+    setCaseRelationEditDraft({
+      id: relation.id,
+      labelAToB: relation.labelAToB?.trim() || '',
+      labelBToA: relation.labelBToA?.trim() || '',
+    });
+  }, [activeCase]);
+
   const handleDeleteCaseRelation = useCallback(async (relationId: string) => {
     if (!activeCase) return;
+
+    const finishRefresh = async () => {
+      setSelectedCaseRelationId(null);
+      setEditingCaseRelationId(null);
+      setCaseRelationEditDraft({ labelAToB: '', labelBToA: '' });
+      if (isLoggedIn) {
+        const detail = await fetchLoggedCaseDetail(activeCase.id);
+        if (detail) setActiveCase(detail);
+      } else {
+        refreshGuestActiveCase(activeCase.id);
+      }
+    };
 
     if (isLoggedIn) {
       const ok = await deleteCaseRelationInDb(relationId);
@@ -3648,14 +3720,44 @@ const App: React.FC = () => {
         setError('删除关系标签失败，请稍后重试');
         return;
       }
-      const detail = await fetchLoggedCaseDetail(activeCase.id);
-      if (detail) setActiveCase(detail);
+      await finishRefresh();
       return;
     }
 
     deleteGuestCaseRelation(relationId);
-    refreshGuestActiveCase(activeCase.id);
+    await finishRefresh();
   }, [activeCase, deleteGuestCaseRelation, fetchLoggedCaseDetail, isLoggedIn, refreshGuestActiveCase]);
+
+  const handleSaveCaseRelationEdit = useCallback(async () => {
+    if (!activeCase || !editingCaseRelationId) return;
+
+    const nextDraft = {
+      labelAToB: caseRelationEditDraft.labelAToB.trim(),
+      labelBToA: caseRelationEditDraft.labelBToA.trim(),
+    };
+
+    if (!nextDraft.labelAToB && !nextDraft.labelBToA) {
+      await handleDeleteCaseRelation(editingCaseRelationId);
+      return;
+    }
+
+    if (isLoggedIn) {
+      const updated = await updateCaseRelationInDb(editingCaseRelationId, nextDraft);
+      if (!updated) {
+        setError('修改关系标签失败，请稍后重试');
+        return;
+      }
+      const detail = await fetchLoggedCaseDetail(activeCase.id);
+      if (detail) setActiveCase(detail);
+    } else {
+      updateGuestCaseRelation(editingCaseRelationId, nextDraft);
+      refreshGuestActiveCase(activeCase.id);
+    }
+
+    setEditingCaseRelationId(null);
+    setSelectedCaseRelationId(null);
+    setCaseRelationEditDraft({ labelAToB: '', labelBToA: '' });
+  }, [activeCase, caseRelationEditDraft, editingCaseRelationId, fetchLoggedCaseDetail, handleDeleteCaseRelation, isLoggedIn, refreshGuestActiveCase, updateGuestCaseRelation]);
 
   const handleSaveCase = async () => {
     if (!isCaseModelType(modelType)) return;
@@ -6607,15 +6709,33 @@ const App: React.FC = () => {
                     <div className="text-sm font-bold text-stone-700">关系标签</div>
                     <div className="flex flex-wrap gap-2">
                       {getCaseDisplayRelations(activeCase.id, activeCase.relations || []).map((relation) => (
-                        <button
-                          key={relation.id}
-                          type="button"
-                          onClick={() => void handleDeleteCaseRelation(relation.id)}
-                          className="glass-chip rounded-full border border-white/60 px-3 py-1.5 text-xs text-stone-600 hover:text-red-500"
-                          title="删除该关系标签"
-                        >
-                          {relation.label}
-                        </button>
+                        <div key={relation.id} className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCaseRelationId((current) => current === relation.id ? null : relation.id)}
+                            className={`glass-chip rounded-full border px-3 py-1.5 text-xs transition ${
+                              selectedCaseRelationId === relation.id
+                                ? 'border-amber-200 bg-amber-50/70 text-amber-700'
+                                : 'border-white/60 text-stone-600 hover:text-stone-800'
+                            }`}
+                            title="点选后可编辑"
+                          >
+                            {relation.label}
+                          </button>
+                          {selectedCaseRelationId === relation.id && (
+                            <button
+                              type="button"
+                              onClick={() => openCaseRelationEditor(relation.id)}
+                              className="glass-chip flex h-8 w-8 items-center justify-center rounded-full border border-white/60 text-stone-600 hover:text-stone-800"
+                              title="修改关系标签"
+                            >
+                              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3.5 13.8 3 17l3.2-.5 8.3-8.3-2.7-2.7-8.3 8.3Z" />
+                                <path d="m10.9 4.8 2.7 2.7" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -7609,6 +7729,12 @@ const App: React.FC = () => {
             </div>
 
             <div className="glass-chat-bg flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5 space-y-4">
+              {compatRelationDrafts.some((draft) => draft.id || draft.labelAToB.trim() || draft.labelBToA.trim()) && (
+                <div className="rounded-[22px] border border-amber-200/70 bg-amber-50/65 px-4 py-3 text-sm leading-7 text-amber-800">
+                  已读取这两位命例之间的已有关系标签。请确认关系是否正确；如需调整，可直接修改后再开始分析。
+                </div>
+              )}
+
               {compatRelationDrafts.map((draft, index) => (
                 <div key={draft.id || index} className="glass-panel-soft rounded-[24px] border border-white/60 p-4 space-y-4">
                   <div className="text-sm font-bold text-stone-700">关系 {index + 1}</div>
@@ -7665,7 +7791,9 @@ const App: React.FC = () => {
                   onClick={() => void handleConfirmCompatibilityRelations(true)}
                   className="glass-chip rounded-full px-4 py-2 text-sm text-stone-600 hover:text-stone-800"
                 >
-                  跳过并开始分析
+                  {compatRelationDrafts.some((draft) => draft.id || draft.labelAToB.trim() || draft.labelBToA.trim())
+                    ? '保持当前标签并开始分析'
+                    : '跳过并开始分析'}
                 </button>
                 <button
                   type="button"
@@ -7678,6 +7806,93 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {editingCaseRelationId && activeCase?.relations && (
+        (() => {
+          const editingRelation = activeCase.relations.find((item) => item.id === editingCaseRelationId);
+          if (!editingRelation) return null;
+          return (
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6"
+              onClick={() => {
+                setEditingCaseRelationId(null);
+                setCaseRelationEditDraft({ labelAToB: '', labelBToA: '' });
+              }}
+            >
+              <div
+                className="glass-panel flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[32px] border border-white/60 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="glass-panel-soft border-b border-white/50 px-6 py-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-bold text-stone-800">修改关系标签</div>
+                      <div className="mt-1 text-sm text-stone-500">可修改双方关系描述，也可直接删除这条标签。</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCaseRelationId(null);
+                        setCaseRelationEditDraft({ labelAToB: '', labelBToA: '' });
+                      }}
+                      className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+                    >
+                      关闭
+                    </button>
+                  </div>
+                </div>
+
+                <div className="glass-chat-bg flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6 md:py-5 space-y-4">
+                  <label className="block">
+                    <span className="block text-sm font-semibold text-stone-700">
+                      {editingRelation.caseATitle || '甲'}是{editingRelation.caseBTitle || '乙'}的：
+                    </span>
+                    <input
+                      type="text"
+                      value={caseRelationEditDraft.labelAToB}
+                      onChange={(event) => setCaseRelationEditDraft((current) => ({ ...current, labelAToB: event.target.value }))}
+                      className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                      placeholder="可留空"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-sm font-semibold text-stone-700">
+                      {editingRelation.caseBTitle || '乙'}是{editingRelation.caseATitle || '甲'}的：
+                    </span>
+                    <input
+                      type="text"
+                      value={caseRelationEditDraft.labelBToA}
+                      onChange={(event) => setCaseRelationEditDraft((current) => ({ ...current, labelBToA: event.target.value }))}
+                      className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                      placeholder="可留空"
+                    />
+                  </label>
+                </div>
+
+                <div className="glass-panel-soft border-t border-white/50 px-4 py-4 md:px-6">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteCaseRelation(editingCaseRelationId)}
+                      className="glass-chip rounded-full px-4 py-2 text-sm text-red-500 hover:text-red-600"
+                    >
+                      删除标签
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveCaseRelationEdit()}
+                      className="glass-panel-dark rounded-full px-4 py-2 text-sm text-amber-200 hover:brightness-105"
+                    >
+                      保存修改
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()
       )}
 
       {/* K线浮球 */}

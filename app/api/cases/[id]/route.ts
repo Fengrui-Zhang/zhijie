@@ -6,6 +6,10 @@ import {
   isCaseModelType,
   normalizeCaseChartParams,
 } from '../../../../lib/divination-cases';
+import {
+  BAZI_COMPATIBILITY_SESSION_TYPE,
+  getBaziCompatibilityCaseIds,
+} from '../../../../lib/professional-features';
 import { prisma } from '../../../../lib/prisma';
 
 export async function GET(
@@ -69,6 +73,40 @@ export async function GET(
     return NextResponse.json({ error: '命例不存在' }, { status: 404 });
   }
 
+  const linkedCompatibilitySessions = await prisma.divinationSession.findMany({
+    where: {
+      userId: session.user.id,
+      modelType: BAZI_COMPATIBILITY_SESSION_TYPE,
+    },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      modelType: true,
+      title: true,
+      caseId: true,
+      createdAt: true,
+      updatedAt: true,
+      chartParams: true,
+    },
+  });
+
+  const mergedSessions = [
+    ...divinationCase.sessions,
+    ...linkedCompatibilitySessions.filter((item) => {
+      const compatibilityCaseIds = getBaziCompatibilityCaseIds(item.chartParams);
+      return compatibilityCaseIds?.caseAId === id || compatibilityCaseIds?.caseBId === id;
+    }).map((item) => ({
+      id: item.id,
+      modelType: item.modelType,
+      title: item.title,
+      caseId: item.caseId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    })),
+  ]
+    .filter((item, index, array) => array.findIndex((candidate) => candidate.id === item.id) === index)
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+
   const relations = [...divinationCase.relationLinksA, ...divinationCase.relationLinksB].map((relation) => ({
     id: relation.id,
     caseAId: relation.caseAId,
@@ -83,6 +121,7 @@ export async function GET(
 
   return NextResponse.json({
     ...divinationCase,
+    sessions: mergedSessions,
     relations,
   });
 }

@@ -64,7 +64,7 @@ export const getCaseDisplayRelations = (
   return relations.flatMap((relation) => {
     if (relation.caseAId === currentCaseId) {
       const counterpartTitle = relation.caseBTitle?.trim() || '关联命例';
-      const label = relation.labelBToA?.trim();
+      const label = relation.labelAToB?.trim();
       return label
         ? [{ id: relation.id, counterpartCaseId: relation.caseBId, counterpartTitle, label: `${counterpartTitle}的${label}` }]
         : [];
@@ -72,7 +72,7 @@ export const getCaseDisplayRelations = (
 
     if (relation.caseBId === currentCaseId) {
       const counterpartTitle = relation.caseATitle?.trim() || '关联命例';
-      const label = relation.labelAToB?.trim();
+      const label = relation.labelBToA?.trim();
       return label
         ? [{ id: relation.id, counterpartCaseId: relation.caseAId, counterpartTitle, label: `${counterpartTitle}的${label}` }]
         : [];

@@ -93,3 +93,15 @@ export const isBaziCompatibilityChartData = (value: unknown): value is BaziCompa
     !!input.personBChartData
   );
 };
+
+export const getBaziCompatibilityCaseIds = (chartParams: unknown) => {
+  if (!chartParams || typeof chartParams !== 'object') return null;
+  const feature = getProfessionalFeature(chartParams);
+  if (feature !== PROFESSIONAL_FEATURE_BAZI_COMPAT) return null;
+  const compatibilityChartData = (chartParams as Record<string, unknown>).compatibilityChartData;
+  if (!isBaziCompatibilityChartData(compatibilityChartData)) return null;
+  return {
+    caseAId: compatibilityChartData.caseAId || null,
+    caseBId: compatibilityChartData.caseBId || null,
+  };
+};
