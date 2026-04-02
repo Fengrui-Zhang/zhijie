@@ -100,7 +100,8 @@ const LiuyaoGrid: React.FC<Props> = ({ data }) => {
   // Prepare Lines Data (6 down to 1)
   const lines = [6, 5, 4, 3, 2, 1].map(i => {
     const key = `gua_yao${i}`;
-    const benIdx = 6 - i;
+    // gua_mark 按初爻到上爻存储；当前表格从上爻往下画，因此需要取第 i 爻对应的索引 i-1。
+    const benIdx = i - 1;
     const isYangBen = ben.gua_mark[benIdx] === '1'; 
     const isYangBian = bian ? bian.gua_mark[benIdx] === '1' : undefined;
 

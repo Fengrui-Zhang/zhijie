@@ -9,11 +9,11 @@ interface Props {
 
 // Helper to draw hexagram lines
 const HexagramSymbol = ({ mark }: { mark: string }) => {
-  const lines = mark.split('').map(m => m === '1'); // 1=Yang, 0=Yin
+  // API returns gua_mark from 初爻到上爻，显示时需要从上爻排到初爻。
+  const lines = mark.split('').reverse().map(m => m === '1'); // 1=Yang, 0=Yin
   
   return (
     <div className="flex flex-col gap-1 w-12 my-2">
-      {/* Draw top to bottom, assume string is Top->Bottom or standard */}
       {lines.map((isYang, i) => (
         <div key={i} className="h-2 w-full flex justify-between">
            {isYang ? (
