@@ -384,6 +384,13 @@ const getCaseDisplayName = (item: Pick<CaseItem, 'title' | 'chartParams'> | Pick
   return params.name || item.title.replace(/^八字命例\s*·\s*/, '').replace(/^紫微命例\s*·\s*/, '') || item.title;
 };
 
+const getCaseSexLabel = (chartParams: unknown) => {
+  const params = normalizeCaseChartParams(chartParams);
+  if (params.sex === 0) return '乾造';
+  if (params.sex === 1) return '坤造';
+  return '';
+};
+
 const buildJointAnalysisPrompt = (jointData: JointChartData) => {
   const baziBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, jointData.baziChartData, '');
   const ziweiBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, jointData.ziweiChartData, '');
@@ -6124,6 +6131,7 @@ const App: React.FC = () => {
                     {caseItems.map((item) => {
                       const params = normalizeCaseChartParams(item.chartParams);
                       const pillarPreview = getCasePillarsPreview(item.modelType, item.chartData);
+                      const sexLabel = getCaseSexLabel(item.chartParams);
                       const specialTags = getCaseSpecialTags(item.chartParams);
                       const datetimeText = buildCaseDateTimeValue(item.chartParams)
                         ? buildCaseDateTimeValue(item.chartParams).replace('T', ' ')
@@ -6145,6 +6153,11 @@ const App: React.FC = () => {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-base font-bold">{item.title}</div>
+                              {sexLabel && (
+                                <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-500'}`}>
+                                  {sexLabel}
+                                </div>
+                              )}
                               {pillarPreview && (
                                 <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-600'}`}>
                                   四柱：{pillarPreview}
@@ -6685,6 +6698,9 @@ const App: React.FC = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
+                    {getCaseSexLabel(activeCase.chartParams) && (
+                      <div className="mt-1 text-sm text-stone-500">{getCaseSexLabel(activeCase.chartParams)}</div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -7425,6 +7441,11 @@ const App: React.FC = () => {
                               <div className="flex items-start justify-between gap-3">
                                 <div>
                                   <div className="text-sm font-bold">{item.title}</div>
+                                  {getCaseSexLabel(item.chartParams) && (
+                                    <div className={`mt-1 text-xs ${professionalSelectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                      {getCaseSexLabel(item.chartParams)}
+                                    </div>
+                                  )}
                                   <div className={`mt-1 text-xs ${professionalSelectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
                                     四柱：{getCasePillarsPreview(item.modelType, item.chartData) || '未获取'}
                                   </div>
@@ -7602,6 +7623,11 @@ const App: React.FC = () => {
                                     }`}
                                   >
                                     <div className="text-sm font-bold">{item.title}</div>
+                                    {getCaseSexLabel(item.chartParams) && (
+                                      <div className={`mt-1 text-xs ${person.state.selectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                        {getCaseSexLabel(item.chartParams)}
+                                      </div>
+                                    )}
                                     <div className={`mt-1 text-xs ${person.state.selectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
                                       四柱：{getCasePillarsPreview(item.modelType, item.chartData) || '未获取'}
                                     </div>
