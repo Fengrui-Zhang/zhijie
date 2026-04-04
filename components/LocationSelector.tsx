@@ -23,12 +23,20 @@ const LocationSelector: React.FC<Props> = ({
   const provinces = Object.keys(CITIES_BY_PROVINCE);
   const availableCities = province ? CITIES_BY_PROVINCE[province] || [] : [];
 
-  // Sync internal enable state with parent data presence if initially loaded with data
   useEffect(() => {
-    if (province && city) {
-      setIsEnabled(true);
+    setIsEnabled(Boolean(province || city));
+  }, [province, city]);
+
+  useEffect(() => {
+    if (!province) {
+      if (city) setCity('');
+      return;
     }
-  }, []);
+
+    if (city && !availableCities.includes(city)) {
+      setCity('');
+    }
+  }, [availableCities, city, province, setCity]);
 
   const handleToggle = (checked: boolean) => {
     setIsEnabled(checked);
