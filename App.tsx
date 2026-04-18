@@ -1138,7 +1138,10 @@ const App: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const pendingCaseSessionScrollRef = useRef(false);
+  const pendingSectionScrollRef = useRef<'report' | 'case-form' | 'case-detail' | 'chat' | null>(null);
   const reportChartRef = useRef<HTMLDivElement>(null);
+  const caseFormRef = useRef<HTMLDivElement>(null);
+  const caseDetailRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUpdates, setShowUpdates] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1197,6 +1200,10 @@ const App: React.FC = () => {
     shouldAutoScrollRef.current = distanceFromBottom < 96;
   }, []);
 
+  const requestSectionScroll = useCallback((target: 'report' | 'case-form' | 'case-detail' | 'chat') => {
+    pendingSectionScrollRef.current = target;
+  }, []);
+
   useEffect(() => {
     const container = chatScrollRef.current;
     if (!container || !shouldAutoScrollRef.current) return;
@@ -1223,6 +1230,29 @@ const App: React.FC = () => {
 
     return () => window.cancelAnimationFrame(frameId);
   }, [activeSessionId, chatHistory.length, isCaseModel]);
+
+  useEffect(() => {
+    const targetKey = pendingSectionScrollRef.current;
+    if (!targetKey) return;
+
+    const target = (
+      targetKey === 'report'
+        ? reportChartRef.current
+        : targetKey === 'case-form'
+          ? caseFormRef.current
+          : targetKey === 'case-detail'
+            ? caseDetailRef.current
+            : chatPanelRef.current
+    );
+    if (!target) return;
+
+    pendingSectionScrollRef.current = null;
+    const frameId = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [step, caseFormOpen, activeSessionId, chatHistory.length, activeCase?.id, requestSectionScroll]);
 
   useEffect(() => {
     const messageIds = new Set(chatHistory.map((msg) => msg.id));
@@ -1420,6 +1450,7 @@ const App: React.FC = () => {
       setGuestFollowUpCount(nextFollowUpCount);
       localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
       setStep('chart');
+      requestSectionScroll('case-detail');
       return;
     }
 
@@ -1438,10 +1469,11 @@ const App: React.FC = () => {
       setActiveSessionId(null);
       setSessionAnalysisModel(null);
       setStep('chart');
+      requestSectionScroll('case-detail');
     } catch {
       // silently ignore
     }
-  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions]);
+  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions, requestSectionScroll]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1279px)');
@@ -2899,6 +2931,7 @@ const App: React.FC = () => {
     setCaseFormOpen(true);
     resetCaseFormInputs();
     setError('');
+    requestSectionScroll('case-form');
   };
 
   const beginCaseEdit = () => {
@@ -2908,6 +2941,7 @@ const App: React.FC = () => {
     applyCaseChartParamsToForm(activeCase.chartParams);
     setError('');
     setStep('input');
+    requestSectionScroll('case-form');
   };
 
   const refreshGuestActiveCase = useCallback((caseId: string) => {
@@ -3248,6 +3282,7 @@ const App: React.FC = () => {
         userMsg,
         { id: modelId, role: 'model', content: '', timestamp: new Date() },
       ]);
+      requestSectionScroll('chat');
 
       const finalState = await sendMessageToDeepseekStream(
         prompt,
@@ -3287,7 +3322,7 @@ const App: React.FC = () => {
       setLoading(false);
       setIsTyping(false);
     }
-  }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
+  }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, requestSectionScroll, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
 
   const handleRunJointProfessionalFromExisting = useCallback(async () => {
     if (!professionalSelectedCaseId) {
@@ -3498,6 +3533,7 @@ const App: React.FC = () => {
         userMsg,
         { id: modelId, role: 'model', content: '', timestamp: new Date() },
       ]);
+      requestSectionScroll('chat');
 
       const finalState = await sendMessageToDeepseekStream(
         prompt,
@@ -3539,7 +3575,7 @@ const App: React.FC = () => {
       setPendingCompatibilityData(null);
       setCompatRelationDrafts([{ labelAToB: '', labelBToA: '' }]);
     }
-  }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
+  }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, requestSectionScroll, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
 
   const handleRunBaziCompatibilityProfessional = useCallback(async () => {
     setProfessionalBusy(true);
@@ -3871,6 +3907,7 @@ const App: React.FC = () => {
       setCaseFormOpen(false);
       setEditingCaseId(null);
       setKnowledgeHint(null);
+      requestSectionScroll('report');
     } catch (err: any) {
       setError(err.message || '排盘失败，请稍后重试');
     } finally {
@@ -4024,6 +4061,7 @@ const App: React.FC = () => {
     setKnowledgeHint(null);
     setStep('chart');
     setShowInitialAnalysisModal(false);
+    requestSectionScroll('chat');
 
     const systemInstruction = buildSystemInstruction(
       targetCase.modelType,
@@ -4143,6 +4181,7 @@ const App: React.FC = () => {
           userMsg,
           { id: modelId, role: 'model', content: '', timestamp: new Date() },
         ]);
+        requestSectionScroll('chat');
       }
 
       const knowledge = useKnowledge && supportsKnowledge
@@ -4322,6 +4361,7 @@ const App: React.FC = () => {
         userMsg,
         { id: modelId, role: 'model', content: '', timestamp: new Date() },
       ]);
+      requestSectionScroll('chat');
 
       const knowledge = useKnowledge && supportsKnowledge
         ? {
@@ -4406,6 +4446,7 @@ const App: React.FC = () => {
 
     if (!isLoggedIn && existingGuestSession) {
       handleLoadGuestCaseSession(existingGuestSession.id);
+      requestSectionScroll('chat');
       const nextQuestion = question.trim();
       setQuestion('');
       if (!nextQuestion) return;
@@ -4615,6 +4656,7 @@ const App: React.FC = () => {
 
       setChartData(resultData);
       setStep('chart');
+      requestSectionScroll('report');
 
       // --- Save session to DB immediately (before AI streaming) ---
       const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
@@ -4647,6 +4689,7 @@ const App: React.FC = () => {
         ...prev,
         { id: modelId, role: 'model', content: '', timestamp: new Date() }
       ]);
+      requestSectionScroll('chat');
 
       const knowledgeQueryText = (() => {
         if (knowledgeQuery) return knowledgeQuery;
@@ -6207,7 +6250,7 @@ const App: React.FC = () => {
                 )}
 
                 {caseFormOpen && (
-                  <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
+                  <div ref={caseFormRef} className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-base font-bold text-stone-700">
@@ -6694,7 +6737,7 @@ const App: React.FC = () => {
             </div>
 
             {isCaseModel && activeCase && (
-              <div className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
+              <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
