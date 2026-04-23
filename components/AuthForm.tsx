@@ -1,20 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 
 interface AuthFormProps {
   onSuccess: () => void;
   onSkip: () => void;
+  registrationEnabled: boolean;
+  registrationClosedContact: string;
+  guestModeEnabled: boolean;
 }
 
-export default function AuthForm({ onSuccess, onSkip }: AuthFormProps) {
+export default function AuthForm({
+  onSuccess,
+  onSkip,
+  registrationEnabled,
+  registrationClosedContact,
+  guestModeEnabled,
+}: AuthFormProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!registrationEnabled && mode === 'register') {
+      setMode('login');
+      setError('');
+    }
+  }, [mode, registrationEnabled]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,18 +92,26 @@ export default function AuthForm({ onSuccess, onSkip }: AuthFormProps) {
             >
               登录
             </button>
-            <button
-              type="button"
-              onClick={() => { setMode('register'); setError(''); }}
-              className={`flex-1 py-2 text-sm rounded-md transition-all ${
-                mode === 'register'
-                  ? 'bg-white shadow text-stone-800 font-medium'
-                  : 'text-stone-500 hover:text-stone-700'
-              }`}
-            >
-              注册
-            </button>
+            {registrationEnabled && (
+              <button
+                type="button"
+                onClick={() => { setMode('register'); setError(''); }}
+                className={`flex-1 py-2 text-sm rounded-md transition-all ${
+                  mode === 'register'
+                    ? 'bg-white shadow text-stone-800 font-medium'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                注册
+              </button>
+            )}
           </div>
+
+          {!registrationEnabled && (
+            <div className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs leading-6 text-amber-800">
+              注册通道已关闭，若有需要请联系{registrationClosedContact}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
@@ -156,15 +180,17 @@ export default function AuthForm({ onSuccess, onSkip }: AuthFormProps) {
             </button>
           </form>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={onSkip}
-              className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
-            >
-              暂不登录，直接使用
-            </button>
-          </div>
+          {guestModeEnabled && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={onSkip}
+                className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+              >
+                暂不登录，直接使用
+              </button>
+            </div>
+          )}
         </div>
 
         <p className="text-center text-xs text-stone-400 mt-6">

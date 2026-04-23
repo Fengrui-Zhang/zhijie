@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../../../lib/prisma';
+import { getPublicSiteSettings } from '../../../../lib/site-settings';
 
 export async function POST(request: Request) {
   try {
+    const siteSettings = await getPublicSiteSettings();
+    if (!siteSettings.registrationEnabled) {
+      return NextResponse.json(
+        { error: `注册通道已关闭，若有需要请联系${siteSettings.registrationClosedContact}` },
+        { status: 403 }
+      );
+    }
+
     const { email, password, name } = await request.json();
 
     if (!email || !password || !name) {

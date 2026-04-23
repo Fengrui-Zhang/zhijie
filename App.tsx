@@ -5,7 +5,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSession, signOut } from 'next-auth/react';
-import updates from './data/updates.json';
 import {
   DEFAULT_ANALYSIS_MODEL,
   DOUBAO_SEED_PRO_MODEL,
@@ -51,6 +50,10 @@ import {
   type BaziCompatibilityChartData,
   type JointChartData,
 } from './lib/professional-features';
+import {
+  DEFAULT_SITE_SETTINGS,
+  type PublicSiteSettings,
+} from './lib/site-settings-defaults';
 
 // Services
 import { 
@@ -1042,6 +1045,7 @@ const App: React.FC = () => {
   const [userQuota, setUserQuota] = useState<number | null>(null);
   const [guestFortuneCount, setGuestFortuneCount] = useState(0);
   const [guestFollowUpCount, setGuestFollowUpCount] = useState(0);
+  const [siteSettings, setSiteSettings] = useState<PublicSiteSettings>(DEFAULT_SITE_SETTINGS);
 
   // --- Persistence State ---
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1173,6 +1177,11 @@ const App: React.FC = () => {
   const [klineSelected, setKlineSelected] = useState<KlineSelection>(null);
   const [klineProgress, setKlineProgress] = useState(0);
   const [klineYearProgress, setKlineYearProgress] = useState(0);
+
+  const registrationEnabled = siteSettings.registrationEnabled;
+  const guestModeEnabled = siteSettings.guestModeEnabled;
+  const authEntryLabel = registrationEnabled ? '登录 / 注册' : '登录';
+  const registrationClosedMessage = `注册通道已关闭，若有需要请联系${siteSettings.registrationClosedContact}`;
   const [klineSeries, setKlineSeries] = useState({
     overall: true,
     wealth: false,
@@ -1661,6 +1670,33 @@ const App: React.FC = () => {
     setGuestFollowUpCount(parseInt(localStorage.getItem('guestFollowUpCount') || '0', 10));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSiteSettings = async () => {
+      try {
+        const res = await fetch('/api/site-settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data || typeof data !== 'object') return;
+        setSiteSettings({
+          ...DEFAULT_SITE_SETTINGS,
+          ...data,
+          announcementItems: Array.isArray(data.announcementItems)
+            ? data.announcementItems.filter((item: unknown): item is string => typeof item === 'string')
+            : DEFAULT_SITE_SETTINGS.announcementItems,
+        });
+      } catch {
+        // fall back to defaults
+      }
+    };
+
+    void loadSiteSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const fetchUserProfile = useCallback(async () => {
     if (!isLoggedIn) return;
     try {
@@ -1675,6 +1711,15 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
+
+  const requireLoginIfGuestModeDisabled = useCallback(() => {
+    if (!isLoggedIn && !guestModeEnabled) {
+      setError('需要登录后才能使用');
+      setShowAuth(true);
+      return true;
+    }
+    return false;
+  }, [guestModeEnabled, isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn) return;
@@ -3325,6 +3370,7 @@ const App: React.FC = () => {
   }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, requestSectionScroll, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
 
   const handleRunJointProfessionalFromExisting = useCallback(async () => {
+    if (requireLoginIfGuestModeDisabled()) return;
     if (!professionalSelectedCaseId) {
       setError('请先选择一个已有命例');
       return;
@@ -3395,9 +3441,10 @@ const App: React.FC = () => {
     } finally {
       setProfessionalBusy(false);
     }
-  }, [buildJointSummaryTitle, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalCase, professionalCaseOptions, professionalSelectedCaseId, runJointProfessionalSession]);
+  }, [buildJointSummaryTitle, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalCase, professionalCaseOptions, professionalSelectedCaseId, requireLoginIfGuestModeDisabled, runJointProfessionalSession]);
 
   const handleRunJointProfessionalFromNew = useCallback(async () => {
+    if (requireLoginIfGuestModeDisabled()) return;
     const sourceParams = buildProfessionalBirthChartParams();
     if (!sourceParams) {
       setError('请选择出生日期');
@@ -3448,7 +3495,7 @@ const App: React.FC = () => {
     } finally {
       setProfessionalBusy(false);
     }
-  }, [buildJointSummaryTitle, buildProfessionalBirthChartParams, findProfessionalMatchingCase, persistProfessionalCase, runJointProfessionalSession]);
+  }, [buildJointSummaryTitle, buildProfessionalBirthChartParams, findProfessionalMatchingCase, persistProfessionalCase, requireLoginIfGuestModeDisabled, runJointProfessionalSession]);
 
   const buildBaziCompatibilitySummaryTitle = useCallback((leftTitle: string, rightTitle: string) => {
     return `${leftTitle} × ${rightTitle}`;
@@ -3578,6 +3625,7 @@ const App: React.FC = () => {
   }, [analysisModel, fetchSessions, fetchUserProfile, isLoggedIn, requestSectionScroll, saveGuestCaseSession, saveSessionToDb, updateGuestCaseSessionMessages]);
 
   const handleRunBaziCompatibilityProfessional = useCallback(async () => {
+    if (requireLoginIfGuestModeDisabled()) return;
     setProfessionalBusy(true);
     setError('');
 
@@ -3660,7 +3708,7 @@ const App: React.FC = () => {
     } finally {
       setProfessionalBusy(false);
     }
-  }, [buildBaziCompatibilitySummaryTitle, buildCompatBirthChartParams, compatPersonA, compatPersonB, fetchCaseRelationsForPairInDb, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalPlainCase, professionalCaseOptions, readGuestCaseRelations]);
+  }, [buildBaziCompatibilitySummaryTitle, buildCompatBirthChartParams, compatPersonA, compatPersonB, fetchCaseRelationsForPairInDb, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalPlainCase, professionalCaseOptions, readGuestCaseRelations, requireLoginIfGuestModeDisabled]);
 
   const handleConfirmCompatibilityRelations = useCallback(async (skip: boolean) => {
     if (!pendingCompatibilityData || !pendingCompatibilityData.caseAId || !pendingCompatibilityData.caseBId) return;
@@ -3804,6 +3852,7 @@ const App: React.FC = () => {
 
   const handleSaveCase = async () => {
     if (!isCaseModelType(modelType)) return;
+    if (requireLoginIfGuestModeDisabled()) return;
     if (!customDate) {
       setError('请选择出生日期');
       return;
@@ -4435,6 +4484,7 @@ const App: React.FC = () => {
 
   const handleStartCaseAnalysis = async () => {
     if (!activeCase || !isCaseModelType(activeCase.modelType)) return;
+    if (requireLoginIfGuestModeDisabled()) return;
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
       return;
@@ -4501,6 +4551,7 @@ const App: React.FC = () => {
   };
 
   const handleCalculate = async () => {
+    if (requireLoginIfGuestModeDisabled()) return;
     if (!isLoggedIn) {
       if (guestFortuneCount >= 3) {
         setError('');
@@ -5238,6 +5289,7 @@ const App: React.FC = () => {
   ) => {
     const outgoingMessage = rawMessage.trim();
     if (!outgoingMessage) return;
+    if (requireLoginIfGuestModeDisabled()) return;
 
     const effectiveGuestFollowUpCount = options?.guestFollowUpCountOverride ?? guestFollowUpCount;
     if (!isLoggedIn && !options?.bypassGuestLimit && effectiveGuestFollowUpCount >= 1) {
@@ -5776,6 +5828,9 @@ const App: React.FC = () => {
       <AuthForm
         onSuccess={() => { setShowAuth(false); fetchSessions(); fetchUserProfile(); }}
         onSkip={() => setShowAuth(false)}
+        registrationEnabled={registrationEnabled}
+        registrationClosedContact={siteSettings.registrationClosedContact}
+        guestModeEnabled={guestModeEnabled}
       />
     );
   }
@@ -5786,22 +5841,34 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 max-w-sm w-full text-center space-y-5">
           <div className="text-4xl">🔮</div>
           <h2 className="text-xl font-bold text-stone-800">元分 · 智解</h2>
-          <p className="text-sm text-stone-500">登录后享受完整功能与30次免费提问额度<br/>访客仅可排盘3次，每次排盘后可追问1次</p>
+          <p className="text-sm text-stone-500">
+            {guestModeEnabled
+              ? '登录后享受完整功能与30次免费提问额度'
+              : '登录后即可使用完整功能与提问额度'}
+            <br />
+            {guestModeEnabled
+              ? '访客仅可排盘3次，每次排盘后可追问1次'
+              : registrationEnabled
+                ? '注册或登录后即可开始使用'
+                : registrationClosedMessage}
+          </p>
           <div className="space-y-3">
             <button
               type="button"
               onClick={() => { setShowWelcome(false); sessionStorage.setItem('welcomeDismissed', '1'); setShowAuth(true); }}
               className="w-full py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 transition text-sm"
             >
-              登录 / 注册
+              {authEntryLabel}
             </button>
-            <button
-              type="button"
-              onClick={() => { setShowWelcome(false); sessionStorage.setItem('welcomeDismissed', '1'); }}
-              className="w-full py-2.5 rounded-lg border border-stone-300 text-stone-600 font-medium hover:bg-stone-50 transition text-sm"
-            >
-              访客模式
-            </button>
+            {guestModeEnabled && (
+              <button
+                type="button"
+                onClick={() => { setShowWelcome(false); sessionStorage.setItem('welcomeDismissed', '1'); }}
+                className="w-full py-2.5 rounded-lg border border-stone-300 text-stone-600 font-medium hover:bg-stone-50 transition text-sm"
+              >
+                访客模式
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -5838,7 +5905,7 @@ const App: React.FC = () => {
                 onClick={() => setShowAuth(true)}
                 className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
               >
-                登录 / 注册
+                {authEntryLabel}
               </button>
             )}
           </div>
@@ -5856,8 +5923,8 @@ const App: React.FC = () => {
           >
             <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/50 bg-white/12">
               <div>
-                <div className="text-base font-bold text-stone-800">{updates.title}</div>
-                <div className="mt-1 text-xs text-stone-500 tracking-[0.08em]">更新于 {updates.updated_at}</div>
+                <div className="text-base font-bold text-stone-800">{siteSettings.announcementTitle}</div>
+                <div className="mt-1 text-xs text-stone-500 tracking-[0.08em]">更新于 {siteSettings.announcementUpdatedAt}</div>
               </div>
               <button
                 type="button"
@@ -5868,7 +5935,7 @@ const App: React.FC = () => {
               </button>
             </div>
             <div className="px-6 py-5 space-y-3 text-sm leading-7 text-stone-700">
-              {updates.items.map((item, idx) => (
+              {siteSettings.announcementItems.map((item, idx) => (
                 <div key={idx} className="glass-panel-soft flex items-start gap-3 rounded-2xl px-4 py-3 border border-white/55">
                   <span className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/90 text-[11px] font-bold text-white shadow-[0_0_18px_rgba(251,191,36,0.32)]">
                     {idx + 1}
@@ -5876,6 +5943,11 @@ const App: React.FC = () => {
                   <span className="flex-1">{item}</span>
                 </div>
               ))}
+              {siteSettings.announcementContent && (
+                <div className="glass-panel-soft rounded-2xl border border-white/55 px-4 py-4 whitespace-pre-wrap leading-7">
+                  {siteSettings.announcementContent}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -6022,7 +6094,7 @@ const App: React.FC = () => {
         }
       >
         <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
-        {!isLoggedIn && step === 'input' && (
+        {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
             <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
             <button
@@ -6633,7 +6705,7 @@ const App: React.FC = () => {
         {/* Result Phase */}
         {step === 'chart' && chartData && (
           <div className="animate-fade-in space-y-6">
-            {!isLoggedIn && (
+            {!isLoggedIn && guestModeEnabled && (
               <div className="glass-banner bg-amber-50/72 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
                 <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
                 <button
@@ -7181,7 +7253,7 @@ const App: React.FC = () => {
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
+                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && !guestModeEnabled) ? "需要登录后才能使用" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
                    className="glass-input flex-1 rounded-2xl px-4 py-2"
                  />
                  <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="glass-cta text-amber-300 p-3 rounded-2xl hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100 transition"><SendIcon /></button>

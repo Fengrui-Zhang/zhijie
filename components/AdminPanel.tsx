@@ -1,6 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  DEFAULT_SITE_SETTINGS,
+  type PublicSiteSettings,
+} from '@/lib/site-settings-defaults';
 
 interface UserRow {
   id: string;
@@ -58,6 +62,11 @@ export default function AdminPanel({ onBack }: Props) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [plainPasswordCache, setPlainPasswordCache] = useState<Record<string, string>>({});
   const [revealPasswordId, setRevealPasswordId] = useState<string | null>(null);
+  const [siteSettings, setSiteSettings] = useState<PublicSiteSettings>(DEFAULT_SITE_SETTINGS);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const [settingsSavedAt, setSettingsSavedAt] = useState('');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -76,6 +85,32 @@ export default function AdminPanel({ onBack }: Props) {
   }, []);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  const fetchSiteSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    try {
+      const res = await fetch('/api/admin/site-settings');
+      if (res.ok) {
+        const data = await res.json();
+        setSiteSettings({
+          ...DEFAULT_SITE_SETTINGS,
+          ...data,
+          announcementItems: Array.isArray(data.announcementItems) ? data.announcementItems : DEFAULT_SITE_SETTINGS.announcementItems,
+        });
+        setSettingsError('');
+      } else {
+        setSettingsError('站点配置加载失败');
+      }
+    } catch {
+      setSettingsError('站点配置加载失败');
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSiteSettings();
+  }, [fetchSiteSettings]);
 
   const fetchDetailSessions = useCallback(async (userId: string) => {
     setSessionsLoading(true);
@@ -236,6 +271,67 @@ export default function AdminPanel({ onBack }: Props) {
     } catch { /* ignore */ }
   };
 
+  const handleAnnouncementItemChange = (index: number, value: string) => {
+    setSiteSettings((current) => ({
+      ...current,
+      announcementItems: current.announcementItems.map((item, itemIndex) => (
+        itemIndex === index ? value : item
+      )),
+    }));
+  };
+
+  const handleAddAnnouncementItem = () => {
+    setSiteSettings((current) => ({
+      ...current,
+      announcementItems: [...current.announcementItems, ''],
+    }));
+  };
+
+  const handleRemoveAnnouncementItem = (index: number) => {
+    setSiteSettings((current) => {
+      const nextItems = current.announcementItems.filter((_, itemIndex) => itemIndex !== index);
+      return {
+        ...current,
+        announcementItems: nextItems.length > 0 ? nextItems : [''],
+      };
+    });
+  };
+
+  const handleSaveSiteSettings = async () => {
+    setSettingsSaving(true);
+    setSettingsError('');
+    try {
+      const payload: PublicSiteSettings = {
+        ...siteSettings,
+        announcementTitle: siteSettings.announcementTitle.trim() || DEFAULT_SITE_SETTINGS.announcementTitle,
+        announcementUpdatedAt: siteSettings.announcementUpdatedAt.trim() || DEFAULT_SITE_SETTINGS.announcementUpdatedAt,
+        announcementItems: siteSettings.announcementItems.map((item) => item.trim()).filter(Boolean),
+        announcementContent: siteSettings.announcementContent.trim(),
+        registrationClosedContact: siteSettings.registrationClosedContact.trim() || DEFAULT_SITE_SETTINGS.registrationClosedContact,
+      };
+      const res = await fetch('/api/admin/site-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSettingsError(data.error || '保存站点配置失败');
+        return;
+      }
+      setSiteSettings({
+        ...DEFAULT_SITE_SETTINGS,
+        ...data,
+        announcementItems: Array.isArray(data.announcementItems) ? data.announcementItems : DEFAULT_SITE_SETTINGS.announcementItems,
+      });
+      setSettingsSavedAt(new Date().toLocaleString('zh-CN', { hour12: false }));
+    } catch {
+      setSettingsError('保存站点配置失败');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
   const filtered = users.filter(u =>
     u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.name.toLowerCase().includes(search.toLowerCase())
@@ -272,6 +368,185 @@ export default function AdminPanel({ onBack }: Props) {
             {error}
           </div>
         )}
+
+        <div className="glass-panel-soft mb-4 rounded-[28px] border border-white/60 p-4 md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-stone-800">公告编辑</h3>
+              <p className="mt-1 text-xs text-stone-500">首页“新增功能”弹窗会实时读取这里的内容。</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-stone-400">
+              {settingsSavedAt && <span>已保存：{settingsSavedAt}</span>}
+              <button
+                type="button"
+                onClick={() => void fetchSiteSettings()}
+                className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+              >
+                刷新
+              </button>
+            </div>
+          </div>
+
+          {settingsError && (
+            <div className="mt-3 rounded-2xl border border-red-200/70 bg-red-50/70 px-4 py-3 text-xs text-red-700">
+              {settingsError}
+            </div>
+          )}
+
+          {settingsLoading ? (
+            <p className="mt-4 text-sm text-stone-500">站点配置加载中...</p>
+          ) : (
+            <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                      公告标题
+                    </label>
+                    <input
+                      type="text"
+                      value={siteSettings.announcementTitle}
+                      onChange={(e) => setSiteSettings((current) => ({ ...current, announcementTitle: e.target.value }))}
+                      className="glass-input w-full rounded-2xl px-3 py-2 text-sm outline-none"
+                      placeholder="新增功能"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                      更新时间
+                    </label>
+                    <input
+                      type="text"
+                      value={siteSettings.announcementUpdatedAt}
+                      onChange={(e) => setSiteSettings((current) => ({ ...current, announcementUpdatedAt: e.target.value }))}
+                      className="glass-input w-full rounded-2xl px-3 py-2 text-sm outline-none"
+                      placeholder="2026.04"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label className="block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                      公告条目
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddAnnouncementItem}
+                      className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600 hover:text-stone-800"
+                    >
+                      新增条目
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {siteSettings.announcementItems.map((item, index) => (
+                      <div key={`announcement-item-${index}`} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={item}
+                          onChange={(e) => handleAnnouncementItemChange(index, e.target.value)}
+                          className="glass-input flex-1 rounded-2xl px-3 py-2 text-sm outline-none"
+                          placeholder={`条目 ${index + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAnnouncementItem(index)}
+                          className="glass-chip rounded-full px-3 py-1.5 text-xs text-red-500 hover:text-red-700"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                    补充正文
+                  </label>
+                  <textarea
+                    value={siteSettings.announcementContent}
+                    onChange={(e) => setSiteSettings((current) => ({ ...current, announcementContent: e.target.value }))}
+                    className="glass-input min-h-[160px] w-full rounded-[24px] px-4 py-3 text-sm leading-7 outline-none"
+                    placeholder="可选，用于补充更完整的公告说明。"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
+                  <h4 className="text-sm font-bold text-stone-800">功能控制</h4>
+                  <p className="mt-1 text-xs text-stone-500">控制注册与访客模式是否对前台开放。</p>
+
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-[20px] border border-white/60 bg-white/45 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-stone-700">账号注册</div>
+                          <p className="mt-1 text-xs text-stone-500">关闭后仅保留管理员手动创建账号。</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSiteSettings((current) => ({ ...current, registrationEnabled: !current.registrationEnabled }))}
+                          className={`rounded-full px-3 py-1.5 text-xs transition ${
+                            siteSettings.registrationEnabled
+                              ? 'bg-emerald-100/90 text-emerald-700'
+                              : 'bg-stone-800 text-stone-100'
+                          }`}
+                        >
+                          {siteSettings.registrationEnabled ? '已开启' : '已关闭'}
+                        </button>
+                      </div>
+                      {!siteSettings.registrationEnabled && (
+                        <div className="mt-3">
+                          <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                            联系方式
+                          </label>
+                          <input
+                            type="text"
+                            value={siteSettings.registrationClosedContact}
+                            onChange={(e) => setSiteSettings((current) => ({ ...current, registrationClosedContact: e.target.value }))}
+                            className="glass-input w-full rounded-2xl px-3 py-2 text-sm outline-none"
+                            placeholder={DEFAULT_SITE_SETTINGS.registrationClosedContact}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-[20px] border border-white/60 bg-white/45 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-stone-700">访客模式</div>
+                          <p className="mt-1 text-xs text-stone-500">关闭后，未登录用户只能先登录再使用功能。</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSiteSettings((current) => ({ ...current, guestModeEnabled: !current.guestModeEnabled }))}
+                          className={`rounded-full px-3 py-1.5 text-xs transition ${
+                            siteSettings.guestModeEnabled
+                              ? 'bg-emerald-100/90 text-emerald-700'
+                              : 'bg-stone-800 text-stone-100'
+                          }`}
+                        >
+                          {siteSettings.guestModeEnabled ? '已开启' : '已关闭'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveSiteSettings}
+                  disabled={settingsSaving}
+                  className="glass-cta w-full rounded-2xl px-4 py-3 text-sm text-amber-300 transition hover:brightness-105 disabled:opacity-50"
+                >
+                  {settingsSaving ? '保存中...' : '保存站点配置'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="glass-panel-soft mb-4 rounded-[28px] border border-white/60 p-4 md:p-5">
           <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-stone-500">快速添加账号</h4>
