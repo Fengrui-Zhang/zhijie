@@ -6120,50 +6120,7 @@ const App: React.FC = () => {
             
             {/* Categorized Model Selector */}
             <div className="mb-8 space-y-4">
-               {/* 1. Divination Group */}
-               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
-                  <div className="mb-2.5 flex items-center gap-2.5">
-                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl">
-                      <TaijiIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">占卜预测</div>
-                      <div className="text-[13px] text-stone-400">求测具体事项吉凶</div>
-                    </div>
-                  </div>
-                  <div className="grid gap-2.5 md:grid-cols-3">
-                    {[
-                      [ModelType.QIMEN, '奇门遁甲'], 
-                      [ModelType.MEIHUA, '梅花易数'],
-                      [ModelType.LIUYAO, '六爻纳甲']
-                    ].map(([type, label]) => {
-                      const isRecommended = recommendedModels.has(type as ModelType);
-                      const isSelected = hasSelectedModel && modelType === type;
-                      return (
-                      <button
-                        key={type}
-                        onClick={() => handleModelChange(type as ModelType)}
-                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
-                          isSelected
-                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
-                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
-                        }`}
-                      >
-                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
-                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
-                        {label}
-                        {isRecommended && (
-                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            古籍
-                          </span>
-                        )}
-                      </button>
-                    );
-                    })}
-                  </div>
-               </div>
-
-               {/* 2. Destiny Group */}
+               {/* 1. Destiny Group */}
                <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
                   <div className="mb-2.5 flex items-center gap-2.5">
                     <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base">📜</div>
@@ -6204,6 +6161,49 @@ const App: React.FC = () => {
                             }`}>
                               K线
                             </span>
+                          </span>
+                        )}
+                      </button>
+                    );
+                    })}
+                  </div>
+               </div>
+
+               {/* 2. Divination Group */}
+               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
+                  <div className="mb-2.5 flex items-center gap-2.5">
+                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl">
+                      <TaijiIcon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">占卜预测</div>
+                      <div className="text-[13px] text-stone-400">求测具体事项吉凶</div>
+                    </div>
+                  </div>
+                  <div className="grid gap-2.5 md:grid-cols-3">
+                    {[
+                      [ModelType.QIMEN, '奇门遁甲'], 
+                      [ModelType.MEIHUA, '梅花易数'],
+                      [ModelType.LIUYAO, '六爻纳甲']
+                    ].map(([type, label]) => {
+                      const isRecommended = recommendedModels.has(type as ModelType);
+                      const isSelected = hasSelectedModel && modelType === type;
+                      return (
+                      <button
+                        key={type}
+                        onClick={() => handleModelChange(type as ModelType)}
+                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
+                          isSelected
+                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
+                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
+                        }`}
+                      >
+                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
+                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
+                        {label}
+                        {isRecommended && (
+                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
+                            古籍
                           </span>
                         )}
                       </button>

@@ -14,7 +14,7 @@ model User {
   password  String
   name      String
   role      String   @default("user")
-  quota     Int      @default(30)
+  quota     Int      @default(15)
   createdAt DateTime @default(now())
   cases     DivinationCase[]
   sessions  DivinationSession[]
