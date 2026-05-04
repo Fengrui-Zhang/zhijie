@@ -5598,6 +5598,12 @@ const App: React.FC = () => {
     ].join('\n');
   };
 
+  const buildKlineSystemInstruction = () => [
+    '你是专业八字趋势评分与JSON生成引擎。',
+    '任务是基于八字排盘、初始化分析、大运与流年信息，生成七步大运与七十年流年的趋势评分。',
+    '必须严格遵守用户消息中的JSON格式要求，只输出可被JSON.parse解析的JSON。',
+  ].join('\n');
+
   const parseKlineResult = (raw: string) => {
     const trimmed = raw.trim();
     const tryParse = (value: string) => JSON.parse(value) as KlineResult;
@@ -5714,6 +5720,7 @@ const App: React.FC = () => {
       setBaziInitialAnalysis(initializationAnalysis);
 
       const prompt = buildKlinePrompt(chartData as BaziResponse, initializationAnalysis);
+      await startQimenChat(buildKlineSystemInstruction());
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
