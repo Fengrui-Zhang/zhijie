@@ -18,7 +18,7 @@ export default function AuthForm({
   registrationClosedContact,
   guestModeEnabled,
 }: AuthFormProps) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -55,7 +55,10 @@ export default function AuthForm({
     setNotice('');
     setCodeSending(true);
     try {
-      const res = await fetch('/api/auth/send-verification-code', {
+      const endpoint = mode === 'forgot'
+        ? '/api/auth/send-reset-code'
+        : '/api/auth/send-verification-code';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: trimmedEmail }),
@@ -66,7 +69,7 @@ export default function AuthForm({
         return;
       }
       setVerificationCode('');
-      setNotice('验证码已发送，请查看邮箱');
+      setNotice(mode === 'forgot' ? '找回密码验证码已发送，请查看邮箱' : '验证码已发送，请查看邮箱');
       setCodeCooldown(60);
     } catch {
       setError('验证码发送失败，请稍后重试');
@@ -95,6 +98,28 @@ export default function AuthForm({
           setLoading(false);
           return;
         }
+      }
+
+      if (mode === 'forgot') {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, code: verificationCode }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(data.error || '密码重置失败');
+          setLoading(false);
+          return;
+        }
+
+        setMode('login');
+        setPassword('');
+        setVerificationCode('');
+        setNotice('密码已重置，请使用新密码登录');
+        setLoading(false);
+        return;
       }
 
       const result = await signIn('credentials', {
@@ -127,7 +152,7 @@ export default function AuthForm({
           <div className="flex mb-6 bg-stone-100 rounded-lg p-1">
             <button
               type="button"
-              onClick={() => { setMode('login'); setError(''); }}
+              onClick={() => { setMode('login'); setError(''); setNotice(''); }}
               className={`flex-1 py-2 text-sm rounded-md transition-all ${
                 mode === 'login'
                   ? 'bg-white shadow text-stone-800 font-medium'
@@ -139,7 +164,7 @@ export default function AuthForm({
             {registrationEnabled && (
               <button
                 type="button"
-                onClick={() => { setMode('register'); setError(''); }}
+                onClick={() => { setMode('register'); setError(''); setNotice(''); }}
                 className={`flex-1 py-2 text-sm rounded-md transition-all ${
                   mode === 'register'
                     ? 'bg-white shadow text-stone-800 font-medium'
@@ -154,6 +179,12 @@ export default function AuthForm({
           {!registrationEnabled && (
             <div className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs leading-6 text-amber-800">
               注册通道已关闭，若有需要请联系{registrationClosedContact}
+            </div>
+          )}
+
+          {mode === 'forgot' && (
+            <div className="mb-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs leading-6 text-amber-800">
+              输入注册邮箱，系统确认账号存在后会发送验证码，用于重置密码。
             </div>
           )}
 
@@ -183,7 +214,7 @@ export default function AuthForm({
                 value={email}
                 onChange={e => {
                   setEmail(e.target.value);
-                  if (mode === 'register') {
+                  if (mode === 'register' || mode === 'forgot') {
                     setVerificationCode('');
                     setNotice('');
                   }
@@ -196,7 +227,7 @@ export default function AuthForm({
 
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1">
-                密码
+                {mode === 'forgot' ? '新密码' : '密码'}
               </label>
               <input
                 type="password"
@@ -209,7 +240,7 @@ export default function AuthForm({
               />
             </div>
 
-            {mode === 'register' && (
+            {(mode === 'register' || mode === 'forgot') && (
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-1">
                   邮箱验证码
@@ -260,9 +291,45 @@ export default function AuthForm({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               )}
-              {mode === 'login' ? '登录' : '注册'}
+              {mode === 'login' ? '登录' : mode === 'forgot' ? '重置密码' : '注册'}
             </button>
           </form>
+
+          {mode === 'login' && (
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('forgot');
+                  setError('');
+                  setNotice('');
+                  setPassword('');
+                  setVerificationCode('');
+                }}
+                className="text-xs text-stone-400 transition-colors hover:text-amber-700"
+              >
+                忘记密码？
+              </button>
+            </div>
+          )}
+
+          {mode === 'forgot' && (
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                  setNotice('');
+                  setPassword('');
+                  setVerificationCode('');
+                }}
+                className="text-xs text-stone-400 transition-colors hover:text-stone-600"
+              >
+                返回登录
+              </button>
+            </div>
+          )}
 
           {guestModeEnabled && (
             <div className="mt-4 text-center">

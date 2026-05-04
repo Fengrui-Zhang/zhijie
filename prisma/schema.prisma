@@ -25,6 +25,7 @@ model User {
 model EmailVerificationCode {
   id         String    @id @default(cuid())
   email      String
+  purpose    String    @default("registration")
   codeHash   String
   attempts   Int       @default(0)
   expiresAt  DateTime
@@ -33,6 +34,7 @@ model EmailVerificationCode {
 
   @@index([email, createdAt])
   @@index([email, expiresAt])
+  @@index([email, purpose, createdAt])
 }
 
 model SiteSettings {

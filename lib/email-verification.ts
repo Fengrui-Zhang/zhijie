@@ -5,6 +5,8 @@ const CODE_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_VERIFY_ATTEMPTS = 5;
 
+export type EmailVerificationPurpose = 'registration' | 'password_reset';
+
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export const isValidEmail = (email: string) => {
@@ -26,9 +28,12 @@ export const createVerificationCode = () => {
   return crypto.randomInt(100000, 1000000).toString();
 };
 
-export async function assertCanSendVerificationCode(email: string) {
+export async function assertCanSendVerificationCode(
+  email: string,
+  purpose: EmailVerificationPurpose = 'registration'
+) {
   const latest = await prisma.emailVerificationCode.findFirst({
-    where: { email: normalizeEmail(email), consumedAt: null },
+    where: { email: normalizeEmail(email), purpose, consumedAt: null },
     orderBy: { createdAt: 'desc' },
     select: { createdAt: true },
   });
@@ -43,7 +48,11 @@ export async function assertCanSendVerificationCode(email: string) {
   }
 }
 
-export async function saveVerificationCode(email: string, code: string) {
+export async function saveVerificationCode(
+  email: string,
+  code: string,
+  purpose: EmailVerificationPurpose = 'registration'
+) {
   const normalizedEmail = normalizeEmail(email);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000);
@@ -51,6 +60,7 @@ export async function saveVerificationCode(email: string, code: string) {
   await prisma.emailVerificationCode.updateMany({
     where: {
       email: normalizedEmail,
+      purpose,
       consumedAt: null,
       expiresAt: { gt: now },
     },
@@ -60,13 +70,18 @@ export async function saveVerificationCode(email: string, code: string) {
   return prisma.emailVerificationCode.create({
     data: {
       email: normalizedEmail,
+      purpose,
       codeHash: hashVerificationCode(normalizedEmail, code),
       expiresAt,
     },
   });
 }
 
-export async function verifyEmailCode(email: string, code: string) {
+export async function verifyEmailCode(
+  email: string,
+  code: string,
+  purpose: EmailVerificationPurpose = 'registration'
+) {
   const normalizedEmail = normalizeEmail(email);
   const trimmedCode = code.trim();
   if (!/^\d{6}$/.test(trimmedCode)) {
@@ -76,6 +91,7 @@ export async function verifyEmailCode(email: string, code: string) {
   const record = await prisma.emailVerificationCode.findFirst({
     where: {
       email: normalizedEmail,
+      purpose,
       consumedAt: null,
       expiresAt: { gt: new Date() },
     },
@@ -105,7 +121,11 @@ export async function verifyEmailCode(email: string, code: string) {
   });
 }
 
-export async function sendVerificationEmail(email: string, code: string) {
+export async function sendVerificationEmail(
+  email: string,
+  code: string,
+  purpose: EmailVerificationPurpose = 'registration'
+) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
@@ -122,11 +142,13 @@ export async function sendVerificationEmail(email: string, code: string) {
     body: JSON.stringify({
       from,
       to: [email],
-      subject: '元分 · 智解 注册验证码',
+      subject: purpose === 'password_reset'
+        ? '元分 · 智解 找回密码验证码'
+        : '元分 · 智解 注册验证码',
       html: `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;color:#292524;">
           <h2 style="margin:0 0 12px;">元分 · 智解</h2>
-          <p>你的注册验证码是：</p>
+          <p>你的${purpose === 'password_reset' ? '找回密码' : '注册'}验证码是：</p>
           <div style="font-size:28px;font-weight:700;letter-spacing:6px;margin:18px 0;color:#92400e;">${code}</div>
           <p>验证码 ${CODE_TTL_MINUTES} 分钟内有效。若非本人操作，请忽略这封邮件。</p>
         </div>
