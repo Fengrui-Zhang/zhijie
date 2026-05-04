@@ -1587,6 +1587,7 @@ const App: React.FC = () => {
       showInitialAnalysisModal ||
       showInitialAnalysisRegenerateConfirm ||
       showRerunConfirm ||
+      showUpdates ||
       compatRelationModalOpen ||
       professionalModalOpen ||
       klineModalOpen;
@@ -1609,6 +1610,7 @@ const App: React.FC = () => {
     showInitialAnalysisModal,
     showInitialAnalysisRegenerateConfirm,
     showRerunConfirm,
+    showUpdates,
   ]);
 
   // --- Session Persistence ---
@@ -5888,7 +5890,7 @@ const App: React.FC = () => {
               onClick={() => setShowUpdates(true)}
               className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
             >
-              新增功能
+              功能介绍
             </button>
             {isLoggedIn ? (
               <button
@@ -5913,16 +5915,16 @@ const App: React.FC = () => {
 
       {showUpdates && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
+          className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden overscroll-contain bg-black/42 px-4 py-6 backdrop-blur-md"
           onClick={() => setShowUpdates(false)}
         >
           <div
-            className="glass-panel w-full max-w-lg rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)] overflow-hidden"
+            className="glass-panel flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/50 bg-white/12">
+            <div className="shrink-0 flex items-start justify-between gap-4 px-6 py-5 border-b border-white/50 bg-white/12">
               <div>
-                <div className="text-base font-bold text-stone-800">{siteSettings.announcementTitle}</div>
+                <div className="text-base font-bold text-stone-800">{siteSettings.announcementTitle || '功能介绍'}</div>
                 <div className="mt-1 text-xs text-stone-500 tracking-[0.08em]">更新于 {siteSettings.announcementUpdatedAt}</div>
               </div>
               <button
@@ -5933,7 +5935,7 @@ const App: React.FC = () => {
                 关闭
               </button>
             </div>
-            <div className="px-6 py-5 space-y-3 text-sm leading-7 text-stone-700">
+            <div className="glass-scrollbar flex-1 space-y-3 overflow-y-auto overscroll-contain px-6 py-5 text-sm leading-7 text-stone-700">
               {siteSettings.announcementItems.map((item, idx) => (
                 <div key={idx} className="glass-panel-soft flex items-start gap-3 rounded-2xl px-4 py-3 border border-white/55">
                   <span className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/90 text-[11px] font-bold text-white shadow-[0_0_18px_rgba(251,191,36,0.32)]">

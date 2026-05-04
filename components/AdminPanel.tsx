@@ -374,7 +374,7 @@ export default function AdminPanel({ onBack }: Props) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-stone-800">公告编辑</h3>
-              <p className="mt-1 text-xs text-stone-500">首页“新增功能”弹窗会实时读取这里的内容。</p>
+              <p className="mt-1 text-xs text-stone-500">首页“功能介绍”弹窗会实时读取这里的内容。</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-stone-400">
               {settingsSavedAt && <span>已保存：{settingsSavedAt}</span>}
@@ -409,7 +409,7 @@ export default function AdminPanel({ onBack }: Props) {
                       value={siteSettings.announcementTitle}
                       onChange={(e) => setSiteSettings((current) => ({ ...current, announcementTitle: e.target.value }))}
                       className="glass-input w-full rounded-2xl px-3 py-2 text-sm outline-none"
-                      placeholder="新增功能"
+                      placeholder="功能介绍"
                     />
                   </div>
                   <div>

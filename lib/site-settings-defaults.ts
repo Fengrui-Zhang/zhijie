@@ -20,7 +20,7 @@ export const DEFAULT_WELCOME_INTRO = [
 ].join('\n');
 
 export const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
-  announcementTitle: updates.title || '新增功能',
+  announcementTitle: updates.title || '功能介绍',
   announcementUpdatedAt: updates.updated_at || '',
   announcementItems: Array.isArray(updates.items) ? updates.items.filter((item): item is string => typeof item === 'string') : [],
   announcementContent: '',
