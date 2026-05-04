@@ -14,6 +14,7 @@ type SiteSettingsRecord = {
   announcementUpdatedAt: string;
   announcementItems: string[];
   announcementContent: string;
+  welcomeIntro: string;
   registrationEnabled: boolean;
   registrationClosedContact: string;
   guestModeEnabled: boolean;
@@ -26,6 +27,7 @@ const toCreateData = () => ({
   announcementUpdatedAt: DEFAULT_SITE_SETTINGS.announcementUpdatedAt,
   announcementItems: [...DEFAULT_SITE_SETTINGS.announcementItems],
   announcementContent: DEFAULT_SITE_SETTINGS.announcementContent,
+  welcomeIntro: DEFAULT_SITE_SETTINGS.welcomeIntro,
   registrationEnabled: DEFAULT_SITE_SETTINGS.registrationEnabled,
   registrationClosedContact: DEFAULT_SITE_SETTINGS.registrationClosedContact,
   guestModeEnabled: DEFAULT_SITE_SETTINGS.guestModeEnabled,
@@ -43,6 +45,7 @@ export const serializePublicSiteSettings = (
     announcementUpdatedAt: settings.announcementUpdatedAt,
     announcementItems: settings.announcementItems,
     announcementContent: settings.announcementContent,
+    welcomeIntro: settings.welcomeIntro,
     registrationEnabled: settings.registrationEnabled,
     registrationClosedContact: settings.registrationClosedContact,
     guestModeEnabled: settings.guestModeEnabled,
@@ -71,6 +74,7 @@ export async function updateSiteSettings(input: PublicSiteSettings) {
       announcementUpdatedAt: next.announcementUpdatedAt,
       announcementItems: normalizeAnnouncementItems(next.announcementItems),
       announcementContent: next.announcementContent,
+      welcomeIntro: next.welcomeIntro,
       registrationEnabled: next.registrationEnabled,
       registrationClosedContact: next.registrationClosedContact,
       guestModeEnabled: next.guestModeEnabled,
@@ -81,6 +85,7 @@ export async function updateSiteSettings(input: PublicSiteSettings) {
       announcementUpdatedAt: next.announcementUpdatedAt,
       announcementItems: normalizeAnnouncementItems(next.announcementItems),
       announcementContent: next.announcementContent,
+      welcomeIntro: next.welcomeIntro,
       registrationEnabled: next.registrationEnabled,
       registrationClosedContact: next.registrationClosedContact,
       guestModeEnabled: next.guestModeEnabled,

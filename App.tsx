@@ -163,6 +163,7 @@ const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const GUEST_CASE_RELATIONS_STORAGE_KEY = 'guest-divination-case-relations:v1';
+const GUEST_FORTUNE_LIMIT = 1;
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 const KLINE_CHAT_MODEL: ChatModel = DOUBAO_SEED_PRO_MODEL;
@@ -1182,6 +1183,12 @@ const App: React.FC = () => {
   const guestModeEnabled = siteSettings.guestModeEnabled;
   const authEntryLabel = registrationEnabled ? '登录 / 注册' : '登录';
   const registrationClosedMessage = `注册通道已关闭，若有需要请联系${siteSettings.registrationClosedContact}`;
+  const welcomeIntroText = guestModeEnabled
+    ? siteSettings.welcomeIntro
+    : siteSettings.welcomeIntro
+        .split(/\r?\n/)
+        .filter((line) => !line.includes('访客'))
+        .join('\n');
   const [klineSeries, setKlineSeries] = useState({
     overall: true,
     wealth: false,
@@ -3878,7 +3885,7 @@ const App: React.FC = () => {
         isSameCaseChartIdentity(activeCase.chartParams, chartParams)
       );
 
-      if (!isLoggedIn && !shouldReuseExistingChart && guestFortuneCount >= 3) {
+      if (!isLoggedIn && !shouldReuseExistingChart && guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
         setError('');
         setShowAuth(true);
         return;
@@ -4553,7 +4560,7 @@ const App: React.FC = () => {
   const handleCalculate = async () => {
     if (requireLoginIfGuestModeDisabled()) return;
     if (!isLoggedIn) {
-      if (guestFortuneCount >= 3) {
+      if (guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
         setError('');
         setShowAuth(true);
         return;
@@ -5841,16 +5848,8 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 max-w-sm w-full text-center space-y-5">
           <div className="text-4xl">🔮</div>
           <h2 className="text-xl font-bold text-stone-800">元分 · 智解</h2>
-          <p className="text-sm text-stone-500">
-            {guestModeEnabled
-              ? '登录后享受完整功能与30次免费提问额度'
-              : '登录后即可使用完整功能与提问额度'}
-            <br />
-            {guestModeEnabled
-              ? '访客仅可排盘3次，每次排盘后可追问1次'
-              : registrationEnabled
-                ? '注册或登录后即可开始使用'
-                : registrationClosedMessage}
+          <p className="whitespace-pre-line text-sm leading-7 text-stone-500">
+            {registrationEnabled ? welcomeIntroText : `${welcomeIntroText}\n${registrationClosedMessage}`}
           </p>
           <div className="space-y-3">
             <button
@@ -6096,7 +6095,7 @@ const App: React.FC = () => {
         <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
         {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
-            <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次</span>
+            <span>访客模式：排盘剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
@@ -6707,7 +6706,7 @@ const App: React.FC = () => {
           <div className="animate-fade-in space-y-6">
             {!isLoggedIn && guestModeEnabled && (
               <div className="glass-banner bg-amber-50/72 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
-                <span>访客模式：排盘剩余 {Math.max(0, 3 - guestFortuneCount)}/3 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
+                <span>访客模式：排盘剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
                 <button
                   type="button"
                   onClick={() => setShowAuth(true)}

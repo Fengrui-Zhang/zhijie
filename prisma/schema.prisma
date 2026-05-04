@@ -41,6 +41,7 @@ model SiteSettings {
   announcementUpdatedAt     String
   announcementItems         String[] @default([])
   announcementContent       String   @default("")
+  welcomeIntro              String   @default("")
   registrationEnabled       Boolean  @default(true)
   registrationClosedContact String   @default("微信：zixu9498422")
   guestModeEnabled          Boolean  @default(true)

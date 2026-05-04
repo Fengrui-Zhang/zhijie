@@ -307,6 +307,7 @@ export default function AdminPanel({ onBack }: Props) {
         announcementUpdatedAt: siteSettings.announcementUpdatedAt.trim() || DEFAULT_SITE_SETTINGS.announcementUpdatedAt,
         announcementItems: siteSettings.announcementItems.map((item) => item.trim()).filter(Boolean),
         announcementContent: siteSettings.announcementContent.trim(),
+        welcomeIntro: siteSettings.welcomeIntro.trim() || DEFAULT_SITE_SETTINGS.welcomeIntro,
         registrationClosedContact: siteSettings.registrationClosedContact.trim() || DEFAULT_SITE_SETTINGS.registrationClosedContact,
       };
       const res = await fetch('/api/admin/site-settings', {
@@ -477,6 +478,18 @@ export default function AdminPanel({ onBack }: Props) {
                 <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
                   <h4 className="text-sm font-bold text-stone-800">功能控制</h4>
                   <p className="mt-1 text-xs text-stone-500">控制注册与访客模式是否对前台开放。</p>
+
+                  <div className="mt-4">
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                      首页介绍
+                    </label>
+                    <textarea
+                      value={siteSettings.welcomeIntro}
+                      onChange={(e) => setSiteSettings((current) => ({ ...current, welcomeIntro: e.target.value }))}
+                      className="glass-input min-h-[180px] w-full rounded-[22px] px-4 py-3 text-sm leading-7 outline-none"
+                      placeholder={DEFAULT_SITE_SETTINGS.welcomeIntro}
+                    />
+                  </div>
 
                   <div className="mt-4 space-y-4">
                     <div className="rounded-[20px] border border-white/60 bg-white/45 px-4 py-3">
