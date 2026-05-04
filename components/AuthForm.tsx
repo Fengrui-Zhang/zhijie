@@ -22,7 +22,11 @@ export default function AuthForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [codeSending, setCodeSending] = useState(false);
+  const [codeCooldown, setCodeCooldown] = useState(0);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -32,9 +36,49 @@ export default function AuthForm({
     }
   }, [mode, registrationEnabled]);
 
+  useEffect(() => {
+    if (codeCooldown <= 0) return;
+    const timer = window.setTimeout(() => {
+      setCodeCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [codeCooldown]);
+
+  const handleSendCode = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('请先填写邮箱');
+      return;
+    }
+
+    setError('');
+    setNotice('');
+    setCodeSending(true);
+    try {
+      const res = await fetch('/api/auth/send-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || '验证码发送失败');
+        return;
+      }
+      setVerificationCode('');
+      setNotice('验证码已发送，请查看邮箱');
+      setCodeCooldown(60);
+    } catch {
+      setError('验证码发送失败，请稍后重试');
+    } finally {
+      setCodeSending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
 
     try {
@@ -42,7 +86,7 @@ export default function AuthForm({
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name, code: verificationCode }),
         });
 
         if (!res.ok) {
@@ -137,7 +181,13 @@ export default function AuthForm({
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => {
+                  setEmail(e.target.value);
+                  if (mode === 'register') {
+                    setVerificationCode('');
+                    setNotice('');
+                  }
+                }}
                 required
                 placeholder="your@email.com"
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 bg-white"
@@ -159,9 +209,43 @@ export default function AuthForm({
               />
             </div>
 
+            {mode === 'register' && (
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  邮箱验证码
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={e => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    placeholder="6位验证码"
+                    className="min-w-0 flex-1 px-3 py-2 border border-stone-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={codeSending || codeCooldown > 0 || !email.trim()}
+                    className="shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400"
+                  >
+                    {codeSending ? '发送中' : codeCooldown > 0 ? `${codeCooldown}s` : '发送验证码'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="text-red-600 text-sm bg-red-50 rounded-lg p-3">
                 {error}
+              </div>
+            )}
+
+            {notice && (
+              <div className="text-emerald-700 text-sm bg-emerald-50 rounded-lg p-3">
+                {notice}
               </div>
             )}
 

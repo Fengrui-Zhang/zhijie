@@ -22,6 +22,19 @@ model User {
   note      UserNote?
 }
 
+model EmailVerificationCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+  @@index([email, expiresAt])
+}
+
 model SiteSettings {
   id                        String   @id @default("global")
   announcementTitle         String
