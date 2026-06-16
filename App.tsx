@@ -1095,8 +1095,8 @@ const App: React.FC = () => {
   const activeProfessionalFeature = getProfessionalFeature(activeChartParams);
 
   // --- State ---
-  const [hasSelectedModel, setHasSelectedModel] = useState(false);
-  const [modelType, setModelType] = useState<ModelType>(ModelType.QIMEN);
+  const [hasSelectedModel, setHasSelectedModel] = useState(true);
+  const [modelType, setModelType] = useState<ModelType>(ModelType.BAZI);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'chart'>('input');
   
@@ -2910,6 +2910,8 @@ const App: React.FC = () => {
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
     setHasSelectedModel(true);
+    setProfessionalSelectedProject(null);
+    setProfessionalModalOpen(false);
     setModelType(type);
     clearViewState();
     if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
@@ -3039,9 +3041,9 @@ const App: React.FC = () => {
   }, [isLoggedIn, readGuestCases]);
 
   useEffect(() => {
-    if (!professionalModalOpen) return;
+    if (!professionalSelectedProject) return;
     void fetchProfessionalCaseOptions();
-  }, [fetchProfessionalCaseOptions, professionalModalOpen]);
+  }, [fetchProfessionalCaseOptions, professionalSelectedProject]);
 
   const buildProfessionalBirthChartParams = useCallback(() => {
     if (!professionalCustomDate) return null;
@@ -4608,11 +4610,6 @@ const App: React.FC = () => {
       setError("请选择出生日期");
       return;
     }
-    if ((modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO) && !birthYear) {
-      setError("请输入您的出生年份");
-      return;
-    }
-
     // Meihua / Liuyao Specific Validation
     if (isLiupanModeModel(modelType)) {
       if (
@@ -5525,13 +5522,23 @@ const App: React.FC = () => {
 
   const openProfessionalModal = useCallback(() => {
     resetProfessionalComposer();
-    setProfessionalModalOpen(true);
+    setProfessionalSelectedProject(PROFESSIONAL_FEATURE_JOINT);
+    setProfessionalModalOpen(false);
   }, [resetProfessionalComposer]);
 
   const openProfessionalFeature = useCallback((feature: string) => {
     resetProfessionalComposer();
     setProfessionalSelectedProject(feature);
-    setProfessionalModalOpen(true);
+    setProfessionalModalOpen(false);
+    setHasSelectedModel(true);
+    setModelType(ModelType.BAZI);
+    setStep('input');
+    setChartData(null);
+    setChatHistory([]);
+    clearChatSession();
+    setActiveCase(null);
+    setActiveSessionId(null);
+    setError('');
   }, [resetProfessionalComposer]);
 
   const handleProfessionalPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -5880,12 +5887,14 @@ const App: React.FC = () => {
   const desktopWorkPaddingLeft = desktopNavOffset;
   const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
   const currentModuleLabel =
+    professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
+    professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
     modelType === ModelType.BAZI ? '四柱八字（盲派）' :
     modelType === ModelType.ZIWEI ? '紫微斗数' :
     modelType === ModelType.QIMEN ? '奇门遁甲' :
     modelType === ModelType.LIUYAO ? '六爻纳甲' :
     '梅花易数';
-  const currentWorkspaceLabel = isCaseModel ? '命理库' : '占卜排盘';
+  const currentWorkspaceLabel = professionalSelectedProject ? '进阶功能' : isCaseModel ? '命理库' : '占卜排盘';
   const currentCaseInitialAnalysis = activeCase
     ? normalizeInitialAnalysisData(activeCase.initialAnalysisData)
     : null;
@@ -5960,7 +5969,7 @@ const App: React.FC = () => {
             [ModelType.BAZI, '四柱八字（盲派）'],
             [ModelType.ZIWEI, '紫微斗数'],
           ].map(([type, label]) => {
-            const selected = modelType === type && !professionalModalOpen;
+            const selected = modelType === type && !professionalSelectedProject;
             return (
               <button
                 key={type}
@@ -5986,7 +5995,7 @@ const App: React.FC = () => {
             [ModelType.LIUYAO, '六爻纳甲'],
             [ModelType.MEIHUA, '梅花易数'],
           ].map(([type, label]) => {
-            const selected = modelType === type && !professionalModalOpen;
+            const selected = modelType === type && !professionalSelectedProject;
             return (
               <button
                 key={type}
@@ -6011,7 +6020,7 @@ const App: React.FC = () => {
             [PROFESSIONAL_FEATURE_JOINT, '八字+紫微联合分析'],
             [PROFESSIONAL_FEATURE_BAZI_COMPAT, '八字合盘'],
           ].map(([feature, label]) => {
-            const selected = professionalModalOpen && professionalSelectedProject === feature;
+            const selected = professionalSelectedProject === feature;
             return (
               <button
                 key={feature}
@@ -6031,6 +6040,350 @@ const App: React.FC = () => {
         </div>
       </div>
     </nav>
+  );
+
+  const renderProfessionalWorkspace = () => (
+    <div className="space-y-5 animate-fade-in border-t border-stone-100 pt-6">
+      {professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-stone-700">八字 + 紫微联合分析</div>
+              <div className="mt-1 text-sm text-stone-500">
+                可直接选已有命例，也可新建联合命例。首次分析默认做全盘解读。
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openProfessionalFeature(PROFESSIONAL_FEATURE_JOINT)}
+              className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+            >
+              重置
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setProfessionalMode('existing')}
+              className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                professionalMode === 'existing'
+                  ? 'glass-panel-dark border-transparent text-amber-200'
+                  : 'glass-chip text-stone-600'
+              }`}
+            >
+              选择已有命例
+            </button>
+            <button
+              type="button"
+              onClick={() => setProfessionalMode('new')}
+              className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                professionalMode === 'new'
+                  ? 'glass-panel-dark border-transparent text-amber-200'
+                  : 'glass-chip text-stone-600'
+              }`}
+            >
+              新建联合命例
+            </button>
+          </div>
+
+          {professionalMode === 'existing' && (
+            <div className="space-y-4">
+              <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4">
+                <div className="text-sm font-bold text-stone-700">已有命例</div>
+                <div className="mt-4 max-h-[52vh] overflow-y-auto overscroll-contain pr-1">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {professionalCasesLoading && (
+                      <div className="col-span-full text-sm text-stone-400">正在读取命例...</div>
+                    )}
+                    {!professionalCasesLoading && professionalCaseOptions.length === 0 && (
+                      <div className="col-span-full rounded-2xl border border-dashed border-stone-200 px-4 py-6 text-center text-sm text-stone-400">
+                        暂无可用命例，请切换到“新建联合命例”。
+                      </div>
+                    )}
+                    {professionalCaseOptions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setProfessionalSelectedCaseId(item.id)}
+                        className={`rounded-[24px] border px-4 py-3 text-left transition ${
+                          professionalSelectedCaseId === item.id
+                            ? 'glass-panel-dark border-transparent text-amber-200'
+                            : 'glass-panel bg-white/70 border-white/60 text-stone-700 hover:bg-white/85'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-bold">{item.title}</div>
+                            {getCaseSexLabel(item.chartParams) && (
+                              <div className={`mt-1 text-xs ${professionalSelectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                {getCaseSexLabel(item.chartParams)}
+                              </div>
+                            )}
+                            <div className={`mt-1 text-xs ${professionalSelectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                              四柱：{getCasePillarsPreview(item.modelType, item.chartData) || '未获取'}
+                            </div>
+                          </div>
+                          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                            professionalSelectedCaseId === item.id
+                              ? 'border-amber-200/30 text-amber-100'
+                              : 'border-stone-200 text-stone-500'
+                          }`}>
+                            {item.modelType === ModelType.BAZI ? '八字' : '紫微'}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleRunJointProfessionalFromExisting()}
+                disabled={professionalBusy || !professionalSelectedCaseId}
+                className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+                  professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                }`}
+              >
+                {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
+              </button>
+            </div>
+          )}
+
+          {professionalMode === 'new' && (
+            <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-semibold text-stone-700">姓名（可选）</span>
+                  <input
+                    type="text"
+                    value={professionalName}
+                    onChange={(event) => setProfessionalName(event.target.value)}
+                    className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                    placeholder="请输入姓名"
+                  />
+                </label>
+                <div>
+                  <span className="block text-sm font-semibold text-stone-700">性别</span>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setProfessionalGender(0)}
+                      className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                    >
+                      男
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProfessionalGender(1)}
+                      className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                    >
+                      女
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="block text-sm font-semibold text-stone-700">出生时间</span>
+                <input
+                  type="datetime-local"
+                  value={professionalCustomDate}
+                  onChange={(event) => setProfessionalCustomDate(event.target.value)}
+                  className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                />
+              </label>
+
+              <LocationSelector
+                province={professionalProvince}
+                city={professionalCity}
+                setProvince={setProfessionalProvince}
+                setCity={setProfessionalCity}
+              />
+
+              <button
+                type="button"
+                onClick={() => void handleRunJointProfessionalFromNew()}
+                disabled={professionalBusy || !professionalCustomDate}
+                className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+                  professionalBusy || !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                }`}
+              >
+                {professionalBusy ? '双盘排盘中...' : '排盘并开始联合分析'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-stone-700">八字合盘分析</div>
+              <div className="mt-1 text-sm text-stone-500">
+                为两位命例分别载入八字命盘，再结合关系标签做全盘合盘分析。
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openProfessionalFeature(PROFESSIONAL_FEATURE_BAZI_COMPAT)}
+              className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700"
+            >
+              重置
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {[
+              { key: 'A', label: '甲', state: compatPersonA, setState: setCompatPersonA },
+              { key: 'B', label: '乙', state: compatPersonB, setState: setCompatPersonB },
+            ].map((person) => (
+              <div key={person.key} className="glass-panel-soft rounded-[28px] border border-white/60 p-5 space-y-4">
+                <div>
+                  <div className="text-sm font-bold text-stone-700">{person.label}方命例</div>
+                  <div className="mt-1 text-xs text-stone-500">可直接选已有八字命例，也可新建一个八字命例。</div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => person.setState((current) => ({ ...current, mode: 'existing' }))}
+                    className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      person.state.mode === 'existing'
+                        ? 'glass-panel-dark border-transparent text-amber-200'
+                        : 'glass-chip text-stone-600'
+                    }`}
+                  >
+                    已有命例
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => person.setState((current) => ({ ...current, mode: 'new' }))}
+                    className={`flex-1 rounded-2xl border px-4 py-2.5 text-sm font-semibold transition ${
+                      person.state.mode === 'new'
+                        ? 'glass-panel-dark border-transparent text-amber-200'
+                        : 'glass-chip text-stone-600'
+                    }`}
+                  >
+                    新建命例
+                  </button>
+                </div>
+
+                {person.state.mode === 'existing' ? (
+                  <div className="max-h-[40vh] overflow-y-auto overscroll-contain pr-1">
+                    <div className="space-y-2">
+                      {professionalCasesLoading && (
+                        <div className="text-sm text-stone-400">正在读取命例...</div>
+                      )}
+                      {!professionalCasesLoading && professionalCaseOptions.filter((item) => item.modelType === ModelType.BAZI).length === 0 && (
+                        <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-6 text-center text-sm text-stone-400">
+                          暂无八字命例，请切换到“新建命例”。
+                        </div>
+                      )}
+                      {professionalCaseOptions
+                        .filter((item) => item.modelType === ModelType.BAZI)
+                        .map((item) => (
+                          <button
+                            key={`${person.key}-${item.id}`}
+                            type="button"
+                            onClick={() => person.setState((current) => ({ ...current, selectedCaseId: item.id }))}
+                            className={`w-full rounded-[22px] border px-4 py-3 text-left transition ${
+                              person.state.selectedCaseId === item.id
+                                ? 'glass-panel-dark border-transparent text-amber-200'
+                                : 'glass-panel bg-white/70 border-white/60 text-stone-700 hover:bg-white/85'
+                            }`}
+                          >
+                            <div className="text-sm font-bold">{item.title}</div>
+                            {getCaseSexLabel(item.chartParams) && (
+                              <div className={`mt-1 text-xs ${person.state.selectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                                {getCaseSexLabel(item.chartParams)}
+                              </div>
+                            )}
+                            <div className={`mt-1 text-xs ${person.state.selectedCaseId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                              四柱：{getCasePillarsPreview(item.modelType, item.chartData) || '未获取'}
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="block text-sm font-semibold text-stone-700">姓名（可选）</span>
+                      <input
+                        type="text"
+                        value={person.state.name}
+                        onChange={(event) => person.setState((current) => ({ ...current, name: event.target.value }))}
+                        className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                        placeholder="请输入姓名"
+                      />
+                    </label>
+
+                    <div>
+                      <span className="block text-sm font-semibold text-stone-700">性别</span>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => person.setState((current) => ({ ...current, gender: 0 }))}
+                          className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                        >
+                          男
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => person.setState((current) => ({ ...current, gender: 1 }))}
+                          className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
+                        >
+                          女
+                        </button>
+                      </div>
+                    </div>
+
+                    <label className="block">
+                      <span className="block text-sm font-semibold text-stone-700">出生时间</span>
+                      <input
+                        type="datetime-local"
+                        value={person.state.customDate}
+                        onChange={(event) => person.setState((current) => ({ ...current, customDate: event.target.value }))}
+                        className="glass-input mt-2 w-full rounded-2xl p-3 outline-none"
+                      />
+                    </label>
+
+                    <LocationSelector
+                      province={person.state.province}
+                      city={person.state.city}
+                      setProvince={(value) => person.setState((current) => ({ ...current, province: value }))}
+                      setCity={(value) => person.setState((current) => ({ ...current, city: value }))}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleRunBaziCompatibilityProfessional()}
+            disabled={professionalBusy}
+            className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
+              professionalBusy ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+            }`}
+          >
+            {professionalBusy ? '合盘准备中...' : '开始八字合盘分析'}
+          </button>
+        </div>
+      )}
+
+      {professionalResultSummary && (
+        <div className="glass-panel-soft rounded-[26px] border border-white/60 px-4 py-4">
+          <div className="text-sm font-bold text-stone-700">已载入主界面</div>
+          <div className="mt-2 text-sm leading-7 text-stone-600">
+            {professionalResultSummary}...
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -6252,18 +6605,22 @@ const App: React.FC = () => {
                 <div className="mt-1 text-2xl font-bold text-stone-800">{currentModuleLabel}</div>
               </div>
               <div className="text-sm text-stone-500">
-                {isCaseModel ? '管理命例、排盘并进入 AI 分析' : '先完成排盘，再基于盘面发起解读'}
+                {professionalSelectedProject
+                  ? '选择命例或新建资料后开始进阶分析'
+                  : isCaseModel
+                    ? '管理命例、排盘并进入 AI 分析'
+                    : '先完成排盘，再基于盘面发起解读'}
               </div>
             </div>
 
-            {hasSelectedModel && supportsKnowledge && !isCaseModel && (
+            {hasSelectedModel && supportsKnowledge && !isCaseModel && !professionalSelectedProject && (
               <KnowledgeToggleCard
                 useKnowledge={useKnowledge}
                 onToggle={() => setUseKnowledge((prev) => !prev)}
               />
             )}
 
-            {hasSelectedModel && (isCaseModel ? (
+            {professionalSelectedProject ? renderProfessionalWorkspace() : hasSelectedModel && (isCaseModel ? (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -6526,13 +6883,13 @@ const App: React.FC = () => {
               {/* Birth Year (Meihua & Liuyao) */}
               {!isLifeReading && showBornYear && (
                  <div>
-                   <label className="block text-stone-700 font-bold mb-2">出生年份 (用于起卦依据)</label>
+                   <label className="block text-stone-700 font-bold mb-2">出生年份（选填，用于起卦依据）</label>
                    <input 
                       type="number" 
                       value={birthYear} 
                       onChange={e => setBirthYear(e.target.value)} 
                       className="glass-input w-full rounded-2xl p-3" 
-                      placeholder="例如: 1995"
+                      placeholder="可不填，例如: 1995"
                     />
                  </div>
               )}
@@ -7501,7 +7858,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {professionalModalOpen && (
+      {false && professionalModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6"
           onClick={() => setProfessionalModalOpen(false)}
