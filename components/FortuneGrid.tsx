@@ -475,7 +475,7 @@ const buildShareSvg = ({
   ${jiLines}
   <line x1="72" y1="${height - 78}" x2="688" y2="${height - 78}" stroke="#f5e6c8" stroke-width="2" />
   <text x="72" y="${height - 42}" fill="#a16207" font-size="18" font-weight="800">元分 · 智解</text>
-  <text x="688" y="${height - 42}" fill="#a8a29e" font-size="17" text-anchor="end">AI 命理运势卡片</text>
+  <text x="688" y="${height - 42}" fill="#a8a29e" font-size="17" text-anchor="end">运势参考卡片</text>
 </svg>`;
 };
 
@@ -660,7 +660,7 @@ const ShareDialog = ({
             )}
             <div className="mt-5 flex items-center justify-between border-t border-amber-100 pt-3 text-xs">
               <span className="font-bold text-amber-700">元分 · 智解</span>
-              <span className="text-stone-400">AI 命理运势卡片</span>
+              <span className="text-stone-400">运势参考卡片</span>
             </div>
           </div>
 
