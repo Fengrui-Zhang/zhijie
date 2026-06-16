@@ -39,6 +39,7 @@ export interface SessionItem {
   modelType: string;
   title: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface SessionSidebarProps {

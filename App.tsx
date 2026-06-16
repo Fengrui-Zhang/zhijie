@@ -1318,6 +1318,7 @@ const App: React.FC<AppProps> = ({
   // Chat
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [recordsSearch, setRecordsSearch] = useState('');
+  const [recordsFilter, setRecordsFilter] = useState<'all' | 'life' | 'forecast' | 'fortune' | 'tool'>('all');
   const [standaloneChatInput, setStandaloneChatInput] = useState('');
   const [standaloneChatMessages, setStandaloneChatMessages] = useState<ChatMessage[]>([]);
   const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
@@ -6622,14 +6623,65 @@ const App: React.FC<AppProps> = ({
     </nav>
   );
 
-  const filteredRecords = savedSessions.filter((item) => {
-    const term = recordsSearch.trim().toLowerCase();
-    if (!term) return true;
-    return (
-      item.title.toLowerCase().includes(term) ||
-      (MODEL_LABELS[item.modelType] || item.modelType).toLowerCase().includes(term)
-    );
-  });
+  const getRecordCategory = (item: SessionItem): 'life' | 'forecast' | 'fortune' | 'tool' => {
+    if ([ModelType.BAZI, ModelType.ZIWEI].includes(item.modelType as ModelType)) return 'life';
+    if ([ModelType.DAILY_FORTUNE, ModelType.MONTHLY_FORTUNE].includes(item.modelType as ModelType)) return 'fortune';
+    if (item.modelType === ModelType.ALMANAC) return 'tool';
+    return 'forecast';
+  };
+
+  const recordFilterOptions: Array<{ key: typeof recordsFilter; label: string; description: string }> = [
+    { key: 'all', label: '全部', description: '所有 AI 记录' },
+    { key: 'life', label: '命理', description: '八字、紫微' },
+    { key: 'forecast', label: '占卜', description: '奇门、六爻等' },
+    { key: 'fortune', label: '运势', description: '日运、月运' },
+    { key: 'tool', label: '择日', description: '黄历择日' },
+  ];
+
+  const getRecordTime = (item: SessionItem) => {
+    const raw = item.updatedAt || item.createdAt;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? new Date(0) : date;
+  };
+
+  const filteredRecords = savedSessions
+    .filter((item) => {
+      if (recordsFilter !== 'all' && getRecordCategory(item) !== recordsFilter) return false;
+      const term = recordsSearch.trim().toLowerCase();
+      if (!term) return true;
+      return (
+        item.title.toLowerCase().includes(term) ||
+        (MODEL_LABELS[item.modelType] || item.modelType).toLowerCase().includes(term)
+      );
+    })
+    .sort((a, b) => getRecordTime(b).getTime() - getRecordTime(a).getTime());
+
+  const recordGroups = filteredRecords.reduce<Array<{ label: string; items: SessionItem[] }>>((groups, item) => {
+    const date = getRecordTime(item);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const weekAgo = new Date(today.getTime() - 7 * 86400000);
+    let label = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    if (date >= today) label = '今天';
+    else if (date >= yesterday) label = '昨天';
+    else if (date >= weekAgo) label = '近7天';
+
+    const existing = groups.find((group) => group.label === label);
+    if (existing) {
+      existing.items.push(item);
+    } else {
+      groups.push({ label, items: [item] });
+    }
+    return groups;
+  }, []);
+
+  const recordCounts = recordFilterOptions.reduce<Record<string, number>>((counts, option) => {
+    counts[option.key] = option.key === 'all'
+      ? savedSessions.length
+      : savedSessions.filter((item) => getRecordCategory(item) === option.key).length;
+    return counts;
+  }, {});
 
   const formatSessionDate = (value: string) => {
     const date = new Date(value);
@@ -6644,12 +6696,27 @@ const App: React.FC<AppProps> = ({
     });
   };
 
+  const formatRecordAge = (item: SessionItem) => {
+    const date = getRecordTime(item);
+    const diff = Date.now() - date.getTime();
+    if (!Number.isFinite(diff) || diff < 0) return formatSessionDate(item.updatedAt || item.createdAt);
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '刚刚更新';
+    if (minutes < 60) return `${minutes}分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}天前`;
+    return formatSessionDate(item.updatedAt || item.createdAt);
+  };
+
   const renderRecordsWorkspace = () => (
     <div className="glass-panel rounded-[32px] p-6 md:p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
           <div className="mt-1 text-2xl font-bold text-stone-800">命理记录</div>
+          <div className="mt-2 text-sm text-stone-500">只保存发生过 AI 对话的记录，排盘浏览不会进入这里。</div>
         </div>
         <button
           type="button"
@@ -6660,7 +6727,33 @@ const App: React.FC<AppProps> = ({
         </button>
       </div>
 
-      <div className="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
+      <div className="mb-5 grid gap-3 md:grid-cols-5">
+        {recordFilterOptions.map((option) => {
+          const selected = recordsFilter === option.key;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setRecordsFilter(option.key)}
+              className={`rounded-2xl border px-4 py-3 text-left transition ${
+                selected
+                  ? 'glass-panel-dark border-transparent text-amber-100 shadow-[0_16px_32px_rgba(28,25,23,0.16)]'
+                  : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-bold">{option.label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-400'}>{recordCounts[option.key] || 0}</span>
+              </div>
+              <div className={`mt-1 text-[11px] ${selected ? 'text-amber-100/75' : 'text-stone-400'}`}>
+                {option.description}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mb-5 grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <input
           value={recordsSearch}
           onChange={(event) => setRecordsSearch(event.target.value)}
@@ -6668,7 +6761,10 @@ const App: React.FC<AppProps> = ({
           className="glass-input rounded-2xl border border-white/70 px-4 py-3 text-sm outline-none"
         />
         <div className="glass-chip rounded-2xl px-4 py-3 text-sm font-medium text-stone-500">
-          共 {filteredRecords.length} 条
+          当前 {filteredRecords.length} 条
+        </div>
+        <div className="glass-chip rounded-2xl px-4 py-3 text-sm font-medium text-stone-500">
+          总计 {savedSessions.length} 条
         </div>
       </div>
 
@@ -6683,40 +6779,73 @@ const App: React.FC<AppProps> = ({
           正在读取记录...
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {filteredRecords.map((item) => (
-          <div
-            key={item.id}
-            className={`group rounded-[24px] border px-4 py-4 transition ${
-              activeSessionId === item.id
-                ? 'glass-panel-dark border-transparent text-amber-100'
-                : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => void handleLoadSession(item.id)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <div className="truncate text-base font-bold">{item.title}</div>
-                <div className={`mt-1 text-xs ${activeSessionId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
-                  {MODEL_LABELS[item.modelType] || item.modelType} · {formatSessionDate(item.createdAt)}
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDeleteSession(item.id)}
-                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                  activeSessionId === item.id
-                    ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
-                    : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
-                }`}
-              >
-                删除
-              </button>
-            </div>
-          </div>
+        <div className="space-y-5">
+          {recordGroups.map((group) => (
+            <section key={group.label} className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="text-xs font-bold tracking-[0.18em] text-stone-400">{group.label}</div>
+                <div className="text-xs text-stone-400">{group.items.length} 条</div>
+              </div>
+              <div className="space-y-2">
+                {group.items.map((item) => {
+                  const selected = activeSessionId === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`group rounded-[22px] border px-4 py-3 transition ${
+                        selected
+                          ? 'glass-panel-dark border-transparent text-amber-100'
+                          : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleLoadSession(item.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-base font-bold">{item.title}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] ${
+                              selected ? 'bg-white/10 text-amber-100' : 'bg-white/70 text-stone-500'
+                            }`}>
+                              {MODEL_LABELS[item.modelType] || item.modelType}
+                            </span>
+                          </div>
+                          <div className={`mt-1 text-xs ${selected ? 'text-amber-100/75' : 'text-stone-500'}`}>
+                            更新：{formatRecordAge(item)} · 创建：{formatSessionDate(item.createdAt)}
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleLoadSession(item.id)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                              selected
+                                ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
+                                : 'border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-white/70'
+                            }`}
+                          >
+                            打开
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteSession(item.id)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                              selected
+                                ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
+                                : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
+                            }`}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           ))}
         </div>
       )}
