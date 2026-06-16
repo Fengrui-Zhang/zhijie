@@ -93,6 +93,7 @@ import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import GenericTaibuGrid from './components/GenericTaibuGrid';
+import FortuneGrid from './components/FortuneGrid';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
@@ -7476,13 +7477,14 @@ const App: React.FC = () => {
                   {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
                   {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
                   {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+                  {[ModelType.DAILY_FORTUNE, ModelType.MONTHLY_FORTUNE].includes(modelType) && (
+                    <FortuneGrid data={chartData as GenericTaibuResponse} />
+                  )}
                   {[
                     ModelType.DALIUREN,
                     ModelType.TAIYI,
                     ModelType.XIAOLIUREN,
                     ModelType.ALMANAC,
-                    ModelType.DAILY_FORTUNE,
-                    ModelType.MONTHLY_FORTUNE,
                   ].includes(modelType) && (
                     <GenericTaibuGrid data={chartData as GenericTaibuResponse} title={MODEL_LABELS[modelType]} />
                   )}

@@ -6,7 +6,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: '元分 · 智解',
-  description: 'A divination application using local Taibu chart algorithms and expert AI interpretation.',
+  description: 'A divination application using local chart algorithms and expert AI interpretation.',
 };
 
 export default function RootLayout({

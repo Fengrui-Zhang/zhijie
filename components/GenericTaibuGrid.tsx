@@ -119,7 +119,7 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-800">{title}</div>
-            <div className="mt-1 text-xs text-stone-500">已使用 Taibu 本地算法生成，后续对话会自动拼接此盘面。</div>
+            <div className="mt-1 text-xs text-stone-500">已使用本地排盘算法生成，后续对话会自动拼接此盘面。</div>
           </div>
         </div>
         <EntryList entries={baseEntries} />
@@ -129,7 +129,7 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
       <FortuneBlock fortune={fortune} />
 
       <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-        <div className="mb-3 text-sm font-bold text-stone-700">Taibu 原始盘面</div>
+        <div className="mb-3 text-sm font-bold text-stone-700">排盘原始信息</div>
         <pre className="max-h-[560px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/60 bg-white/65 p-4 text-sm leading-7 text-stone-700">
           {data.taibuText || JSON.stringify(data.taibuJson || detail, null, 2)}
         </pre>

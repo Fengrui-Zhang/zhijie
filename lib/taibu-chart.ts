@@ -67,6 +67,19 @@ import {
   toAlmanacText,
   type AlmanacOutput,
 } from 'taibu-core/almanac';
+import {
+  STEM_ELEMENTS,
+  ZHI_WUXING,
+  calculateTenGod,
+  getElementRelation,
+} from 'taibu-core/utils';
+import {
+  HIDDEN_STEM_DETAILS,
+  LIU_CHONG,
+  LIU_HE,
+  TAO_HUA,
+  YI_MA,
+} from 'taibu-core/data/shensha';
 import { HEXAGRAMS } from 'taibu-core/data/hexagrams';
 import { Solar } from 'lunar-javascript';
 import { ModelType, LiuyaoMode, type BaseParams, type QimenParams } from '../types';
@@ -671,15 +684,274 @@ function adaptAlmanac(params: BaseParams, chart: AlmanacOutput) {
   };
 }
 
-const FORTUNE_LEVELS = ['偏弱', '平稳', '小吉', '顺遂', '旺相'];
-const FORTUNE_CATEGORIES = ['综合', '事业', '感情', '财富', '健康', '社交'] as const;
+type FortuneLevel = '凶' | '小凶' | '平' | '中吉' | '吉' | '大吉';
+type FortuneScores = {
+  overall: number;
+  career: number;
+  love: number;
+  wealth: number;
+  health: number;
+  social: number;
+};
+type FortuneLevels = Record<keyof FortuneScores, FortuneLevel>;
+type HeavenlyStem = '甲' | '乙' | '丙' | '丁' | '戊' | '己' | '庚' | '辛' | '壬' | '癸';
+type FiveElement = '木' | '火' | '土' | '金' | '水';
 
-function fortuneScore(seed: string, offset: number) {
-  let total = offset * 17;
-  for (let index = 0; index < seed.length; index += 1) {
-    total += seed.charCodeAt(index) * (index + 3);
+const LEVEL_ORDER: FortuneLevel[] = ['凶', '小凶', '平', '中吉', '吉', '大吉'];
+const ELEMENT_RELATION_WEIGHTS: Record<string, number> = {
+  same: 70,
+  produce: 75,
+  produced: 85,
+  control: 62,
+  controlled: 50,
+};
+const TEN_GOD_ADJUSTMENTS: Record<string, Partial<FortuneScores>> = {
+  比肩: { career: 5, love: 0, wealth: -5, health: 5, social: 10 },
+  劫财: { career: 0, love: -5, wealth: -10, health: 5, social: 5 },
+  食神: { career: 5, love: 10, wealth: 5, health: 10, social: 8 },
+  伤官: { career: -5, love: 5, wealth: 5, health: 0, social: -5 },
+  偏财: { career: 5, love: 5, wealth: 15, health: 0, social: 5 },
+  正财: { career: 5, love: 10, wealth: 10, health: 0, social: 5 },
+  七杀: { career: 10, love: -5, wealth: 5, health: -5, social: -3 },
+  正官: { career: 15, love: 5, wealth: 5, health: 0, social: 8 },
+  偏印: { career: 5, love: 0, wealth: -5, health: 5, social: 0 },
+  正印: { career: 10, love: 5, wealth: 0, health: 10, social: 5 },
+};
+const STEM_ELEMENTS_MAP = STEM_ELEMENTS as Record<HeavenlyStem, FiveElement>;
+const BRANCH_ELEMENTS = ZHI_WUXING as Record<string, FiveElement>;
+const BRANCH_HIDDEN_STEMS: Record<string, HeavenlyStem[]> = Object.fromEntries(
+  Object.entries(HIDDEN_STEM_DETAILS).map(([branch, stems]) => [
+    branch,
+    stems.map((item) => item.stem as HeavenlyStem),
+  ])
+) as Record<string, HeavenlyStem[]>;
+const ELEMENT_COLORS: Record<FiveElement, string> = {
+  木: '绿色',
+  火: '红色',
+  土: '黄色',
+  金: '白色',
+  水: '黑色/蓝色',
+};
+const ELEMENT_DIRECTIONS: Record<FiveElement, string> = {
+  木: '东方',
+  火: '南方',
+  土: '中央',
+  金: '西方',
+  水: '北方',
+};
+
+function clampWeight(value: number) {
+  return Math.max(30, Math.min(98, Math.round(value)));
+}
+
+function weightToLevel(value: number): FortuneLevel {
+  if (value >= 85) return '大吉';
+  if (value >= 75) return '吉';
+  if (value >= 65) return '中吉';
+  if (value >= 55) return '平';
+  if (value >= 45) return '小凶';
+  return '凶';
+}
+
+function compareLevels(left: FortuneLevel, right: FortuneLevel) {
+  return LEVEL_ORDER.indexOf(left) - LEVEL_ORDER.indexOf(right);
+}
+
+function isLevelFavorable(level: FortuneLevel) {
+  return compareLevels(level, '中吉') >= 0;
+}
+
+function fortuneLevelToChartValue(level: FortuneLevel) {
+  const map: Record<FortuneLevel, number> = {
+    大吉: 92,
+    吉: 78,
+    中吉: 65,
+    平: 52,
+    小凶: 40,
+    凶: 30,
+  };
+  return map[level];
+}
+
+function calcHiddenStemBonus(userDayStem: HeavenlyStem, branch: string) {
+  const hiddenStems = BRANCH_HIDDEN_STEMS[branch];
+  if (!hiddenStems?.length) return 0;
+  const weights = [0.6, 0.3, 0.1];
+  const userElement = STEM_ELEMENTS_MAP[userDayStem];
+  let bonus = 0;
+  for (let index = 0; index < hiddenStems.length; index += 1) {
+    const stemElement = STEM_ELEMENTS_MAP[hiddenStems[index]];
+    const relation = getElementRelation(userElement, stemElement);
+    const relationWeights: Record<string, number> = {
+      produced: 6,
+      same: 3,
+      produce: 1,
+      control: -2,
+      controlled: -5,
+    };
+    bonus += (relationWeights[relation] || 0) * (weights[index] || 0.1);
   }
-  return (Math.abs(total) % 5) + 1;
+  return bonus;
+}
+
+function calcBranchInteraction(userDayBranch: string, flowBranch: string) {
+  const result = { career: 0, love: 0, wealth: 0, health: 0, social: 0 };
+  if (LIU_HE[userDayBranch] === flowBranch) {
+    result.career += 4;
+    result.love += 5;
+    result.wealth += 3;
+    result.health += 3;
+    result.social += 5;
+  }
+  if (LIU_CHONG[userDayBranch] === flowBranch) {
+    result.career -= 5;
+    result.love -= 4;
+    result.wealth -= 3;
+    result.health -= 6;
+    result.social -= 4;
+  }
+  if (TAO_HUA[userDayBranch] === flowBranch) {
+    result.love += 4;
+    result.social += 3;
+  }
+  if (YI_MA[userDayBranch] === flowBranch) {
+    result.career += 3;
+    result.wealth += 2;
+  }
+  return result;
+}
+
+function calcFortuneByStemBranch(
+  userDayStem: HeavenlyStem,
+  userDayBranch: string,
+  flowStem: HeavenlyStem,
+  flowBranch: string
+) {
+  const relation = getElementRelation(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[flowStem]);
+  const baseWeight = ELEMENT_RELATION_WEIGHTS[relation] || 65;
+  const tenGod = calculateTenGod(userDayStem, flowStem);
+  const hiddenBonus = calcHiddenStemBonus(userDayStem, flowBranch);
+  const branchBonus = calcBranchInteraction(userDayBranch, flowBranch);
+  const adj = TEN_GOD_ADJUSTMENTS[tenGod] || {};
+  const career = clampWeight(baseWeight + (adj.career || 0) + hiddenBonus + branchBonus.career);
+  const love = clampWeight(baseWeight + (adj.love || 0) + hiddenBonus + branchBonus.love);
+  const wealth = clampWeight(baseWeight + (adj.wealth || 0) + hiddenBonus + branchBonus.wealth);
+  const health = clampWeight(baseWeight + (adj.health || 0) + hiddenBonus + branchBonus.health);
+  const social = clampWeight(baseWeight + (adj.social || 0) + hiddenBonus + branchBonus.social);
+  const overall = clampWeight((career + love + wealth + health + social) / 5);
+  const scores = { overall, career, love, wealth, health, social };
+  return {
+    tenGod,
+    levels: {
+      overall: weightToLevel(overall),
+      career: weightToLevel(career),
+      love: weightToLevel(love),
+      wealth: weightToLevel(wealth),
+      health: weightToLevel(health),
+      social: weightToLevel(social),
+    } satisfies FortuneLevels,
+    scores,
+  };
+}
+
+function getLuckyElement(userElement: FiveElement): FiveElement {
+  const order: FiveElement[] = ['木', '火', '土', '金', '水'];
+  const index = order.indexOf(userElement);
+  return order[(index + 4) % 5];
+}
+
+function generateDailyAdvice(tenGod: string, levels: FortuneLevels) {
+  const tenGodAdvice: Record<string, string> = {
+    比肩: '今日适合与朋友合作，互帮互助',
+    劫财: '注意财务支出，避免借贷',
+    食神: '创意灵感丰富，适合发挥才华',
+    伤官: '思维活跃但需谨言慎行',
+    偏财: '有意外之财，可适当投资',
+    正财: '正财运佳，努力工作有回报',
+    七杀: '压力较大，但挑战中有机遇',
+    正官: '贵人运旺，适合拓展人脉',
+    偏印: '适合学习研究，提升自我',
+    正印: '长辈相助，学业事业顺遂',
+  };
+  const advice = [tenGodAdvice[tenGod] || '顺其自然，平常心对待'];
+  if (compareLevels(levels.overall, '吉') >= 0) advice.push('整体运势极佳，可大胆行动');
+  else if (compareLevels(levels.overall, '平') < 0) advice.push('今日宜静不宜动，稳健为上');
+  if (compareLevels(levels.career, '吉') >= 0) advice.push('事业运强劲，把握晋升机会');
+  else if (compareLevels(levels.career, '平') < 0) advice.push('职场需低调行事，避免冲突');
+  if (compareLevels(levels.wealth, '平') < 0) advice.push('财运平平，不宜大额消费投资');
+  if (compareLevels(levels.health, '平') < 0) advice.push('注意休息，避免过度劳累');
+  return advice.slice(0, 4);
+}
+
+function generateMonthlySummary(tenGod: string, overall: FortuneLevel) {
+  const tenGodSummary: Record<string, string> = {
+    比肩: '本月人际关系活跃，适合团队合作',
+    劫财: '本月财务需谨慎，防止意外支出',
+    食神: '本月创意运势佳，适合发展副业',
+    伤官: '本月思维活跃，但需注意言行',
+    偏财: '本月偏财运旺，可尝试投资',
+    正财: '本月正财稳定，努力有回报',
+    七杀: '本月挑战与机遇并存，需果断行动',
+    正官: '本月事业运强，贵人相助',
+    偏印: '本月适合学习进修，提升能力',
+    正印: '本月稳健发展，长辈贵人相助',
+  };
+  let summary = tenGodSummary[tenGod] || '本月运势平稳，顺其自然';
+  if (compareLevels(overall, '吉') >= 0) summary += '。整体运势极佳，可积极把握机会。';
+  else if (compareLevels(overall, '中吉') >= 0) summary += '。运势良好，稳步前进即可。';
+  else summary += '。建议稳健行事，避免冒险。';
+  return summary;
+}
+
+function fortuneFromDate(bazi: BaziOutput, date: Date) {
+  const solar = Solar.fromYmd(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  const eightChar = solar.getLunar().getEightChar();
+  const dayStem = eightChar.getDayGan() as HeavenlyStem;
+  const dayBranch = eightChar.getDayZhi();
+  const userDayStem = bazi.dayMaster as HeavenlyStem;
+  const userDayBranch = bazi.fourPillars.day.branch;
+  const result = calcFortuneByStemBranch(userDayStem, userDayBranch, dayStem, dayBranch);
+  const luckyElement = getLuckyElement(STEM_ELEMENTS_MAP[userDayStem]);
+  return {
+    date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
+    dayStem,
+    dayBranch,
+    tenGod: result.tenGod,
+    ...result.levels,
+    advice: generateDailyAdvice(result.tenGod, result.levels),
+    luckyColor: ELEMENT_COLORS[luckyElement],
+    luckyDirection: ELEMENT_DIRECTIONS[luckyElement],
+    _chart: result.scores,
+  };
+}
+
+function buildTrend(bazi: BaziOutput, centerDate: Date) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(centerDate);
+    date.setDate(centerDate.getDate() + index - 2);
+    const fortune = fortuneFromDate(bazi, date);
+    return {
+      date: `${date.getMonth() + 1}/${date.getDate()}`,
+      fullDate: fortune.date,
+      dayOfMonth: date.getDate(),
+      scores: fortune._chart,
+      level: fortune.overall,
+    };
+  });
+}
+
+function buildMonthCalendar(bazi: BaziOutput, year: number, month: number) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const fortune = fortuneFromDate(bazi, new Date(year, month - 1, day));
+    return {
+      day,
+      level: fortune.overall,
+      scores: fortune._chart,
+      trend: isLevelFavorable(fortune.overall) ? 'up' : compareLevels(fortune.overall, '平') < 0 ? 'down' : 'neutral',
+    };
+  });
 }
 
 async function buildDailyFortune(params: BaseParams) {
@@ -691,6 +963,7 @@ async function buildDailyFortune(params: BaseParams) {
   };
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
+  const fortune = fortuneFromDate(bazi, new Date(target.year, target.month - 1, target.day));
   const almanac = await calculateDailyAlmanac({
     date: dateOnlyString(target),
     dayMaster: bazi.fourPillars.day.stem,
@@ -699,42 +972,29 @@ async function buildDailyFortune(params: BaseParams) {
     birthDay: params.day,
     birthHour: params.hours,
   });
-  const seed = [
-    params.name || '',
-    dateOnlyString(target),
-    bazi.fourPillars.day.stem,
-    almanac.dayInfo.ganZhi,
-    almanac.tenGod || '',
-  ].join('|');
-  const categories = Object.fromEntries(
-    FORTUNE_CATEGORIES.map((label, index) => {
-      const score = fortuneScore(seed, index);
-      return [label, {
-        score,
-        level: FORTUNE_LEVELS[score - 1],
-      }];
-    })
-  );
-  const advice = [
-    `日主${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}，今日${almanac.dayInfo.ganZhi}。`,
-    almanac.tenGod ? `今日十神侧重：${almanac.tenGod}。` : '今日以日课与命局关系综合判断。',
-    '宜先看整体节奏，再结合具体问题细断。',
-  ];
+  const trend = buildTrend(bazi, new Date(target.year, target.month - 1, target.day));
   const text = [
     '【每日运势】',
     `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,
     `日期：${dateOnlyString(target)}`,
-    `命局日主：${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
-    `今日干支：${almanac.dayInfo.ganZhi}`,
+    `日干支：${fortune.dayStem}${fortune.dayBranch}`,
+    `十神：${fortune.tenGod}`,
     '',
-    ...Object.entries(categories).map(([label, item]: [string, any]) => `${label}：${item.level}（${item.score}/5）`),
+    `综合：${fortune.overall}`,
+    `事业：${fortune.career}`,
+    `感情：${fortune.love}`,
+    `财富：${fortune.wealth}`,
+    `健康：${fortune.health}`,
+    `人际：${fortune.social}`,
     '',
-    `建议：${advice.join(' ')}`,
+    `幸运色：${fortune.luckyColor}`,
+    `吉方位：${fortune.luckyDirection}`,
+    `建议：${fortune.advice.join(' ')}`,
   ].join('\n');
 
   return {
     taibuText: text,
-    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), categories, advice },
+    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), fortune, trend },
     base_info: buildGenericBaseInfo(params, {
       date: dateOnlyString(target),
       dayMaster: `${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
@@ -743,9 +1003,17 @@ async function buildDailyFortune(params: BaseParams) {
     detail_info: {
       fortune: {
         type: 'daily',
-        categories,
-        advice,
+        ...fortune,
+        trend,
         almanac,
+        chartValueMap: {
+          overall: fortuneLevelToChartValue(fortune.overall),
+          career: fortuneLevelToChartValue(fortune.career),
+          love: fortuneLevelToChartValue(fortune.love),
+          wealth: fortuneLevelToChartValue(fortune.wealth),
+          health: fortuneLevelToChartValue(fortune.health),
+          social: fortuneLevelToChartValue(fortune.social),
+        },
       },
     },
   };
@@ -761,6 +1029,18 @@ async function buildMonthlyFortune(params: BaseParams) {
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
   const midMonthParams = { ...target, day: Math.min(15, target.day || 15) };
+  const solar = Solar.fromYmd(target.year, target.month, 15);
+  const eightChar = solar.getLunar().getEightChar();
+  const monthStem = eightChar.getMonthGan() as HeavenlyStem;
+  const monthBranch = eightChar.getMonthZhi();
+  const monthly = calcFortuneByStemBranch(
+    bazi.dayMaster as HeavenlyStem,
+    bazi.fourPillars.day.branch,
+    monthStem,
+    monthBranch
+  );
+  const summary = generateMonthlySummary(monthly.tenGod, monthly.levels.overall);
+  const calendar = buildMonthCalendar(bazi, target.year, target.month);
   const almanac = await calculateDailyAlmanac({
     date: dateOnlyString(midMonthParams),
     dayMaster: bazi.fourPillars.day.stem,
@@ -769,41 +1049,27 @@ async function buildMonthlyFortune(params: BaseParams) {
     birthDay: params.day,
     birthHour: params.hours,
   });
-  const seed = [
-    params.name || '',
-    `${target.year}-${target.month}`,
-    bazi.fourPillars.day.stem,
-    almanac.dayInfo.ganZhi,
-    almanac.tenGod || '',
-  ].join('|');
-  const categories = Object.fromEntries(
-    FORTUNE_CATEGORIES.map((label, index) => {
-      const score = fortuneScore(seed, index + 8);
-      return [label, {
-        score,
-        level: FORTUNE_LEVELS[score - 1],
-      }];
-    })
-  );
-  const summary = [
-    `${params.year}年${params.month}月以${almanac.dayInfo.ganZhi}为月内参考日课。`,
-    almanac.tenGod ? `本月重点可从${almanac.tenGod}角度观察。` : '本月重点以命局与月内节奏综合观察。',
-    '不输出重要日期提醒，仅保留运势趋势与建议。',
-  ];
   const text = [
     '【每月运势】',
     `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,
     `月份：${target.year}-${pad2(target.month)}`,
     `命局日主：${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
+    `流月干支：${monthStem}${monthBranch}`,
+    `主运十神：${monthly.tenGod}`,
     '',
-    ...Object.entries(categories).map(([label, item]: [string, any]) => `${label}：${item.level}（${item.score}/5）`),
+    `综合：${monthly.levels.overall}`,
+    `事业：${monthly.levels.career}`,
+    `感情：${monthly.levels.love}`,
+    `财富：${monthly.levels.wealth}`,
+    `健康：${monthly.levels.health}`,
+    `人际：${monthly.levels.social}`,
     '',
-    `总结：${summary.join(' ')}`,
+    `总结：${summary}`,
   ].join('\n');
 
   return {
     taibuText: text,
-    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), categories, summary },
+    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), monthly, summary, calendar },
     base_info: buildGenericBaseInfo(params, {
       month: `${target.year}-${pad2(target.month)}`,
       dayMaster: `${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
@@ -811,8 +1077,15 @@ async function buildMonthlyFortune(params: BaseParams) {
     detail_info: {
       fortune: {
         type: 'monthly',
-        categories,
+        year: target.year,
+        month: target.month,
+        monthStem,
+        monthBranch,
+        tenGod: monthly.tenGod,
+        ...monthly.levels,
+        _chart: monthly.scores,
         summary,
+        calendar,
         almanac,
       },
     },
