@@ -699,12 +699,29 @@ const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
   settings: '/settings',
 };
 
+const SETTINGS_TAB_ROUTES: Record<SettingsWorkspaceTab, string> = {
+  profile: '/settings/profile',
+  general: '/settings/general',
+  charts: '/settings/charts',
+  knowledge: '/settings/knowledge',
+  help: '/settings/help',
+  security: '/settings/security',
+};
+
 const ROUTE_WORKSPACES: Record<string, WorkspaceView> = Object.entries(WORKSPACE_ROUTES).reduce(
   (acc, [workspace, route]) => {
     acc[route] = workspace as WorkspaceView;
     return acc;
   },
   {} as Record<string, WorkspaceView>
+);
+
+const ROUTE_SETTINGS_TABS: Record<string, SettingsWorkspaceTab> = Object.entries(SETTINGS_TAB_ROUTES).reduce(
+  (acc, [tab, route]) => {
+    acc[route] = tab as SettingsWorkspaceTab;
+    return acc;
+  },
+  {} as Record<string, SettingsWorkspaceTab>
 );
 
 const SETTINGS_WORKSPACE_TABS: Array<{
@@ -1311,11 +1328,13 @@ const buildInitialAnalysisBundle = (
 type AppProps = {
   initialModelType?: ModelType;
   initialWorkspace?: WorkspaceView;
+  initialSettingsTab?: SettingsWorkspaceTab;
 };
 
 const App: React.FC<AppProps> = ({
   initialModelType = ModelType.BAZI,
   initialWorkspace = 'divination',
+  initialSettingsTab = 'profile',
 }) => {
   const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
@@ -1440,7 +1459,7 @@ const App: React.FC<AppProps> = ({
   const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
   const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
-  const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>('profile');
+  const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(initialSettingsTab);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -3395,7 +3414,22 @@ const App: React.FC<AppProps> = ({
   useEffect(() => {
     const syncModelFromPath = () => {
       if (typeof window === 'undefined') return;
+      const routedSettingsTab = ROUTE_SETTINGS_TABS[window.location.pathname];
+      if (routedSettingsTab) {
+        setWorkspaceView('settings');
+        setSettingsWorkspaceTab(routedSettingsTab);
+        setProfessionalSelectedProject(null);
+        setProfessionalModalOpen(false);
+        return;
+      }
       const routedWorkspace = ROUTE_WORKSPACES[window.location.pathname];
+      if (routedWorkspace === 'settings') {
+        setWorkspaceView('settings');
+        setSettingsWorkspaceTab('profile');
+        setProfessionalSelectedProject(null);
+        setProfessionalModalOpen(false);
+        return;
+      }
       if (routedWorkspace && routedWorkspace !== workspaceView) {
         setWorkspaceView(routedWorkspace);
         setProfessionalSelectedProject(null);
@@ -3448,10 +3482,21 @@ const App: React.FC<AppProps> = ({
 
   const navigateWorkspace = (view: Exclude<WorkspaceView, 'divination'>) => {
     setWorkspaceView(view);
+    if (view === 'settings') {
+      setSettingsWorkspaceTab('profile');
+    }
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
     const nextRoute = WORKSPACE_ROUTES[view];
     if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
+      window.history.pushState(null, '', nextRoute);
+    }
+  };
+
+  const handleSettingsWorkspaceTabChange = (tab: SettingsWorkspaceTab) => {
+    setSettingsWorkspaceTab(tab);
+    const nextRoute = SETTINGS_TAB_ROUTES[tab];
+    if (typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
       window.history.pushState(null, '', nextRoute);
     }
   };
@@ -7552,7 +7597,7 @@ const App: React.FC<AppProps> = ({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setSettingsWorkspaceTab(tab.id)}
+                  onClick={() => handleSettingsWorkspaceTabChange(tab.id)}
                   className={`flex min-w-[142px] items-center gap-3 rounded-2xl px-3 py-3 text-left transition lg:w-full ${
                     selected
                       ? 'bg-stone-200/70 text-stone-900 shadow-sm'
