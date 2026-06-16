@@ -6325,7 +6325,7 @@ const App: React.FC<AppProps> = ({
   const desktopHistoryOffset = sidebarCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
   const desktopNavOffset = !isCompactLayout ? 292 : 0;
   const desktopWorkPaddingLeft = desktopNavOffset;
-  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
+  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout && workspaceView === 'divination' ? desktopHistoryOffset : 0;
   const currentModuleLabel =
     professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
@@ -7214,7 +7214,7 @@ const App: React.FC<AppProps> = ({
         />
       )}
 
-      {isLoggedIn && (
+      {isLoggedIn && workspaceView === 'divination' && (
         <div
           className="xl:hidden fixed right-3 top-[106px] z-20 flex flex-col gap-2"
         >
@@ -7233,7 +7233,7 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
-      {isLoggedIn && (
+      {isLoggedIn && workspaceView === 'divination' && (
         <div
           className={`xl:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${activeCompactPanel ? 'pointer-events-auto' : 'pointer-events-none'}`}
           aria-hidden={!activeCompactPanel}
@@ -7272,7 +7272,7 @@ const App: React.FC<AppProps> = ({
           {renderModuleNavigation(false)}
         </div>
 
-        {isLoggedIn && (
+        {isLoggedIn && workspaceView === 'divination' && (
           <div className="hidden xl:block fixed right-3 top-[106px] z-10">
             <SessionSidebar
               sessions={savedSessions}
