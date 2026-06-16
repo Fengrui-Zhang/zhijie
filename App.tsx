@@ -642,6 +642,22 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
   {} as Record<string, ModelType>
 );
 
+type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
+
+const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
+  records: '/records',
+  chat: '/chat',
+  settings: '/settings',
+};
+
+const ROUTE_WORKSPACES: Record<string, WorkspaceView> = Object.entries(WORKSPACE_ROUTES).reduce(
+  (acc, [workspace, route]) => {
+    acc[route] = workspace as WorkspaceView;
+    return acc;
+  },
+  {} as Record<string, WorkspaceView>
+);
+
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
   [LiuyaoMode.AUTO, '时间起卦'],
   [LiuyaoMode.CUSTOM_TIME, '指定时间'],
@@ -1137,9 +1153,13 @@ const buildInitialAnalysisBundle = (
 
 type AppProps = {
   initialModelType?: ModelType;
+  initialWorkspace?: WorkspaceView;
 };
 
-const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
+const App: React.FC<AppProps> = ({
+  initialModelType = ModelType.BAZI,
+  initialWorkspace = 'divination',
+}) => {
   const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
   const [showAuth, setShowAuth] = useState(false);
@@ -1203,6 +1223,7 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
   // --- State ---
   const [hasSelectedModel, setHasSelectedModel] = useState(true);
   const [modelType, setModelType] = useState<ModelType>(initialModelType);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(initialWorkspace);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'chart'>('input');
   
@@ -1248,6 +1269,11 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
 
   // Chat
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [recordsSearch, setRecordsSearch] = useState('');
+  const [standaloneChatInput, setStandaloneChatInput] = useState('');
+  const [standaloneChatMessages, setStandaloneChatMessages] = useState<ChatMessage[]>([]);
+  const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
+  const [standaloneChatError, setStandaloneChatError] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -2273,8 +2299,14 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
 
       clearChatSession();
       setActiveSessionId(id);
+      setWorkspaceView('divination');
       setHasSelectedModel(true);
-      setModelType(sessionProfessionalFeature ? ModelType.BAZI : (data.modelType as ModelType));
+      const loadedModelType = sessionProfessionalFeature ? ModelType.BAZI : (data.modelType as ModelType);
+      setModelType(loadedModelType);
+      const loadedRoute = MODEL_ROUTES[loadedModelType];
+      if (loadedRoute && typeof window !== 'undefined' && window.location.pathname !== loadedRoute) {
+        window.history.pushState(null, '', loadedRoute);
+      }
       setChartData(effectiveChartData);
       setActiveChartParams(sessionChartParams);
       setStep('chart');
@@ -2362,8 +2394,14 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
       ? storedSession.chartData
       : (detail?.chartData ?? storedSession.chartData);
     clearChatSession();
+    setWorkspaceView('divination');
     setHasSelectedModel(true);
-    setModelType(sessionProfessionalFeature ? ModelType.BAZI : (storedSession.modelType as ModelType));
+    const loadedModelType = sessionProfessionalFeature ? ModelType.BAZI : (storedSession.modelType as ModelType);
+    setModelType(loadedModelType);
+    const loadedRoute = MODEL_ROUTES[loadedModelType];
+    if (loadedRoute && typeof window !== 'undefined' && window.location.pathname !== loadedRoute) {
+      window.history.pushState(null, '', loadedRoute);
+    }
     setChartData(effectiveChartData);
     setActiveChartParams(storedSession.chartParams || {});
     setActiveSessionId(storedSession.id);
@@ -3040,8 +3078,16 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
   useEffect(() => {
     const syncModelFromPath = () => {
       if (typeof window === 'undefined') return;
+      const routedWorkspace = ROUTE_WORKSPACES[window.location.pathname];
+      if (routedWorkspace && routedWorkspace !== workspaceView) {
+        setWorkspaceView(routedWorkspace);
+        setProfessionalSelectedProject(null);
+        setProfessionalModalOpen(false);
+        return;
+      }
       const routedModel = ROUTE_MODELS[window.location.pathname];
       if (routedModel && routedModel !== modelType) {
+        setWorkspaceView('divination');
         setHasSelectedModel(true);
         setProfessionalSelectedProject(null);
         setProfessionalModalOpen(false);
@@ -3057,10 +3103,11 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
 
     window.addEventListener('popstate', syncModelFromPath);
     return () => window.removeEventListener('popstate', syncModelFromPath);
-  }, [clearViewState, modelType]);
+  }, [clearViewState, modelType, workspaceView]);
 
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
+    setWorkspaceView('divination');
     setHasSelectedModel(true);
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
@@ -3082,8 +3129,74 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
     }
   };
 
+  const navigateWorkspace = (view: Exclude<WorkspaceView, 'divination'>) => {
+    setWorkspaceView(view);
+    setProfessionalSelectedProject(null);
+    setProfessionalModalOpen(false);
+    const nextRoute = WORKSPACE_ROUTES[view];
+    if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
+      window.history.pushState(null, '', nextRoute);
+    }
+  };
+
   const handleReset = () => {
     clearViewState();
+  };
+
+  const handleStandaloneChatSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const content = standaloneChatInput.trim();
+    if (!content || standaloneChatLoading) return;
+    if (requireLoginIfGuestModeDisabled()) return;
+    setStandaloneChatError('');
+    setStandaloneChatInput('');
+    const userMsg: ChatMessage = {
+      id: `standalone-u-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date(),
+    };
+    const nextMessages = [...standaloneChatMessages, userMsg];
+    setStandaloneChatMessages(nextMessages);
+    setStandaloneChatLoading(true);
+    try {
+      const apiMessages = [
+        {
+          role: 'system',
+          content: '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
+        },
+        ...nextMessages.map((msg) => ({
+          role: msg.role === 'model' ? 'assistant' : 'user',
+          content: msg.content,
+        })),
+      ];
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: apiMessages,
+          model: analysisModel,
+          temperature: 0.7,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '发送失败');
+      }
+      const modelMsg: ChatMessage = {
+        id: `standalone-m-${Date.now()}`,
+        role: 'model',
+        content: data.content || '暂无回复',
+        timestamp: new Date(),
+      };
+      setStandaloneChatMessages((prev) => [...prev, modelMsg]);
+      await fetchUserProfile();
+    } catch (err) {
+      setStandaloneChatError(err instanceof Error ? err.message : '发送失败，请稍后再试');
+      setStandaloneChatInput(content);
+    } finally {
+      setStandaloneChatLoading(false);
+    }
   };
 
   const handleDeleteGuestSession = useCallback((id: string) => {
@@ -5843,6 +5956,7 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
 
   const openProfessionalFeature = useCallback((feature: string) => {
     resetProfessionalComposer();
+    setWorkspaceView('divination');
     setProfessionalSelectedProject(feature);
     setProfessionalModalOpen(false);
     setHasSelectedModel(true);
@@ -6391,8 +6505,248 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
             );
           })}
         </div>
+
+        <div className="space-y-2">
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">个人工作区</div>
+          {[
+            ['records', '命理记录'],
+            ['chat', '新聊天'],
+            ['settings', '设置'],
+          ].map(([view, label]) => {
+            const selected = workspaceView === view;
+            return (
+              <button
+                key={view}
+                type="button"
+                onClick={() => navigateWorkspace(view as Exclude<WorkspaceView, 'divination'>)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                  selected
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
+  );
+
+  const filteredRecords = savedSessions.filter((item) => {
+    const term = recordsSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      item.title.toLowerCase().includes(term) ||
+      (MODEL_LABELS[item.modelType] || item.modelType).toLowerCase().includes(term)
+    );
+  });
+
+  const formatSessionDate = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  };
+
+  const renderRecordsWorkspace = () => (
+    <div className="glass-panel rounded-[32px] p-6 md:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
+          <div className="mt-1 text-2xl font-bold text-stone-800">命理记录</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => handleModelChange(ModelType.BAZI)}
+          className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
+        >
+          新建排盘
+        </button>
+      </div>
+
+      <div className="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
+        <input
+          value={recordsSearch}
+          onChange={(event) => setRecordsSearch(event.target.value)}
+          placeholder="搜索记录名称或类型"
+          className="glass-input rounded-2xl border border-white/70 px-4 py-3 text-sm outline-none"
+        />
+        <div className="glass-chip rounded-2xl px-4 py-3 text-sm font-medium text-stone-500">
+          共 {filteredRecords.length} 条
+        </div>
+      </div>
+
+      {!isLoggedIn && (
+        <div className="glass-banner mb-5 rounded-2xl border border-amber-200/80 bg-amber-50/70 px-4 py-3 text-sm text-amber-800">
+          登录后可查看和管理云端记录。
+        </div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {filteredRecords.map((item) => (
+          <div
+            key={item.id}
+            className={`group rounded-[24px] border px-4 py-4 transition ${
+              activeSessionId === item.id
+                ? 'glass-panel-dark border-transparent text-amber-100'
+                : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => void handleLoadSession(item.id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <div className="truncate text-base font-bold">{item.title}</div>
+                <div className={`mt-1 text-xs ${activeSessionId === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
+                  {MODEL_LABELS[item.modelType] || item.modelType} · {formatSessionDate(item.createdAt)}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteSession(item.id)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  activeSessionId === item.id
+                    ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
+                    : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
+                }`}
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredRecords.length === 0 && (
+        <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
+          暂无记录。完成 AI 对话后，记录会显示在这里。
+        </div>
+      )}
+    </div>
+  );
+
+  const renderChatWorkspace = () => (
+    <div className="glass-panel rounded-[32px] p-6 md:p-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
+          <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
+        </div>
+        <div className="text-sm text-stone-500">手动提问后才会请求模型</div>
+      </div>
+
+      <div className="glass-panel-soft flex h-[62vh] min-h-[480px] flex-col overflow-hidden rounded-[30px] border border-white/60">
+        <div className="glass-chat-bg glass-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
+          {standaloneChatMessages.length === 0 && (
+            <div className="flex h-full items-center justify-center text-center text-sm leading-7 text-stone-500">
+              可直接提问，也可以先进入某个排盘结果页，让问题自动携带盘面上下文。
+            </div>
+          )}
+          {standaloneChatMessages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[88%] rounded-[24px] p-4 text-sm leading-7 shadow-sm ${
+                msg.role === 'user'
+                  ? 'glass-panel-dark text-white'
+                  : 'glass-panel-soft text-stone-800'
+              }`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+            </div>
+          ))}
+          {standaloneChatLoading && (
+            <div className="glass-chip inline-flex rounded-full px-3 py-1.5 text-xs text-stone-500">
+              正在回复...
+            </div>
+          )}
+        </div>
+        {standaloneChatError && (
+          <div className="border-t border-red-100 bg-red-50/70 px-4 py-2 text-xs text-red-600">
+            {standaloneChatError}
+          </div>
+        )}
+        <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/58 p-3 backdrop-blur-xl">
+          <div className="flex gap-2">
+            <input
+              value={standaloneChatInput}
+              onChange={(event) => setStandaloneChatInput(event.target.value)}
+              placeholder="输入你的问题..."
+              className="glass-input min-w-0 flex-1 rounded-2xl border border-white/70 px-4 py-3 text-sm outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!standaloneChatInput.trim() || standaloneChatLoading}
+              className="glass-cta rounded-2xl px-5 py-3 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              发送
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  const renderSettingsWorkspace = () => (
+    <div className="glass-panel rounded-[32px] p-6 md:p-8">
+      <div className="mb-6 border-b border-stone-100 pb-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
+        <div className="mt-1 text-2xl font-bold text-stone-800">设置</div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
+          <div className="text-sm font-bold text-stone-700">账号</div>
+          <div className="mt-4 space-y-2 text-sm text-stone-600">
+            <div>昵称：{authSession?.user?.name || '未登录'}</div>
+            <div>邮箱：{authSession?.user?.email || '未登录'}</div>
+            <div>剩余额度：{userQuota ?? '-'}</div>
+          </div>
+        </div>
+        <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
+          <div className="text-sm font-bold text-stone-700">安全</div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!isLoggedIn ? (
+              <button
+                type="button"
+                onClick={() => setShowAuth(true)}
+                className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300"
+              >
+                登录
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowChangePassword(true)}
+                  className="glass-chip rounded-2xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                >
+                  修改密码
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountSettings(true)}
+                  className="glass-chip rounded-2xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50/80"
+                >
+                  注销账号
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   const renderProfessionalWorkspace = () => (
@@ -6929,6 +7283,11 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
         <div className="xl:hidden">
           {renderModuleNavigation(true)}
         </div>
+        {workspaceView === 'records' && renderRecordsWorkspace()}
+        {workspaceView === 'chat' && renderChatWorkspace()}
+        {workspaceView === 'settings' && renderSettingsWorkspace()}
+        {workspaceView === 'divination' && (
+          <>
         {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
             <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次，排盘不消耗次数</span>
@@ -8098,6 +8457,8 @@ const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
             </div>
             )}
           </div>
+        )}
+          </>
         )}
         </div>
       </main>
