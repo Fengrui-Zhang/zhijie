@@ -738,7 +738,7 @@ const SETTINGS_WORKSPACE_TABS: Array<{
   { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与记录' },
   { id: 'charts', label: '命盘', group: '资料', icon: '盘', description: '八字与紫微信息' },
   { id: 'knowledge', label: '知识参考', group: '资料', icon: '书', description: '问答引用设置' },
-  { id: 'help', label: '帮助', group: '支持', icon: '？', description: '使用规则说明' },
+  { id: 'help', label: '帮助', group: '支持', icon: '？', description: '常见问题' },
   { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号' },
 ];
 
@@ -6714,6 +6714,35 @@ const App: React.FC<AppProps> = ({
       ? '已生成'
       : '未生成';
 
+  const handleBaziBasicAnalysisSaved = async (nextInitialAnalysisData: unknown) => {
+    if (!activeCase || activeCase.modelType !== ModelType.BAZI) return;
+    const updatedAt = new Date().toISOString();
+    const nextCase: CaseDetail = {
+      ...activeCase,
+      initialAnalysisData: nextInitialAnalysisData as any,
+      updatedAt,
+    };
+    setActiveCase(nextCase);
+    setCaseItems((current) => current.map((item) => (
+      item.id === activeCase.id
+        ? { ...item, initialAnalysisData: nextInitialAnalysisData as any, updatedAt }
+        : item
+    )));
+    if (!isLoggedIn) {
+      saveGuestCase({
+        id: nextCase.id,
+        modelType: nextCase.modelType,
+        title: nextCase.title,
+        chartParams: nextCase.chartParams,
+        chartData: nextCase.chartData,
+        klineData: nextCase.klineData,
+        initialAnalysisData: nextInitialAnalysisData as any,
+        createdAt: nextCase.createdAt,
+        updatedAt,
+      });
+    }
+  };
+
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
   }
@@ -6940,7 +6969,6 @@ const App: React.FC<AppProps> = ({
               item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
             }`}
           >
-            {item.id === 'more-bottom' && <span className="block text-base leading-none">+</span>}
             <span className="block">{item.label}</span>
           </button>
         ))}
@@ -7025,43 +7053,10 @@ const App: React.FC<AppProps> = ({
     pinned: savedSessions.filter((item) => item.isPinned && !item.isArchived).length,
     archived: savedSessions.filter((item) => item.isArchived).length,
   };
-  const selectedRecord = filteredRecords.find((item) => item.id === activeSessionId) || filteredRecords[0] || null;
-  const latestRecord = savedSessions
-    .slice()
-    .sort((a, b) => getRecordTime(b).getTime() - getRecordTime(a).getTime())[0] || null;
   const getRecordCategoryLabel = (item: SessionItem) => (
     recordFilterOptions.find((option) => option.key === getRecordCategory(item))?.label || '记录'
   );
   const getRecordMessageCount = (item: SessionItem) => item._count?.messages ?? 0;
-  const handleExportRecords = (records: SessionItem[], filenamePrefix: string) => {
-    if (!records.length || typeof window === 'undefined') return;
-    const payload = {
-      app: '元分 · 智解',
-      type: 'divination_sessions',
-      exportedAt: new Date().toISOString(),
-      count: records.length,
-      records: records.map((item) => ({
-        id: item.id,
-        title: item.title,
-        modelType: item.modelType,
-        category: getRecordCategoryLabel(item),
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        isPinned: Boolean(item.isPinned),
-        isArchived: Boolean(item.isArchived),
-        messageCount: getRecordMessageCount(item),
-      })),
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  };
 
   const formatSessionDate = (value: string) => {
     const date = new Date(value);
@@ -7100,22 +7095,6 @@ const App: React.FC<AppProps> = ({
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => handleExportRecords(filteredRecords, 'zhijie-records-filtered')}
-            disabled={filteredRecords.length === 0}
-            className="rounded-full border border-stone-100 bg-white/70 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-white hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            导出筛选
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportRecords(savedSessions, 'zhijie-records-all')}
-            disabled={savedSessions.length === 0}
-            className="rounded-full border border-stone-100 bg-white/70 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-white hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            导出全部
-          </button>
-          <button
-            type="button"
             onClick={() => handleModelChange(ModelType.BAZI)}
             className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
           >
@@ -7126,7 +7105,7 @@ const App: React.FC<AppProps> = ({
 
       <div className="mb-4 flex flex-wrap gap-2 rounded-2xl border border-stone-100 bg-white/55 p-2">
         {[
-          ['active', '当前记录', recordScopeCounts.active],
+          ['active', '全部', recordScopeCounts.active],
           ['pinned', '置顶', recordScopeCounts.pinned],
           ['archived', '归档', recordScopeCounts.archived],
         ].map(([scope, label, count]) => {
@@ -7323,112 +7302,6 @@ const App: React.FC<AppProps> = ({
             ))}
           </div>
 
-          <aside className="hidden">
-            <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
-              <div className="text-xs font-bold tracking-[0.18em] text-stone-400">记录概览</div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/60 bg-white/60 px-3 py-3">
-                  <div className="text-[11px] text-stone-400">总记录</div>
-                  <div className="mt-1 text-xl font-bold text-stone-800">{savedSessions.length}</div>
-                </div>
-                <div className="rounded-2xl border border-white/60 bg-white/60 px-3 py-3">
-                  <div className="text-[11px] text-stone-400">当前筛选</div>
-                  <div className="mt-1 text-xl font-bold text-stone-800">{filteredRecords.length}</div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                {recordFilterOptions.filter((option) => option.key !== 'all').map((option) => {
-                  const count = recordCounts[option.key] || 0;
-                  const ratio = savedSessions.length ? Math.round((count / savedSessions.length) * 100) : 0;
-                  return (
-                    <div key={option.key} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-stone-500">
-                        <span>{option.label}</span>
-                        <span>{count} · {ratio}%</span>
-                      </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-                        <div className="h-full rounded-full bg-amber-400/80" style={{ width: `${ratio}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
-              <div className="text-xs font-bold tracking-[0.18em] text-stone-400">当前记录</div>
-              {selectedRecord ? (
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <div className="text-lg font-bold leading-7 text-stone-800">{selectedRecord.title}</div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="rounded-full border border-white/70 bg-white/70 px-2.5 py-1 text-xs font-semibold text-stone-600">
-                        {MODEL_LABELS[selectedRecord.modelType] || selectedRecord.modelType}
-                      </span>
-                      <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                        {getRecordCategoryLabel(selectedRecord)}
-                      </span>
-                      {selectedRecord.isPinned && (
-                        <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                          置顶
-                        </span>
-                      )}
-                      {selectedRecord.isArchived && (
-                        <span className="rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-500">
-                          归档
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2 rounded-2xl border border-white/60 bg-white/58 px-3 py-3 text-xs leading-6 text-stone-500">
-                    <div>创建：{formatSessionDate(selectedRecord.createdAt)}</div>
-                    <div>更新：{formatSessionDate(selectedRecord.updatedAt || selectedRecord.createdAt)}</div>
-                    <div>消息：{getRecordMessageCount(selectedRecord)} 条</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleUpdateSessionFlags(selectedRecord.id, { isPinned: !selectedRecord.isPinned })}
-                      className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
-                    >
-                      {selectedRecord.isPinned ? '取消置顶' : '置顶'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleUpdateSessionFlags(selectedRecord.id, { isArchived: !selectedRecord.isArchived })}
-                      className="rounded-2xl border border-stone-200 bg-white/60 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-white"
-                    >
-                      {selectedRecord.isArchived ? '取消归档' : '归档'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenRecordWorkspaceSession(selectedRecord.id)}
-                      className="glass-cta flex-1 rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
-                    >
-                      打开记录
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteSession(selectedRecord.id)}
-                      className="rounded-2xl border border-red-200 bg-red-50/60 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:border-red-300 hover:text-red-600"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 text-sm text-stone-400">请选择一条记录。</div>
-              )}
-            </div>
-
-            {latestRecord && (
-              <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 text-sm leading-7 text-stone-600">
-                <div className="text-xs font-bold tracking-[0.18em] text-stone-400">最近更新</div>
-                <div className="mt-3 font-bold text-stone-800">{latestRecord.title}</div>
-                <div className="text-xs text-stone-500">{formatRecordAge(latestRecord)}</div>
-              </div>
-            )}
-          </aside>
         </div>
       )}
     </div>
@@ -7655,7 +7528,6 @@ const App: React.FC<AppProps> = ({
             <div className="space-y-5">
               <div>
                 <div className="text-lg font-bold text-stone-800">账户信息</div>
-                <div className="mt-1 text-sm text-stone-500">查看当前登录账户与 AI 解读额度。</div>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl border border-white/65 bg-white/60 p-4">
@@ -7669,13 +7541,6 @@ const App: React.FC<AppProps> = ({
                 <div className="rounded-2xl border border-white/65 bg-white/60 p-4">
                   <div className="text-xs text-stone-400">剩余额度</div>
                   <div className="mt-2 text-base font-bold text-stone-800">{userQuota ?? '-'}</div>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/65 bg-white/55 p-5">
-                <div className="text-sm font-bold text-stone-700">使用规则</div>
-                <div className="mt-3 grid gap-3 text-sm leading-7 text-stone-600 md:grid-cols-2">
-                  <div className="rounded-2xl border border-stone-100 bg-white/55 p-4">排盘浏览不会扣除额度。</div>
-                  <div className="rounded-2xl border border-stone-100 bg-white/55 p-4">只有主动发起 AI 解读或追问时消耗额度。</div>
                 </div>
               </div>
             </div>
@@ -7698,7 +7563,6 @@ const App: React.FC<AppProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <div className="text-sm font-bold text-stone-700">历史记录</div>
-                    <div className="mt-1 text-xs text-stone-400">只保存发生过 AI 对话的会话。</div>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">已启用</span>
                 </div>
@@ -9263,7 +9127,14 @@ const App: React.FC<AppProps> = ({
               ) : (
                 <>
                   {modelType === ModelType.QIMEN && <QimenGrid data={chartData} />}
-                  {modelType === ModelType.BAZI && <BaziGrid data={chartData} />}
+                  {modelType === ModelType.BAZI && (
+                    <BaziGrid
+                      data={chartData}
+                      caseId={activeCase?.modelType === ModelType.BAZI ? activeCase.id : null}
+                      initialAnalysisData={activeCase?.modelType === ModelType.BAZI ? activeCase.initialAnalysisData : null}
+                      onAnalysisSaved={handleBaziBasicAnalysisSaved}
+                    />
+                  )}
                   {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
                   {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
                   {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}

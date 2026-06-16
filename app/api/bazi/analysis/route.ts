@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '../../../../lib/auth';
-import { resolveChatModel } from '../../../../lib/analysis-models';
+import { DEFAULT_ANALYSIS_MODEL, resolveChatModel } from '../../../../lib/analysis-models';
 import { prisma } from '../../../../lib/prisma';
 
 type BaziAnalysisType = 'wuxing' | 'personality';
@@ -80,11 +81,46 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({})) as {
     type?: BaziAnalysisType;
     chartText?: string;
+    caseId?: string;
+    force?: boolean;
   };
   if (body.type !== 'wuxing' && body.type !== 'personality') {
     return NextResponse.json({ error: '分析类型无效' }, { status: 400 });
   }
-  const chartText = typeof body.chartText === 'string' ? body.chartText.trim() : '';
+  const caseId = typeof body.caseId === 'string' ? body.caseId.trim() : '';
+  let chartText = typeof body.chartText === 'string' ? body.chartText.trim() : '';
+  let existingInitialAnalysisData: unknown = null;
+
+  if (caseId) {
+    const divinationCase = await prisma.divinationCase.findFirst({
+      where: { id: caseId, userId, modelType: 'bazi' },
+      select: {
+        chartData: true,
+        initialAnalysisData: true,
+      },
+    });
+    if (!divinationCase) {
+      return NextResponse.json({ error: '命例不存在' }, { status: 404 });
+    }
+
+    existingInitialAnalysisData = divinationCase.initialAnalysisData;
+    const savedContent = getSavedBaziAnalysis(existingInitialAnalysisData, body.type);
+    if (savedContent && !body.force) {
+      return NextResponse.json({
+        content: savedContent,
+        saved: true,
+        initialAnalysisData: existingInitialAnalysisData,
+      });
+    }
+
+    if (!chartText) {
+      const chartData = toRecord(divinationCase.chartData);
+      chartText = typeof chartData?.taibuText === 'string'
+        ? chartData.taibuText.trim()
+        : JSON.stringify(divinationCase.chartData ?? {}, null, 2);
+    }
+  }
+
   if (!chartText) {
     return NextResponse.json({ error: '缺少八字盘面信息' }, { status: 400 });
   }
@@ -131,5 +167,57 @@ export async function POST(request: Request) {
 
   await prisma.user.update({ where: { id: userId }, data: { quota: { decrement: 1 } } });
   const data = await response.json();
-  return NextResponse.json({ content: data.choices?.[0]?.message?.content ?? '' });
+  const content = data.choices?.[0]?.message?.content ?? '';
+  let nextInitialAnalysisData: unknown = existingInitialAnalysisData;
+
+  if (caseId && content) {
+    nextInitialAnalysisData = buildNextInitialAnalysisData(existingInitialAnalysisData, body.type, content);
+    await prisma.divinationCase.update({
+      where: { id: caseId },
+      data: {
+        initialAnalysisData: nextInitialAnalysisData as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  return NextResponse.json({ content, initialAnalysisData: nextInitialAnalysisData });
 }
+
+const toRecord = (value: unknown): Record<string, unknown> | null => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+);
+
+const getSavedBaziAnalysis = (initialAnalysisData: unknown, type: BaziAnalysisType) => {
+  const root = toRecord(initialAnalysisData);
+  const store = toRecord(root?.baziBasicAnalyses);
+  const item = toRecord(store?.[type]);
+  const content = item?.content;
+  return typeof content === 'string' && content.trim() ? content.trim() : '';
+};
+
+const buildNextInitialAnalysisData = (
+  initialAnalysisData: unknown,
+  type: BaziAnalysisType,
+  content: string,
+) => {
+  const root = toRecord(initialAnalysisData);
+  const generatedAt = new Date().toISOString();
+  const store = toRecord(root?.baziBasicAnalyses) || {};
+  return {
+    ...(root || {
+      content: '',
+      model: DEFAULT_ANALYSIS_MODEL,
+      generatedAt,
+    }),
+    baziBasicAnalyses: {
+      ...store,
+      [type]: {
+        content,
+        model: DEFAULT_ANALYSIS_MODEL,
+        generatedAt,
+      },
+    },
+  };
+};

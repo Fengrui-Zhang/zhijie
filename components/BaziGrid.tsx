@@ -6,6 +6,9 @@ import MarkdownContent from './MarkdownContent';
 
 interface Props {
   data: BaziResponse;
+  caseId?: string | null;
+  initialAnalysisData?: unknown;
+  onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }
 
 const splitList = (value?: string | string[]) => {
@@ -176,22 +179,46 @@ const collectTenGods = (data: BaziResponse) => {
   return Array.from(new Set(values.filter((item) => tenGodKnowledge[item] && item !== '日主')));
 };
 
+const toRecord = (value: unknown): Record<string, unknown> | null => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+);
+
+const getSavedBasicAnalysis = (initialAnalysisData: unknown, type: AnalysisType) => {
+  const root = toRecord(initialAnalysisData);
+  const store = toRecord(root?.baziBasicAnalyses);
+  const item = toRecord(store?.[type]);
+  const content = item?.content;
+  return typeof content === 'string' && content.trim() ? content.trim() : '';
+};
+
 const AnalysisCard = ({
   type,
   title,
   subtitle,
   chartText,
+  caseId,
+  savedContent,
+  onSaved,
 }: {
   type: AnalysisType;
   title: string;
   subtitle: string;
   chartText: string;
+  caseId?: string | null;
+  savedContent?: string;
+  onSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }) => {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(savedContent || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const run = async () => {
+  React.useEffect(() => {
+    setContent(savedContent || '');
+  }, [savedContent]);
+
+  const run = async (force = false) => {
     if (loading) return;
     setLoading(true);
     setError('');
@@ -199,13 +226,16 @@ const AnalysisCard = ({
       const response = await fetch('/api/bazi/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, chartText }),
+        body: JSON.stringify({ type, chartText, caseId, force }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.error || '分析失败，请稍后重试');
       }
       setContent(String(data.content || ''));
+      if (data.initialAnalysisData !== undefined) {
+        await onSaved?.(data.initialAnalysisData);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '分析失败，请稍后重试');
     } finally {
@@ -222,7 +252,7 @@ const AnalysisCard = ({
         </div>
         <button
           type="button"
-          onClick={run}
+          onClick={() => run(Boolean(content))}
           disabled={loading}
           className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
         >
@@ -346,7 +376,7 @@ const ChipButton = ({
   </button>
 );
 
-const BaziGrid: React.FC<Props> = ({ data }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
   const dayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -389,6 +419,8 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
   const dayElement = elementLabel(dayMaster);
   const highlightedTenGods = useMemo(() => collectTenGods(data), [data]);
+  const savedWuxingAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'wuxing');
+  const savedPersonalityAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'personality');
   const notesKey = useMemo(() => {
     const identity = `${base_info.name || '匿名'}:${base_info.gongli || bazi_info.bazi.join('')}`;
     return `zhijie:bazi-notes:${identity}`;
@@ -524,13 +556,13 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 md:gap-3">
         {tabItems.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => setActiveTab(item.key)}
-            className={`rounded-2xl border px-4 py-3 text-center transition ${
+            className={`rounded-xl border px-2 py-2 text-center text-sm transition md:rounded-2xl md:px-4 md:py-3 md:text-base ${
               activeTab === item.key
                 ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
                 : 'border-stone-100 bg-white/65 text-stone-700 hover:bg-white'
@@ -577,33 +609,39 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
             title="AI专业五行分析"
             subtitle="深度解读五行配置与喜用神"
             chartText={data.taibuText || JSON.stringify(data.taibuJson || data, null, 2)}
+            caseId={caseId}
+            savedContent={savedWuxingAnalysis}
+            onSaved={onAnalysisSaved}
           />
           <AnalysisCard
             type="personality"
             title="AI人格分析"
             subtitle="MBTI风格深度人格解读"
             chartText={data.taibuText || JSON.stringify(data.taibuJson || data, null, 2)}
+            caseId={caseId}
+            savedContent={savedPersonalityAnalysis}
+            onSaved={onAnalysisSaved}
           />
           <TenGodKnowledge highlighted={highlightedTenGods} />
         </div>
       )}
 
       {activeTab === 'professional' && (
-        <div className="rounded-[30px] border border-white/60 bg-white/35 p-4 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-5">
-      <div className="glass-panel-soft overflow-x-auto rounded-[26px] border border-white/60">
-        <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0 text-center">
+        <div className="rounded-[24px] border border-white/60 bg-white/35 p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
+      <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[26px]">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-center">
           <thead>
             <tr>
-              <th className="w-20 border-b border-white/60 bg-white/35 p-3 text-xs font-semibold text-stone-400">四柱</th>
+              <th className="w-11 border-b border-white/60 bg-white/35 p-1.5 text-[10px] font-semibold text-stone-400 md:w-20 md:p-3 md:text-xs">四柱</th>
               {tableColumns.map((column) => (
                 <th
                   key={column.key}
-                  className={`border-b border-l border-white/60 p-3 ${
+                  className={`border-b border-l border-white/60 p-1.5 md:p-3 ${
                     column.kind === 'flow' ? 'bg-amber-50/70 text-amber-800' : 'bg-white/35 text-stone-800'
                   }`}
                 >
-                  <div className="text-base font-bold">{column.title}</div>
-                  {column.subtitle && <div className="mt-1 text-[10px] font-normal text-stone-500">{column.subtitle}</div>}
+                  <div className="text-xs font-bold md:text-base">{column.title}</div>
+                  {column.subtitle && <div className="mt-1 text-[9px] font-normal leading-3 text-stone-500 md:text-[10px] md:leading-4">{column.subtitle}</div>}
                 </th>
               ))}
             </tr>
@@ -611,15 +649,15 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
           <tbody>
             {rowLabels.map((row) => (
               <tr key={row}>
-                <th className="border-b border-white/60 bg-white/30 p-3 text-xs font-semibold text-stone-500">{row}</th>
+                <th className="border-b border-white/60 bg-white/30 p-1.5 text-[10px] font-semibold text-stone-500 md:p-3 md:text-xs">{row}</th>
                 {tableColumns.map((column) => {
                   const content = column.values[row as keyof typeof column.values] || '—';
                   const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
                   return (
-                    <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-3 align-middle">
+                    <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-1 align-middle md:p-3">
                       <div
-                        className={`mx-auto max-w-[150px] whitespace-normal break-keep text-center leading-5 ${
-                          row === '天干' || row === '地支' ? `text-3xl font-bold ${colorClass}` : 'text-xs text-stone-700'
+                        className={`mx-auto max-w-full whitespace-normal break-all text-center ${
+                          row === '天干' || row === '地支' ? `text-xl font-bold leading-7 md:text-3xl ${colorClass}` : 'text-[9px] leading-4 text-stone-700 md:text-xs md:leading-5'
                         }`}
                       >
                         {content}
@@ -636,7 +674,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
       <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
         <section>
           <div className="mb-2 text-sm font-bold text-stone-800">大运</div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex flex-wrap gap-2 pb-1">
             {dayunList.map((item: any, index: number) => (
               <ChipButton key={`${item.ganZhi}-${index}`} active={selectedDayunIndex === index} onClick={() => selectDayun(index)}>
                 <div className="text-sm font-bold">{item.ganZhi}</div>
@@ -649,7 +687,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         {selectedDayun && (
           <section>
             <div className="mb-2 text-sm font-bold text-stone-800">流年</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex flex-wrap gap-2 pb-1">
               {(selectedDayun.liunianList || []).map((item: any) => (
                 <ChipButton key={item.year} active={selectedYear === item.year} onClick={() => selectYear(item.year)}>
                   <div className="text-xs">{item.year}</div>
@@ -664,7 +702,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         {selectedYear && liuyueList.length > 0 && (
           <section>
             <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年流月</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex flex-wrap gap-2 pb-1">
               {liuyueList.map((item: any) => (
                 <ChipButton key={item.month} active={selectedMonth === item.month} onClick={() => selectMonth(item.month)}>
                   <div className="text-xs">{item.month}月</div>
@@ -678,7 +716,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         {selectedMonth && liuriList.length > 0 && (
           <section>
             <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年{selectedMonth}月流日</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex flex-wrap gap-2 pb-1">
               {liuriList.map((item: any) => (
                 <ChipButton key={item.date} active={selectedDay === item.day} onClick={() => setSelectedDay((current) => current === item.day ? null : item.day)}>
                   <div className="text-xs">{item.day}日</div>

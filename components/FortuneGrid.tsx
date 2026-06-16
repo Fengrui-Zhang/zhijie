@@ -311,9 +311,33 @@ type TrendPoint = {
 };
 
 const chartX = (index: number, total: number) => (total <= 1 ? 50 : 8 + (index / (total - 1)) * 84);
-const chartY = (value: number) => {
+const chartY = (value: number, min = 25, max = 100) => {
   const safe = Math.max(25, Math.min(100, Number(value) || 52));
-  return 12 + ((100 - safe) / 75) * 76;
+  const low = Math.max(0, Math.min(100, min));
+  const high = Math.max(low + 1, Math.min(100, max));
+  return 12 + ((high - safe) / (high - low)) * 76;
+};
+
+const getAdaptiveChartRange = (values: number[]) => {
+  const safeValues = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .map((value) => Math.max(0, Math.min(100, value)));
+  if (!safeValues.length) return { min: 25, max: 100 };
+  const minValue = Math.min(...safeValues);
+  const maxValue = Math.max(...safeValues);
+  const spread = Math.max(24, maxValue - minValue);
+  const middle = (minValue + maxValue) / 2;
+  const min = Math.max(0, Math.floor(middle - spread / 2 - 8));
+  const max = Math.min(100, Math.ceil(middle + spread / 2 + 8));
+  return max - min < 30
+    ? { min: Math.max(0, min - 6), max: Math.min(100, max + 6) }
+    : { min, max };
+};
+
+const chartGridValues = (range: { min: number; max: number }) => {
+  const step = (range.max - range.min) / 3;
+  return [range.min, range.min + step, range.min + step * 2, range.max];
 };
 
 const dimensionShortLabel = (label: string) => label.replace('运势', '').replace('运', '');
@@ -720,31 +744,26 @@ const InterpretationModeControl = ({
   onModeChange: (mode: InterpretationMode) => void;
   activeClass?: string;
 }) => (
-  <div className="space-y-2">
-    <div className="flex flex-wrap gap-1 rounded-2xl bg-stone-100 p-1">
-      {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => {
-        const active = mode === item;
-        return (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onModeChange(item)}
-            title={MODE_CONFIG[item].description}
-            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition md:px-3 ${
-              active ? activeClass : 'text-stone-500 hover:bg-white hover:text-stone-800'
-            }`}
-          >
-            <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-white text-stone-400'}`}>
-              {MODE_CONFIG[item].icon}
-            </span>
-            <span>{MODE_LABELS[item]}</span>
-          </button>
-        );
-      })}
-    </div>
-    <div className="text-right text-[11px] leading-5 text-stone-400">
-      {MODE_CONFIG[mode].label} · {MODE_CONFIG[mode].description}
-    </div>
+  <div className="flex flex-wrap gap-1 rounded-2xl bg-stone-100 p-1">
+    {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => {
+      const active = mode === item;
+      return (
+        <button
+          key={item}
+          type="button"
+          onClick={() => onModeChange(item)}
+          title={MODE_CONFIG[item].description}
+          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition md:px-3 ${
+            active ? activeClass : 'text-stone-500 hover:bg-white hover:text-stone-800'
+          }`}
+        >
+          <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-white text-stone-400'}`}>
+            {MODE_CONFIG[item].icon}
+          </span>
+          <span>{MODE_LABELS[item]}</span>
+        </button>
+      );
+    })}
   </div>
 );
 
@@ -757,17 +776,22 @@ const FortuneTrendChart = ({
 }) => {
   const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall']);
   const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
-  const series = useMemo(() => {
-    if (!trend?.length) return [];
-    return activeDimensions.map((dimension) => ({
+  const { series, range } = useMemo(() => {
+    if (!trend?.length) return { series: [], range: { min: 25, max: 100 } };
+    const values = activeDimensions.flatMap((dimension) =>
+      trend.map((item) => item.scores?.[dimension] ?? item.scores?.overall ?? 52)
+    );
+    const nextRange = getAdaptiveChartRange(values);
+    const nextSeries = activeDimensions.map((dimension) => ({
       dimension,
       points: trend.map((item, index) => {
         const value = item.scores?.[dimension] ?? item.scores?.overall ?? 52;
         const x = chartX(index, trend.length);
-        const y = chartY(value);
+        const y = chartY(value, nextRange.min, nextRange.max);
         return { x, y, value, label: item.date, fullDate: item.fullDate, dimension };
       }),
     }));
+    return { series: nextSeries, range: nextRange };
   }, [trend, activeDimensions]);
 
   if (!series.length) return null;
@@ -808,8 +832,8 @@ const FortuneTrendChart = ({
       </div>
       <div className="relative h-56 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72">
         <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
-          {[25, 50, 75, 100].map((line) => (
-            <line key={line} x1="8" y1={chartY(line)} x2="92" y2={chartY(line)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
+          {chartGridValues(range).map((line) => (
+            <line key={line} x1="8" y1={chartY(line, range.min, range.max)} x2="92" y2={chartY(line, range.min, range.max)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
           ))}
           {series.map((item) => (
             <path
@@ -890,7 +914,6 @@ const AskPanel = ({
     <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
       <div className="border-b border-stone-100 pb-3 md:pb-4">
         <div className="text-base font-bold text-stone-800 md:text-lg">{title}</div>
-        <div className="mt-1 text-xs text-stone-500 md:text-sm">针对选中日期提出问题，确认后才会请求 AI 解答。</div>
       </div>
       <div className="mt-3 rounded-2xl border border-stone-100 bg-stone-50/50 p-3 md:mt-5 md:p-4">
         <div className="text-sm font-bold text-stone-700">选中日期</div>
@@ -1142,18 +1165,23 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
 };
 
 const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
-  const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career', 'wealth']);
+  const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career']);
   const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
-  const series = useMemo(() => {
-    return activeDimensions.map((dimension) => ({
+  const { series, range } = useMemo(() => {
+    const values = activeDimensions.flatMap((dimension) =>
+      calendar.map((item: any) => item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level))
+    );
+    const nextRange = getAdaptiveChartRange(values);
+    const nextSeries = activeDimensions.map((dimension) => ({
       dimension,
       points: calendar.map((item: any, index: number) => {
         const value = item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level);
         const x = chartX(index, calendar.length);
-        const y = chartY(value);
+        const y = chartY(value, nextRange.min, nextRange.max);
         return { x, y, label: `${item.day}`, value, fullDate: item.date, dimension };
       }),
     }));
+    return { series: nextSeries, range: nextRange };
   }, [calendar, activeDimensions]);
   if (!series.length) return null;
   const primaryPoints = series[0]?.points || [];
@@ -1187,8 +1215,8 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
       </div>
       <div className="relative h-60 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-80">
         <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
-          {[25, 50, 75, 100].map((line) => (
-            <line key={line} x1="8" y1={chartY(line)} x2="92" y2={chartY(line)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
+          {chartGridValues(range).map((line) => (
+            <line key={line} x1="8" y1={chartY(line, range.min, range.max)} x2="92" y2={chartY(line, range.min, range.max)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
           ))}
           {series.map((item) => (
             <path
