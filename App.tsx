@@ -1175,6 +1175,7 @@ const App: React.FC<AppProps> = ({
   // --- Persistence State ---
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const [caseItems, setCaseItems] = useState<CaseItem[]>([]);
   const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
   const [caseFormOpen, setCaseFormOpen] = useState(false);
@@ -1811,7 +1812,11 @@ const App: React.FC<AppProps> = ({
 
   // --- Session Persistence ---
   const fetchSessions = useCallback(async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+      setSessionsLoading(false);
+      return;
+    }
+    setSessionsLoading(true);
     try {
       const res = await fetch('/api/sessions');
       if (res.ok) {
@@ -1820,6 +1825,8 @@ const App: React.FC<AppProps> = ({
       }
     } catch {
       // silently ignore
+    } finally {
+      setSessionsLoading(false);
     }
   }, [isLoggedIn]);
 
@@ -6591,8 +6598,13 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {filteredRecords.map((item) => (
+      {sessionsLoading || authStatus === 'loading' ? (
+        <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
+          正在读取记录...
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {filteredRecords.map((item) => (
           <div
             key={item.id}
             className={`group rounded-[24px] border px-4 py-4 transition ${
@@ -6625,10 +6637,11 @@ const App: React.FC<AppProps> = ({
               </button>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {filteredRecords.length === 0 && (
+      {!sessionsLoading && authStatus !== 'loading' && filteredRecords.length === 0 && (
         <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
           暂无记录。完成 AI 对话后，记录会显示在这里。
         </div>
