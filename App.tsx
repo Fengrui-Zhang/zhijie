@@ -90,7 +90,6 @@ import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
-import NoteSidebar, { NoteIcon } from './components/NoteSidebar';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 
 // --- Icons ---
@@ -1062,11 +1061,8 @@ const App: React.FC = () => {
   const [editingCaseRelationId, setEditingCaseRelationId] = useState<string | null>(null);
   const [caseRelationEditDraft, setCaseRelationEditDraft] = useState<EditableCaseRelationDraft>({ labelAToB: '', labelBToA: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [noteCollapsed, setNoteCollapsed] = useState(false);
-  const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'note' | null>(null);
+  const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | null>(null);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
-  const [noteContent, setNoteContent] = useState('');
-  const [noteSaveState, setNoteSaveState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('idle');
   const analysisModel = DEFAULT_ANALYSIS_MODEL;
   const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
   const [sessionAnalysisModel, setSessionAnalysisModel] = useState<AnalysisModel | null>(null);
@@ -1217,9 +1213,6 @@ const App: React.FC = () => {
     startY: number;
   } | null>(null);
   const klineYearProgressRef = useRef(0);
-  const noteHydratedRef = useRef(false);
-  const noteLastSavedRef = useRef('');
-  const noteSaveRunRef = useRef(0);
 
   const syncAutoScrollState = useCallback(() => {
     const container = chatScrollRef.current;
@@ -1676,31 +1669,9 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn]);
 
-  const fetchNote = useCallback(async () => {
-    if (!isLoggedIn) return;
-    setNoteSaveState('loading');
-    try {
-      const res = await fetch('/api/note');
-      if (!res.ok) throw new Error('笔记加载失败');
-      const data = await res.json();
-      const content = typeof data?.content === 'string' ? data.content : '';
-      noteHydratedRef.current = true;
-      noteLastSavedRef.current = content;
-      setNoteContent(content);
-      setNoteSaveState('idle');
-    } catch {
-      noteHydratedRef.current = true;
-      setNoteSaveState('error');
-    }
-  }, [isLoggedIn]);
-
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
-
-  useEffect(() => {
-    fetchNote();
-  }, [fetchNote]);
 
   useEffect(() => {
     if (!isCaseModelType(modelType)) {
@@ -1781,47 +1752,8 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isLoggedIn) return;
-    noteHydratedRef.current = false;
-    noteLastSavedRef.current = '';
-    noteSaveRunRef.current = 0;
-    setNoteContent('');
-    setNoteSaveState('idle');
     setActiveCompactPanel(null);
   }, [isLoggedIn]);
-
-  useEffect(() => {
-    if (!isLoggedIn || !noteHydratedRef.current) return;
-    if (noteContent === noteLastSavedRef.current) return;
-
-    const runId = ++noteSaveRunRef.current;
-    const timer = window.setTimeout(async () => {
-      setNoteSaveState('saving');
-      try {
-        const res = await fetch('/api/note', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: noteContent }),
-        });
-
-        if (!res.ok) throw new Error('笔记保存失败');
-        const data = await res.json();
-        if (noteSaveRunRef.current !== runId) return;
-
-        const content = typeof data?.content === 'string' ? data.content : noteContent;
-        noteLastSavedRef.current = content;
-        setNoteSaveState('saved');
-        window.setTimeout(() => {
-          setNoteSaveState((current) => (current === 'saved' ? 'idle' : current));
-        }, 1200);
-      } catch {
-        if (noteSaveRunRef.current === runId) {
-          setNoteSaveState('error');
-        }
-      }
-    }, 700);
-
-    return () => window.clearTimeout(timer);
-  }, [isLoggedIn, noteContent]);
 
   const saveSessionToDb = async (
     mType: string,
@@ -3833,6 +3765,49 @@ const App: React.FC = () => {
     setStep('input');
   };
 
+  const beginCaseEditFromLibrary = async (caseId: string) => {
+    const detail = isLoggedIn ? await fetchLoggedCaseDetail(caseId) : getGuestCaseDetail(caseId);
+    if (!detail) {
+      setError('命例读取失败，请稍后重试');
+      return;
+    }
+    setHasSelectedModel(true);
+    setModelType(detail.modelType);
+    setActiveCase(detail);
+    setChartData(detail.chartData);
+    setActiveChartParams((detail.chartParams || {}) as Record<string, unknown>);
+    setEditingCaseId(detail.id);
+    setCaseFormOpen(true);
+    applyCaseChartParamsToForm(detail.chartParams);
+    setError('');
+    setStep('input');
+    requestSectionScroll('case-form');
+  };
+
+  const handleDeleteCaseFromLibrary = async (caseId: string) => {
+    if (isLoggedIn) {
+      const ok = await deleteCaseInDb(caseId);
+      if (!ok) {
+        setError('删除命例失败，请稍后重试');
+        return;
+      }
+      await hydrateCasesForModel(modelType);
+      fetchSessions();
+    } else {
+      deleteGuestCase(caseId);
+    }
+
+    if (activeCase?.id === caseId) {
+      setActiveCase(null);
+      setActiveSessionId(null);
+      setChartData(null);
+      setChatHistory([]);
+      setQuestion('');
+      clearChatSession();
+      setStep('input');
+    }
+  };
+
   const openCaseRelationEditor = useCallback((relationId: string) => {
     if (!activeCase?.relations) return;
     const relation = activeCase.relations.find((item) => item.id === relationId);
@@ -5553,6 +5528,12 @@ const App: React.FC = () => {
     setProfessionalModalOpen(true);
   }, [resetProfessionalComposer]);
 
+  const openProfessionalFeature = useCallback((feature: string) => {
+    resetProfessionalComposer();
+    setProfessionalSelectedProject(feature);
+    setProfessionalModalOpen(true);
+  }, [resetProfessionalComposer]);
+
   const handleProfessionalPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!professionalPos) return;
     const target = event.currentTarget;
@@ -5895,9 +5876,16 @@ const App: React.FC = () => {
 
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
   const desktopHistoryOffset = sidebarCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
-  const desktopNoteOffset = noteCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
-  const desktopWorkPaddingLeft = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
-  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopNoteOffset : 0;
+  const desktopNavOffset = !isCompactLayout ? 292 : 0;
+  const desktopWorkPaddingLeft = desktopNavOffset;
+  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout ? desktopHistoryOffset : 0;
+  const currentModuleLabel =
+    modelType === ModelType.BAZI ? '四柱八字（盲派）' :
+    modelType === ModelType.ZIWEI ? '紫微斗数' :
+    modelType === ModelType.QIMEN ? '奇门遁甲' :
+    modelType === ModelType.LIUYAO ? '六爻纳甲' :
+    '梅花易数';
+  const currentWorkspaceLabel = isCaseModel ? '命理库' : '占卜排盘';
   const currentCaseInitialAnalysis = activeCase
     ? normalizeInitialAnalysisData(activeCase.initialAnalysisData)
     : null;
@@ -5955,11 +5943,101 @@ const App: React.FC = () => {
     );
   }
 
+  const renderModuleNavigation = (mobile = false) => (
+    <nav
+      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-112px)] w-[260px]'} glass-panel-soft flex flex-col rounded-[28px] border border-white/65 p-4 shadow-[0_24px_60px_rgba(28,25,23,0.12)]`}
+      aria-label="功能导航"
+    >
+      <div className="mb-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-400">功能</div>
+        <div className="mt-1 text-lg font-bold text-stone-800">元分 · 智解</div>
+      </div>
+
+      <div className={`${mobile ? 'grid gap-3 md:grid-cols-3' : 'min-h-0 flex-1 overflow-y-auto pr-1 space-y-4'}`}>
+        <div className="space-y-2">
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">命理运势</div>
+          {[
+            [ModelType.BAZI, '四柱八字（盲派）'],
+            [ModelType.ZIWEI, '紫微斗数'],
+          ].map(([type, label]) => {
+            const selected = modelType === type && !professionalModalOpen;
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleModelChange(type as ModelType)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                  selected
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">占卜预测</div>
+          {[
+            [ModelType.QIMEN, '奇门遁甲'],
+            [ModelType.LIUYAO, '六爻纳甲'],
+            [ModelType.MEIHUA, '梅花易数'],
+          ].map(([type, label]) => {
+            const selected = modelType === type && !professionalModalOpen;
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleModelChange(type as ModelType)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                  selected
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">进阶功能</div>
+          {[
+            [PROFESSIONAL_FEATURE_JOINT, '八字+紫微联合分析'],
+            [PROFESSIONAL_FEATURE_BAZI_COMPAT, '八字合盘'],
+          ].map(([feature, label]) => {
+            const selected = professionalModalOpen && professionalSelectedProject === feature;
+            return (
+              <button
+                key={feature}
+                type="button"
+                onClick={() => openProfessionalFeature(feature)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                  selected
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
+  );
+
   return (
     <div className="app-shell min-h-screen flex flex-col text-stone-800 font-serif">
       {/* Header */}
       <header className="glass-topbar text-stone-100 py-4 px-4 border-b border-amber-500/40 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
@@ -6063,7 +6141,7 @@ const App: React.FC = () => {
 
       {isLoggedIn && (
         <div
-          className="xl:hidden fixed left-3 top-[106px] z-20 flex flex-col gap-2"
+          className="xl:hidden fixed right-3 top-[106px] z-20 flex flex-col gap-2"
         >
           <button
             type="button"
@@ -6076,18 +6154,6 @@ const App: React.FC = () => {
             title="历史记录"
           >
             <SessionIcon className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveCompactPanel((current) => (current === 'note' ? null : 'note'))}
-            className={`flex h-12 w-12 items-center justify-center rounded-2xl border backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.16)] transition ${
-              activeCompactPanel === 'note'
-                ? 'border-amber-200/80 bg-amber-50/90 text-amber-800'
-                : 'border-white/70 bg-white/62 text-stone-600'
-            }`}
-            title="笔记"
-          >
-            <NoteIcon className="w-5 h-5" />
           </button>
         </div>
       )}
@@ -6102,7 +6168,7 @@ const App: React.FC = () => {
             onClick={() => setActiveCompactPanel(null)}
           />
           <div
-            className={`absolute inset-y-0 left-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'history' ? 'translate-x-0' : '-translate-x-full'}`}
+            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'history' ? 'translate-x-0' : 'translate-x-full'}`}
           >
             <SessionSidebar
               sessions={savedSessions}
@@ -6123,24 +6189,16 @@ const App: React.FC = () => {
               mobile
             />
           </div>
-          <div
-            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'note' ? 'translate-x-0' : 'translate-x-full'}`}
-          >
-            <NoteSidebar
-              content={noteContent}
-              onChange={setNoteContent}
-              saveState={noteSaveState}
-              collapsed={false}
-              onToggle={() => setActiveCompactPanel(null)}
-              mobile
-            />
-          </div>
         </div>
       )}
 
       <div className="flex flex-1 overflow-hidden min-h-0">
+        <div className="hidden xl:block fixed left-3 top-[106px] z-10">
+          {renderModuleNavigation(false)}
+        </div>
+
         {isLoggedIn && (
-          <div className="hidden xl:block fixed left-3 top-[106px] z-10">
+          <div className="hidden xl:block fixed right-3 top-[106px] z-10">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
@@ -6153,18 +6211,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {isLoggedIn && (
-          <div className="hidden xl:block fixed right-3 top-[106px] z-10">
-            <NoteSidebar
-              content={noteContent}
-              onChange={setNoteContent}
-              saveState={noteSaveState}
-              collapsed={noteCollapsed}
-              onToggle={() => setNoteCollapsed((prev) => !prev)}
-            />
-          </div>
-        )}
-
       <main
         className="flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300"
         style={
@@ -6173,7 +6219,10 @@ const App: React.FC = () => {
             : undefined
         }
       >
-        <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
+        <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-6">
+        <div className="xl:hidden">
+          {renderModuleNavigation(true)}
+        </div>
         {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
             <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次，排盘不消耗次数</span>
@@ -6197,100 +6246,14 @@ const App: React.FC = () => {
         {/* Input Phase */}
         {step === 'input' && (
           <div className="glass-panel p-6 md:p-8 rounded-[32px]">
-            
-            {/* Categorized Model Selector */}
-            <div className="mb-8 space-y-4">
-               {/* 1. Destiny Group */}
-               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
-                  <div className="mb-2.5 flex items-center gap-2.5">
-                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl text-base">📜</div>
-                    <div>
-                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">命理运势</div>
-                      <div className="text-[13px] text-stone-400">观测人生大运趋势</div>
-                    </div>
-                  </div>
-                  <div className="grid gap-2.5 md:grid-cols-2">
-                    {[
-                      [ModelType.BAZI, '四柱八字（盲派）'], 
-                      [ModelType.ZIWEI, '紫微斗数']
-                    ].map(([type, label]) => {
-                      const isRecommended = recommendedModels.has(type as ModelType);
-                      const isSelected = hasSelectedModel && modelType === type;
-                      return (
-                      <button
-                        key={type}
-                        onClick={() => handleModelChange(type as ModelType)}
-                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
-                          isSelected
-                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
-                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
-                        }`}
-                      >
-                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
-                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
-                        {label}
-                        {isRecommended && type === ModelType.BAZI && (
-                          <span className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
-                            <span className="bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                              古籍
-                            </span>
-                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full border shadow-[0_10px_20px_rgba(28,25,23,0.16)] ${
-                              isSelected
-                                ? 'border-white/35 bg-white/14 text-amber-100'
-                                : 'border-amber-200/80 bg-white/78 text-amber-700'
-                            }`}>
-                              K线
-                            </span>
-                          </span>
-                        )}
-                      </button>
-                    );
-                    })}
-                  </div>
-               </div>
-
-               {/* 2. Divination Group */}
-               <div className="glass-panel-soft rounded-[24px] p-3.5 md:p-4">
-                  <div className="mb-2.5 flex items-center gap-2.5">
-                    <div className="glass-chip flex h-9 w-9 items-center justify-center rounded-xl">
-                      <TaijiIcon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.22em]">占卜预测</div>
-                      <div className="text-[13px] text-stone-400">求测具体事项吉凶</div>
-                    </div>
-                  </div>
-                  <div className="grid gap-2.5 md:grid-cols-3">
-                    {[
-                      [ModelType.QIMEN, '奇门遁甲'], 
-                      [ModelType.MEIHUA, '梅花易数'],
-                      [ModelType.LIUYAO, '六爻纳甲']
-                    ].map(([type, label]) => {
-                      const isRecommended = recommendedModels.has(type as ModelType);
-                      const isSelected = hasSelectedModel && modelType === type;
-                      return (
-                      <button
-                        key={type}
-                        onClick={() => handleModelChange(type as ModelType)}
-                        className={`group relative overflow-hidden py-4 text-sm font-bold rounded-[20px] border transition-all duration-300 ${isRecommended ? 'ring-1 ring-amber-300/70' : ''} ${
-                          isSelected
-                            ? 'glass-panel-dark text-amber-300 border-transparent shadow-[0_20px_40px_rgba(28,25,23,0.2)] -translate-y-0.5' 
-                            : 'glass-chip text-stone-700 border-white/60 hover:bg-white/70 hover:border-stone-200/90 hover:-translate-y-0.5'
-                        }`}
-                      >
-                        <span className={`pointer-events-none absolute inset-x-0 top-0 h-px ${isSelected ? 'bg-white/50' : 'bg-white/80'}`}></span>
-                        <span className={`pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 ${isSelected ? 'opacity-100 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_52%)]' : 'group-hover:opacity-100 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.36),transparent_60%)]'}`}></span>
-                        {label}
-                        {isRecommended && (
-                          <span className="absolute right-2.5 top-2.5 bg-amber-500/95 text-white text-[10px] px-2.5 py-0.5 rounded-full shadow-[0_10px_20px_rgba(245,158,11,0.24)]">
-                            古籍
-                          </span>
-                        )}
-                      </button>
-                    );
-                    })}
-                  </div>
-               </div>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">{currentWorkspaceLabel}</div>
+                <div className="mt-1 text-2xl font-bold text-stone-800">{currentModuleLabel}</div>
+              </div>
+              <div className="text-sm text-stone-500">
+                {isCaseModel ? '管理命例、排盘并进入 AI 分析' : '先完成排盘，再基于盘面发起解读'}
+              </div>
             </div>
 
             {hasSelectedModel && supportsKnowledge && !isCaseModel && (
@@ -6335,10 +6298,17 @@ const App: React.FC = () => {
                         ? `真太阳时 · ${params.province}${params.city}`
                         : '';
                       return (
-                        <button
+                        <div
                           key={item.id}
-                          type="button"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => loadCaseDetail(item.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              loadCaseDetail(item.id);
+                            }
+                          }}
                           className={`text-left rounded-[24px] border px-4 py-3.5 transition ${
                             activeCase?.id === item.id
                               ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.22)]'
@@ -6362,17 +6332,49 @@ const App: React.FC = () => {
                                 {datetimeText}
                               </div>
                             </div>
-                            <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                              activeCase?.id === item.id
-                                ? 'border-amber-200/30 text-amber-100'
-                                : 'border-stone-200 text-stone-500'
-                            }`}>
-                              {specialTags.includes(JOINT_CASE_TAG)
-                                ? JOINT_CASE_TAG
-                                : item.modelType === ModelType.BAZI
-                                  ? '八字'
-                                  : '紫微'}
-                            </span>
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                activeCase?.id === item.id
+                                  ? 'border-amber-200/30 text-amber-100'
+                                  : 'border-stone-200 text-stone-500'
+                              }`}>
+                                {specialTags.includes(JOINT_CASE_TAG)
+                                  ? JOINT_CASE_TAG
+                                  : item.modelType === ModelType.BAZI
+                                    ? '八字'
+                                    : '紫微'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void beginCaseEditFromLibrary(item.id);
+                                  }}
+                                  className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                                    activeCase?.id === item.id
+                                      ? 'border-amber-200/30 text-amber-100 hover:bg-white/10'
+                                      : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-800'
+                                  }`}
+                                >
+                                  修改
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleDeleteCaseFromLibrary(item.id);
+                                  }}
+                                  className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                                    activeCase?.id === item.id
+                                      ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
+                                      : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
+                                  }`}
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </div>
                           </div>
                           {specialTags.length > 0 && !specialTags.includes(JOINT_CASE_TAG) && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -6395,7 +6397,7 @@ const App: React.FC = () => {
                               {solarText}
                             </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -6757,6 +6759,43 @@ const App: React.FC = () => {
               >
                 {loading ? <Spinner /> : '开始排盘'}
               </button>
+
+              {!isCaseModel && (
+                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-stone-700">排盘记录</div>
+                    <div className="text-xs text-stone-500">
+                      {savedSessions.filter((item) => item.modelType === modelType).length
+                        ? `共 ${savedSessions.filter((item) => item.modelType === modelType).length} 条`
+                        : '暂无记录'}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {savedSessions.filter((item) => item.modelType === modelType).slice(0, 5).map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleLoadSession(item.id)}
+                        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition ${
+                          activeSessionId === item.id
+                            ? 'glass-panel-dark border-transparent text-amber-200'
+                            : 'border-white/60 bg-white/55 text-stone-700 hover:bg-white/80'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{item.title}</span>
+                        <span className={`ml-3 shrink-0 text-xs ${activeSessionId === item.id ? 'text-amber-100/75' : 'text-stone-400'}`}>
+                          {new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false })}
+                        </span>
+                      </button>
+                    ))}
+                    {savedSessions.filter((item) => item.modelType === modelType).length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-5 text-center text-sm text-stone-400">
+                        完成排盘并发起解读后，会在这里显示记录。
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>
@@ -7459,28 +7498,6 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {professionalPos && !activeSessionId && !activeCase && (
-        <div className="fixed z-40 select-none" style={{ left: professionalPos.x, top: professionalPos.y }}>
-          <button
-            type="button"
-            onPointerDown={handleProfessionalPointerDown}
-            onPointerMove={handleProfessionalPointerMove}
-            onPointerUp={handleProfessionalPointerUp}
-            onPointerCancel={handleProfessionalPointerUp}
-            className="group relative h-[68px] w-[68px] overflow-hidden rounded-full border border-white/35 bg-white/10 text-stone-700 shadow-[0_18px_46px_rgba(255,255,255,0.12)] backdrop-blur-[22px] transition cursor-grab active:cursor-grabbing hover:scale-[1.03] hover:border-white/55"
-            title="Beta"
-          >
-            <span className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.22),rgba(255,255,255,0.08)_58%,rgba(255,255,255,0.03)_100%)]" />
-            <span className="absolute inset-[2px] rounded-full border border-white/24 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.26)]" />
-            <span className="absolute inset-[7px] rounded-full border border-white/18 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.16),rgba(255,255,255,0.05)_58%,rgba(255,255,255,0.01)_100%)]" />
-            <span className="pointer-events-none absolute inset-x-3 top-2 h-3 rounded-full bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.01))] blur-[1.5px] opacity-90" />
-            <span className="relative z-10 flex h-full w-full flex-col items-center justify-center leading-none">
-              <span className="text-[13px] font-medium tracking-[0.08em] text-stone-700/82">Beta</span>
-            </span>
-          </button>
         </div>
       )}
 
