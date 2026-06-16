@@ -4906,16 +4906,9 @@ const App: React.FC = () => {
       setStep('chart');
       requestSectionScroll('report');
 
-      // --- Save session to DB immediately (before AI streaming) ---
       const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || baseParams.name || new Date().toLocaleDateString('zh-CN')}`;
       const sessionChartParams = { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>;
-      const newSessionId = await saveSessionToDb(
-        modelType,
-        sessionTitle,
-        sessionChartParams,
-        resultData
-      );
-      if (newSessionId) setActiveSessionId(newSessionId);
+      setActiveSessionId(null);
       setActiveChartParams(sessionChartParams);
       setSessionAnalysisModel(analysisModel);
 
@@ -4990,12 +4983,46 @@ const App: React.FC = () => {
       }
 
       // --- Save messages to DB ---
-      if (newSessionId) {
-        const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
-        await saveMessagesToDb(newSessionId, [
-          { role: 'user', content: userContent },
-          { role: 'model', content: finalContent },
-        ]);
+      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
+      if (isLoggedIn) {
+        const newSessionId = await saveSessionToDb(
+          modelType,
+          sessionTitle,
+          sessionChartParams,
+          resultData
+        );
+        if (newSessionId) {
+          setActiveSessionId(newSessionId);
+          await saveMessagesToDb(newSessionId, [
+            { role: 'user', content: userContent },
+            { role: 'model', content: finalContent },
+          ]);
+        }
+      } else if (activeCase) {
+        const guestSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const now = new Date().toISOString();
+        const finalMessages: ChatMessage[] = [
+          { id: 'init-u', role: 'user', content: userContent, timestamp: new Date() },
+          { id: modelId, role: 'model', content: finalContent, timestamp: new Date() },
+        ];
+        saveGuestCaseSession({
+          id: guestSessionId,
+          caseId: activeCase.id,
+          modelType,
+          title: sessionTitle,
+          chartParams: sessionChartParams,
+          chartData: resultData,
+          messages: finalMessages.map((msg) => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+          })),
+          guestFollowUpCount: 0,
+          createdAt: now,
+          updatedAt: now,
+        });
+        setActiveSessionId(guestSessionId);
       }
 
       if (!isLoggedIn) {
@@ -5517,7 +5544,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const sessionId = options?.sessionIdOverride ?? activeSessionId;
+    let sessionId = options?.sessionIdOverride ?? activeSessionId;
     const caseId = options?.caseIdOverride ?? activeCase?.id ?? null;
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -5560,6 +5587,26 @@ const App: React.FC = () => {
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
 
       if (isLoggedIn) {
+        if (!sessionId && chartData) {
+          const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${outgoingMessage.slice(0, 20) || String(activeChartParams.name || new Date().toLocaleDateString('zh-CN'))}`;
+          const nextChartParams = {
+            ...activeChartParams,
+            question: outgoingMessage,
+            analysisModel,
+          } as Record<string, unknown>;
+          sessionId = await saveSessionToDb(
+            modelType,
+            sessionTitle,
+            nextChartParams,
+            chartData,
+            activeCase?.id
+          );
+          if (sessionId) {
+            setActiveSessionId(sessionId);
+            setActiveChartParams(nextChartParams);
+            setSessionAnalysisModel(analysisModel);
+          }
+        }
         updateChatMessage(modelId, finalContent);
         await saveMessagesToDb(sessionId, [
           { role: 'user', content: outgoingMessage },
@@ -5576,6 +5623,32 @@ const App: React.FC = () => {
           );
           if (sessionId) {
             updateGuestCaseSessionMessages(sessionId, next, nextGuestFollowUpCount);
+          } else if (activeCase && chartData) {
+            const guestSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const now = new Date().toISOString();
+            saveGuestCaseSession({
+              id: guestSessionId,
+              caseId: activeCase.id,
+              modelType,
+              title: `${MODEL_LABELS[modelType] || modelType} - ${outgoingMessage.slice(0, 20) || activeCase.title}`,
+              chartParams: {
+                ...activeChartParams,
+                question: outgoingMessage,
+                analysisModel,
+              },
+              chartData,
+              messages: next.map((msg) => ({
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp.toISOString(),
+              })),
+              guestFollowUpCount: nextGuestFollowUpCount,
+              createdAt: now,
+              updatedAt: now,
+            });
+            sessionId = guestSessionId;
+            setActiveSessionId(guestSessionId);
           }
           return next;
         });
