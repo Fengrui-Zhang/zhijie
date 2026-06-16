@@ -164,8 +164,17 @@ export default function SessionSidebar({
               {items.map(item => (
                 <div
                   key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`打开历史记录：${item.title}，${MODEL_LABELS[item.modelType] || item.modelType}`}
                   onClick={() => onSelect(item.id)}
-                  className={`group flex items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all text-sm border ${
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelect(item.id);
+                    }
+                  }}
+                  className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all text-left text-sm border ${
                     activeSessionId === item.id
                       ? 'bg-amber-50/95 text-amber-900 border-amber-200/80 shadow-[0_10px_30px_rgba(245,158,11,0.12)]'
                       : 'bg-white/50 text-stone-700 border-white/60 hover:bg-white/85 hover:border-stone-200/80'

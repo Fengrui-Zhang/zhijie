@@ -4693,7 +4693,7 @@ const App: React.FC = () => {
     setShowInitialAnalysisModal(true);
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = async (options?: { targetDate?: Date }) => {
     if (requireLoginIfGuestModeDisabled()) return;
 
     // Validation
@@ -4762,12 +4762,12 @@ const App: React.FC = () => {
 
     try {
       // Date logic
-      let date = new Date();
-      if (isLiupanModeModel(modelType) && requiresLiupanDate(liuyaoMode) && customDate) {
+      let date = options?.targetDate || new Date();
+      if (!options?.targetDate && isLiupanModeModel(modelType) && requiresLiupanDate(liuyaoMode) && customDate) {
          date = new Date(customDate);
-      } else if (isLiupanModeModel(modelType) && liuyaoMode === LiuyaoMode.AUTO) {
+      } else if (!options?.targetDate && isLiupanModeModel(modelType) && liuyaoMode === LiuyaoMode.AUTO) {
          date = new Date();
-      } else if (!isLifeReading && timeMode === 'custom' && customDate) {
+      } else if (!options?.targetDate && !isLifeReading && timeMode === 'custom' && customDate) {
          date = new Date(customDate);
       }
       const fortuneCase = isFortuneReading
@@ -4916,6 +4916,14 @@ const App: React.FC = () => {
       if (newSessionId) setActiveSessionId(newSessionId);
       setActiveChartParams(sessionChartParams);
       setSessionAnalysisModel(analysisModel);
+
+      if (isFortuneReading) {
+        await startQimenChat(systemInstruction);
+        resetMessageVersions();
+        setChatHistory([]);
+        fetchSessions();
+        return;
+      }
 
       if (isLoggedIn && userQuota !== null && userQuota <= 0) {
         setError('排盘已完成。您的提问额度已用完，暂不能请求 AI 解读。');
@@ -5586,6 +5594,19 @@ const App: React.FC = () => {
 
   const handleSendMessage = async () => {
     await sendFollowUpMessage(inputMessage);
+  };
+
+  const handleFortuneDateChange = async (targetDate: Date) => {
+    if (loading || isTyping) return;
+    const value = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}T00:00`;
+    setTimeMode('custom');
+    setCustomDate(value);
+    await handleCalculate({ targetDate });
+  };
+
+  const handleFortuneSuggestedAsk = async (message: string) => {
+    requestSectionScroll('chat');
+    await sendFollowUpMessage(message);
   };
 
   const toggleLine = (idx: number) => {
@@ -7325,7 +7346,7 @@ const App: React.FC = () => {
               )}
 
               <button 
-                onClick={handleCalculate} disabled={loading}
+                onClick={() => handleCalculate()} disabled={loading}
                 className="glass-cta w-full hover:brightness-105 text-amber-300 font-bold py-4 rounded-2xl mt-4 flex justify-center items-center gap-2 transition"
               >
                 {loading ? <Spinner /> : '开始排盘'}
@@ -7472,7 +7493,12 @@ const App: React.FC = () => {
                   {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
                   {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
                   {[ModelType.DAILY_FORTUNE, ModelType.MONTHLY_FORTUNE].includes(modelType) && (
-                    <FortuneGrid data={chartData as GenericTaibuResponse} />
+                    <FortuneGrid
+                      data={chartData as GenericTaibuResponse}
+                      onDateChange={handleFortuneDateChange}
+                      onAsk={handleFortuneSuggestedAsk}
+                      isAsking={isTyping}
+                    />
                   )}
                   {[
                     ModelType.DALIUREN,
