@@ -345,7 +345,6 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-800">{title}</div>
-            <div className="mt-1 text-xs text-stone-500">可继续在下方提问，系统会带入当前盘面。</div>
           </div>
         </div>
         <EntryList entries={baseEntries} />
@@ -361,7 +360,6 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-sm font-bold text-stone-700">完整盘面文本</div>
-            <div className="mt-1 text-xs text-stone-400">默认收起，提问时会自动带入。</div>
           </div>
           <button
             type="button"

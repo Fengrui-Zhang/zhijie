@@ -2944,7 +2944,7 @@ const App: React.FC<AppProps> = ({
       const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
       const displayText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
       const timeText = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', { hour12: false }) : '';
-      const roleLabel = msg.role === 'user' ? '用户' : '大师';
+      const roleLabel = msg.role === 'user' ? '用户' : '解读';
       const contentHtml = renderMarkdownToHtml(displayText);
 
       return `
@@ -7392,10 +7392,7 @@ const App: React.FC<AppProps> = ({
       <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-8">
         {standaloneChatMessages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-xl font-bold text-stone-700">今天想问什么？</div>
-            <div className="mt-2 max-w-lg text-sm leading-7 text-stone-500">
-              可直接提问，也可以先进入排盘结果页，让问题自动携带盘面上下文。
-            </div>
+            <div className="text-xl font-bold text-stone-700">新聊天</div>
             <div className="mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-2">
               {[
                 '结合最近运势，今天适合推进什么？',
@@ -9323,10 +9320,7 @@ const App: React.FC<AppProps> = ({
               <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <div className="text-lg font-bold text-stone-800">需要进一步解读？</div>
-                    <div className="mt-1 text-sm text-stone-500">
-                      排盘已完成。点击后会把当前盘面与问题一起发送给 AI，并消耗一次额度。
-                    </div>
+                    <div className="text-lg font-bold text-stone-800">AI 解读</div>
                   </div>
                   <button
                     type="button"
@@ -9344,7 +9338,7 @@ const App: React.FC<AppProps> = ({
             {(chatHistory.length > 0 || isTyping) && (
             <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
-                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : '大师解读'}</h3>
+                 <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : 'AI 解读'}</h3>
                  <div className="flex items-center gap-3">
                    <button
                      type="button"
@@ -9560,7 +9554,7 @@ const App: React.FC<AppProps> = ({
                      </div>
                    </div>
                  )})}
-                 {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">大师正在思考...</div>}
+                 {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">正在分析...</div>}
                  <div ref={chatEndRef} />
                </div>
                <div className="glass-panel-soft p-4 border-t border-white/50 flex gap-2">
