@@ -16,11 +16,11 @@ export const DEFAULT_WELCOME_INTRO = [
   '排盘流程完整清晰，减少人工换算误差。',
   '参考四柱八字与奇门遁甲古籍资料，断卦有依据，判断更可靠。',
   '专业优化 AI 提示词，提问更简单，回答更精准。',
-  '新注册用户默认 15 次提问额度；每日 8:00 会将低于 3 次的账号补足至 3 次。访客排盘不消耗次数，AI 解读与追问受访客额度限制。',
+  '新注册用户默认 15 次提问额度；访客可体验基础功能。',
 ].join('\n');
 
 export const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
-  announcementTitle: updates.title || '功能介绍',
+  announcementTitle: updates.title || '站点公告',
   announcementUpdatedAt: updates.updated_at || '',
   announcementItems: Array.isArray(updates.items) ? updates.items.filter((item): item is string => typeof item === 'string') : [],
   announcementContent: '',

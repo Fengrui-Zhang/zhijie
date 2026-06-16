@@ -5,14 +5,14 @@
 @tailwind utilities;
 
 :root {
-  --glass-bg: rgba(255, 253, 249, 0.78);
-  --glass-bg-strong: rgba(255, 253, 249, 0.9);
-  --glass-bg-soft: rgba(255, 255, 255, 0.62);
-  --glass-dark: rgba(27, 24, 22, 0.72);
-  --glass-border: rgba(231, 229, 228, 0.72);
-  --glass-border-soft: rgba(231, 229, 228, 0.64);
-  --glass-shadow: 0 14px 34px rgba(28, 25, 23, 0.08);
-  --glass-shadow-soft: 0 8px 22px rgba(28, 25, 23, 0.05);
+  --glass-bg: rgba(255, 253, 249, 0.82);
+  --glass-bg-strong: rgba(255, 253, 249, 0.92);
+  --glass-bg-soft: rgba(255, 255, 255, 0.68);
+  --glass-dark: rgba(27, 24, 22, 0.78);
+  --glass-border: rgba(231, 229, 228, 0.78);
+  --glass-border-soft: rgba(231, 229, 228, 0.7);
+  --glass-shadow: 0 8px 22px rgba(28, 25, 23, 0.055);
+  --glass-shadow-soft: 0 4px 14px rgba(28, 25, 23, 0.035);
   --glass-highlight: rgba(255, 255, 255, 0.32);
 }
 
@@ -64,31 +64,31 @@ body::after {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .glass-panel-soft {
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border-soft);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .glass-panel-dark {
   background: linear-gradient(135deg, rgba(41, 37, 36, 0.88), rgba(28, 25, 23, 0.72));
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 22px 60px rgba(28, 25, 23, 0.28);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 10px 26px rgba(28, 25, 23, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .glass-topbar {
   background: linear-gradient(135deg, rgba(24, 20, 18, 0.88), rgba(31, 27, 25, 0.72));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 16px rgba(28, 25, 23, 0.12);
 }
 
 .glass-banner {

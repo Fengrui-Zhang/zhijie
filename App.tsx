@@ -1477,7 +1477,6 @@ const App: React.FC<AppProps> = ({
   const caseFormRef = useRef<HTMLDivElement>(null);
   const caseDetailRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
-  const [showUpdates, setShowUpdates] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const supportsKnowledge =
@@ -2003,7 +2002,6 @@ const App: React.FC<AppProps> = ({
       showInitialAnalysisModal ||
       showInitialAnalysisRegenerateConfirm ||
       showRerunConfirm ||
-      showUpdates ||
       compatRelationModalOpen ||
       professionalModalOpen ||
       klineModalOpen;
@@ -2026,7 +2024,6 @@ const App: React.FC<AppProps> = ({
     showInitialAnalysisModal,
     showInitialAnalysisRegenerateConfirm,
     showRerunConfirm,
-    showUpdates,
   ]);
 
   // --- Session Persistence ---
@@ -6959,7 +6956,7 @@ const App: React.FC<AppProps> = ({
           { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
           { id: 'records-bottom', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
           { id: 'chat-bottom', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
-          { id: 'more-bottom', label: '更多', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
+          { id: 'more-bottom', label: '更多', symbol: '+', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
         ].map((item) => (
           <button
             key={item.id}
@@ -6969,6 +6966,7 @@ const App: React.FC<AppProps> = ({
               item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
             }`}
           >
+            {'symbol' in item && item.symbol && <span className="block text-lg leading-none">{item.symbol}</span>}
             <span className="block">{item.label}</span>
           </button>
         ))}
@@ -8222,13 +8220,6 @@ const App: React.FC<AppProps> = ({
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
-            <button
-              type="button"
-              onClick={() => setShowUpdates(true)}
-              className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
-            >
-              功能介绍
-            </button>
             {isLoggedIn ? (
               <button
                 type="button"
@@ -8249,47 +8240,6 @@ const App: React.FC<AppProps> = ({
           </div>
         </div>
       </header>
-
-      {showUpdates && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden overscroll-contain bg-black/42 px-4 py-6 backdrop-blur-md"
-          onClick={() => setShowUpdates(false)}
-        >
-          <div
-            className="glass-panel flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-[30px] border border-white/55 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="shrink-0 flex items-start justify-between gap-4 px-6 py-5 border-b border-white/50 bg-white/12">
-              <div>
-                <div className="text-base font-bold text-stone-800">{siteSettings.announcementTitle || '功能介绍'}</div>
-                <div className="mt-1 text-xs text-stone-500 tracking-[0.08em]">更新于 {siteSettings.announcementUpdatedAt}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowUpdates(false)}
-                className="glass-chip shrink-0 rounded-full px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700 hover:bg-white/70 transition"
-              >
-                关闭
-              </button>
-            </div>
-            <div className="glass-scrollbar flex-1 space-y-3 overflow-y-auto overscroll-contain px-6 py-5 text-sm leading-7 text-stone-700">
-              {siteSettings.announcementItems.map((item, idx) => (
-                <div key={idx} className="glass-panel-soft flex items-start gap-3 rounded-2xl px-4 py-3 border border-white/55">
-                  <span className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-400/90 text-[11px] font-bold text-white shadow-[0_0_18px_rgba(251,191,36,0.32)]">
-                    {idx + 1}
-                  </span>
-                  <span className="flex-1">{item}</span>
-                </div>
-              ))}
-              {siteSettings.announcementContent && (
-                <div className="glass-panel-soft rounded-2xl border border-white/55 px-4 py-4 whitespace-pre-wrap leading-7">
-                  {siteSettings.announcementContent}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {showUserMenu && isLoggedIn && (
         <UserMenuPopup
@@ -8406,7 +8356,7 @@ const App: React.FC<AppProps> = ({
           <>
         {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
-            <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次，排盘不消耗次数</span>
+            <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
@@ -8418,7 +8368,7 @@ const App: React.FC<AppProps> = ({
         )}
         {isLoggedIn && userQuota !== null && userQuota <= 0 && step === 'input' && (
           <div className="glass-banner bg-red-50/70 border border-red-200/80 text-red-700 text-xs rounded-2xl px-4 py-3 mb-4">
-            您的提问额度已用完，仍可排盘，但暂不能请求 AI 解读。
+            您的提问额度已用完，暂不能请求 AI 解读。
           </div>
         )}
 
