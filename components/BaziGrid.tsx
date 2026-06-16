@@ -239,8 +239,8 @@ const AnalysisCard = ({
           <MarkdownContent content={content} />
         </div>
       ) : (
-        <div className="mt-5 rounded-[22px] border border-dashed border-stone-200 bg-white/35 px-4 py-5 text-sm leading-6 text-stone-500">
-          由用户手动确认后才会请求 AI，不会自动消耗次数。分析结果支持文本与图表块展示。
+        <div className="mt-5 rounded-2xl border border-dashed border-stone-200 bg-white/45 px-4 py-5 text-sm text-stone-400">
+          暂无分析结果
         </div>
       )}
     </section>
@@ -393,10 +393,10 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
     const identity = `${base_info.name || '匿名'}:${base_info.gongli || bazi_info.bazi.join('')}`;
     return `zhijie:bazi-notes:${identity}`;
   }, [base_info.gongli, base_info.name, bazi_info.bazi]);
-  const tabItems: Array<{ key: BaziTab; label: string; desc: string }> = [
-    { key: 'basic', label: '基本信息', desc: '日主、AI 分析、十神知识' },
-    { key: 'professional', label: '专业排盘', desc: '四柱、大运、流年流月流日' },
-    { key: 'notes', label: '断事笔记', desc: '应事记录与复盘' },
+  const tabItems: Array<{ key: BaziTab; label: string }> = [
+    { key: 'basic', label: '基本信息' },
+    { key: 'professional', label: '专业排盘' },
+    { key: 'notes', label: '断事笔记' },
   ];
   const tableColumns = useMemo(() => {
     const natalColumns = pillars.map((pillar) => ({
@@ -530,14 +530,13 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
             key={item.key}
             type="button"
             onClick={() => setActiveTab(item.key)}
-            className={`rounded-[24px] border px-4 py-3 text-left transition ${
+            className={`rounded-2xl border px-4 py-3 text-center transition ${
               activeTab === item.key
-                ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.18)]'
-                : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+                ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                : 'border-stone-100 bg-white/65 text-stone-700 hover:bg-white'
             }`}
           >
             <div className="font-bold">{item.label}</div>
-            <div className={`mt-1 text-xs ${activeTab === item.key ? 'text-amber-100/80' : 'text-stone-500'}`}>{item.desc}</div>
           </button>
         ))}
       </div>

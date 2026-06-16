@@ -157,13 +157,12 @@ export default function LifeReadingForm({
   };
 
   return (
-    <div className="mx-auto max-w-4xl rounded-[30px] border border-white/60 bg-white/35 p-5 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-6">
+    <div className="mx-auto max-w-4xl rounded-2xl border border-stone-100 bg-white/70 p-5 shadow-sm backdrop-blur-md md:p-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">出生信息</div>
           <h2 className="mt-1 text-2xl font-bold text-stone-900">{modelLabel}排盘</h2>
         </div>
-        <p className="text-sm text-stone-500">填写出生信息，生成命盘后可继续请求 AI 解读</p>
       </div>
 
       <div className="space-y-5">

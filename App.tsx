@@ -6764,7 +6764,7 @@ const App: React.FC<AppProps> = ({
 
   const renderModuleNavigation = (mobile = false) => (
     <nav
-      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-112px)] w-[260px]'} glass-panel-soft flex flex-col rounded-[28px] border border-white/65 p-4 shadow-[0_24px_60px_rgba(28,25,23,0.12)]`}
+      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-112px)] w-[260px]'} glass-panel-soft flex flex-col rounded-2xl border border-stone-100/80 p-4 shadow-sm`}
       aria-label="功能导航"
     >
       <div className="mb-4">
@@ -6792,8 +6792,8 @@ const App: React.FC<AppProps> = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
-                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
                 }`}
               >
                 <span>{label}</span>
@@ -6824,8 +6824,8 @@ const App: React.FC<AppProps> = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
-                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
                 }`}
               >
                 <span>{label}</span>
@@ -6851,8 +6851,8 @@ const App: React.FC<AppProps> = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
-                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
                 }`}
               >
                 <span>{label}</span>
@@ -6879,8 +6879,8 @@ const App: React.FC<AppProps> = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
-                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
                 }`}
               >
                 <span>{label}</span>
@@ -6908,8 +6908,8 @@ const App: React.FC<AppProps> = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
-                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
                 }`}
               >
                 <span>{label}</span>
@@ -6923,7 +6923,7 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderMobileBottomNav = () => (
-    <nav className="fixed inset-x-3 bottom-3 z-20 rounded-[24px] border border-white/70 bg-white/78 p-2 shadow-[0_18px_48px_rgba(28,25,23,0.18)] backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
+    <nav className="fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-stone-100 bg-white/86 p-2 shadow-lg shadow-stone-900/10 backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
       <div className="grid grid-cols-5 gap-1">
         {[
           { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
@@ -8465,25 +8465,6 @@ const App: React.FC<AppProps> = ({
           onClose={() => setShowAccountSettings(false)}
           onDeleted={() => { setShowAccountSettings(false); signOut(); }}
         />
-      )}
-
-      {isLoggedIn && workspaceView === 'divination' && (
-        <div
-          className="xl:hidden fixed right-3 top-[106px] z-20 flex flex-col gap-2"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveCompactPanel((current) => (current === 'history' ? null : 'history'))}
-            className={`flex h-12 w-12 items-center justify-center rounded-2xl border backdrop-blur-xl shadow-[0_18px_50px_rgba(28,25,23,0.16)] transition ${
-              activeCompactPanel === 'history'
-                ? 'border-amber-200/80 bg-amber-50/90 text-amber-800'
-                : 'border-white/70 bg-white/62 text-stone-600'
-            }`}
-            title="历史记录"
-          >
-            <SessionIcon className="w-5 h-5" />
-          </button>
-        </div>
       )}
 
       {isLoggedIn && workspaceView === 'divination' && (

@@ -33,6 +33,24 @@ const MODE_LABELS: Record<InterpretationMode, string> = {
   technical: '术语',
 };
 
+const MODE_CONFIG: Record<InterpretationMode, { label: string; description: string; icon: string }> = {
+  colloquial: {
+    label: '白话模式',
+    description: '简单易懂的日常语言',
+    icon: '白',
+  },
+  professional: {
+    label: '专业模式',
+    description: '稍微专业但可理解',
+    icon: '专',
+  },
+  technical: {
+    label: '术语模式',
+    description: '命理专业术语',
+    icon: '术',
+  },
+};
+
 const MODE_PREFIX: Record<InterpretationMode, string> = {
   colloquial: '',
   professional: '从日主与流运关系看，',
@@ -693,6 +711,43 @@ const ScoreBars = ({ fortune }: { fortune: any }) => (
   </div>
 );
 
+const InterpretationModeControl = ({
+  mode,
+  onModeChange,
+  activeClass = 'bg-orange-500 text-white shadow-sm',
+}: {
+  mode: InterpretationMode;
+  onModeChange: (mode: InterpretationMode) => void;
+  activeClass?: string;
+}) => (
+  <div className="space-y-2">
+    <div className="flex flex-wrap gap-1 rounded-2xl bg-stone-100 p-1">
+      {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => {
+        const active = mode === item;
+        return (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onModeChange(item)}
+            title={MODE_CONFIG[item].description}
+            className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition md:px-3 ${
+              active ? activeClass : 'text-stone-500 hover:bg-white hover:text-stone-800'
+            }`}
+          >
+            <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-white text-stone-400'}`}>
+              {MODE_CONFIG[item].icon}
+            </span>
+            <span>{MODE_LABELS[item]}</span>
+          </button>
+        );
+      })}
+    </div>
+    <div className="text-right text-[11px] leading-5 text-stone-400">
+      {MODE_CONFIG[mode].label} · {MODE_CONFIG[mode].description}
+    </div>
+  </div>
+);
+
 const FortuneTrendChart = ({
   trend,
   selectedDate,
@@ -1034,13 +1089,11 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
             <div className="mt-4 border-t border-white/70 pt-4 md:mt-6 md:pt-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
                 <div className="text-base font-bold text-stone-800 md:text-lg">运势指引</div>
-                <div className="rounded-2xl bg-stone-100 p-1">
-                  {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
-                    <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-sky-500 text-white' : 'text-stone-500'}`}>
-                      {MODE_LABELS[item]}
-                    </button>
-                  ))}
-                </div>
+                <InterpretationModeControl
+                  mode={mode}
+                  onModeChange={setMode}
+                  activeClass="bg-sky-500 text-white shadow-sm"
+                />
               </div>
               <ol className="space-y-2 md:space-y-3">
                 {modeAdvice.map((item: string, index: number) => (
@@ -1259,13 +1312,11 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
             <div className="mt-4 border-t border-stone-100 pt-4 md:mt-6 md:pt-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
                 <div className="text-base font-bold text-stone-800 md:text-lg">本月指引</div>
-                <div className="rounded-2xl bg-stone-100 p-1">
-                  {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
-                    <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-indigo-500 text-white' : 'text-stone-500'}`}>
-                      {MODE_LABELS[item]}
-                    </button>
-                  ))}
-                </div>
+                <InterpretationModeControl
+                  mode={mode}
+                  onModeChange={setMode}
+                  activeClass="bg-orange-500 text-white shadow-sm"
+                />
               </div>
               <ol className="space-y-2 md:space-y-3">
                 {monthlyGuide.map((item, index) => (
