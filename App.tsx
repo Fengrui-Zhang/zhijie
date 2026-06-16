@@ -1110,9 +1110,7 @@ const App: React.FC = () => {
   const [customDate, setCustomDate] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [qimenProEnabled, setQimenProEnabled] = useState(false);
-  const [qimenJuModel, setQimenJuModel] = useState(1);
-  const [qimenPanModel, setQimenPanModel] = useState(1);
-  const [qimenFeiPanModel, setQimenFeiPanModel] = useState(1);
+  const [qimenJuModel, setQimenJuModel] = useState(0);
   
   // Liuyao Specifics
   const [liuyaoMode, setLiuyaoMode] = useState<LiuyaoMode>(LiuyaoMode.AUTO);
@@ -2902,9 +2900,7 @@ const App: React.FC = () => {
       setLyNumUp('');
       setLyNumDown('');
       setQimenProEnabled(false);
-      setQimenJuModel(1);
-      setQimenPanModel(1);
-      setQimenFeiPanModel(1);
+      setQimenJuModel(0);
     }
     setBaziInitialAnalysis('');
     setKlineUnlocked(false);
@@ -3887,12 +3883,6 @@ const App: React.FC = () => {
         isSameCaseChartIdentity(activeCase.chartParams, chartParams)
       );
 
-      if (!isLoggedIn && !shouldReuseExistingChart && guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
-        setError('');
-        setShowAuth(true);
-        return;
-      }
-
       setCaseBusy(true);
       setLoading(true);
       setError('');
@@ -3940,17 +3930,14 @@ const App: React.FC = () => {
         };
         saveGuestCase(nextCase);
         refreshGuestActiveCase(caseId);
-        if (!shouldReuseExistingChart) {
-          const newCount = guestFortuneCount + 1;
-          localStorage.setItem('guestFortuneCount', String(newCount));
-          setGuestFortuneCount(newCount);
-          setGuestFollowUpCount(0);
-          localStorage.setItem('guestFollowUpCount', '0');
-        } else {
+        if (shouldReuseExistingChart) {
           const currentGuestSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
           const nextFollowUpCount = currentGuestSession?.guestFollowUpCount || 0;
           setGuestFollowUpCount(nextFollowUpCount);
           localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
+        } else {
+          setGuestFollowUpCount(0);
+          localStorage.setItem('guestFollowUpCount', '0');
         }
       }
 
@@ -4561,17 +4548,6 @@ const App: React.FC = () => {
 
   const handleCalculate = async () => {
     if (requireLoginIfGuestModeDisabled()) return;
-    if (!isLoggedIn) {
-      if (guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
-        setError('');
-        setShowAuth(true);
-        return;
-      }
-    }
-    if (isLoggedIn && userQuota !== null && userQuota <= 0) {
-      setError('您的提问额度已用完');
-      return;
-    }
 
     // Validation
     const isDivination = [ModelType.QIMEN, ModelType.MEIHUA, ModelType.LIUYAO].includes(modelType);
@@ -4647,6 +4623,7 @@ const App: React.FC = () => {
         province: province,
         city: city,
         pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
+        question,
       };
 
       if (isLiupanModeModel(modelType)) {
@@ -4675,9 +4652,7 @@ const App: React.FC = () => {
               ...baseParams,
               question,
               zhen: qimenZhen,
-              ju_model: qimenProEnabled ? qimenJuModel : 1,
-              pan_model: qimenProEnabled ? qimenPanModel : undefined,
-              fei_pan_model: qimenProEnabled && qimenPanModel === 0 ? qimenFeiPanModel : undefined,
+              ju_model: qimenProEnabled ? qimenJuModel : 0,
             };
             resultData = await fetchQimen(qimenParams);
           }
@@ -4730,6 +4705,17 @@ const App: React.FC = () => {
       if (newSessionId) setActiveSessionId(newSessionId);
       setActiveChartParams(sessionChartParams);
       setSessionAnalysisModel(analysisModel);
+
+      if (isLoggedIn && userQuota !== null && userQuota <= 0) {
+        setError('排盘已完成。您的提问额度已用完，暂不能请求 AI 解读。');
+        return;
+      }
+
+      if (!isLoggedIn && guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
+        setError('排盘已完成。访客 AI 解读次数已用完，请登录后继续分析。');
+        setShowAuth(true);
+        return;
+      }
 
       // --- AI Chat Init ---
       await startQimenChat(systemInstruction);
@@ -6104,7 +6090,7 @@ const App: React.FC = () => {
         <div className="mx-auto mt-6 w-full max-w-4xl px-2 pb-6">
         {!isLoggedIn && guestModeEnabled && step === 'input' && (
           <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
-            <span>访客模式：排盘剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次</span>
+            <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次，排盘不消耗次数</span>
             <button
               type="button"
               onClick={() => setShowAuth(true)}
@@ -6116,7 +6102,7 @@ const App: React.FC = () => {
         )}
         {isLoggedIn && userQuota !== null && userQuota <= 0 && step === 'input' && (
           <div className="glass-banner bg-red-50/70 border border-red-200/80 text-red-700 text-xs rounded-2xl px-4 py-3 mb-4">
-            您的提问额度已用完，无法继续提问。
+            您的提问额度已用完，仍可排盘，但暂不能请求 AI 解读。
           </div>
         )}
 
@@ -6519,12 +6505,12 @@ const App: React.FC = () => {
 
                   {!qimenProEnabled && (
                     <div className="text-xs text-stone-400 italic">
-                      默认设置：起局方法为置闰法，盘类型为转盘奇门。
+                      默认设置：拆补法转盘奇门。
                     </div>
                   )}
 
                   {qimenProEnabled && (
-                    <div className="grid md:grid-cols-2 gap-4 animate-fade-in">
+                    <div className="grid gap-4 animate-fade-in">
                       <div>
                         <label className="block text-xs text-stone-500 mb-1">起局方法</label>
                         <select
@@ -6533,36 +6519,9 @@ const App: React.FC = () => {
                           className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
                         >
                           <option value={0}>拆补法</option>
-                          <option value={1}>置闰法</option>
                           <option value={2}>茅山道人法</option>
                         </select>
                       </div>
-
-                      <div>
-                        <label className="block text-xs text-stone-500 mb-1">盘类型</label>
-                        <select
-                          value={qimenPanModel}
-                          onChange={(e) => setQimenPanModel(parseInt(e.target.value, 10))}
-                          className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
-                        >
-                          <option value={0}>飞盘奇门</option>
-                          <option value={1}>转盘奇门</option>
-                        </select>
-                      </div>
-
-                      {qimenPanModel === 0 && (
-                        <div>
-                          <label className="block text-xs text-stone-500 mb-1">飞盘排法</label>
-                          <select
-                            value={qimenFeiPanModel}
-                            onChange={(e) => setQimenFeiPanModel(parseInt(e.target.value, 10))}
-                            className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
-                          >
-                            <option value={1}>全部顺排</option>
-                            <option value={2}>阴顺阳逆</option>
-                          </select>
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -6715,7 +6674,7 @@ const App: React.FC = () => {
           <div className="animate-fade-in space-y-6">
             {!isLoggedIn && guestModeEnabled && (
               <div className="glass-banner bg-amber-50/72 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
-                <span>访客模式：排盘剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
+                <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
                 <button
                   type="button"
                   onClick={() => setShowAuth(true)}

@@ -73,6 +73,8 @@ export interface PalaceData {
 }
 
 export interface QimenResponse {
+  taibuText?: string;
+  taibuJson?: unknown;
   name?: string;
   sex?: string;
   gongli: string;
@@ -115,6 +117,8 @@ export interface QimenResponse {
 
 // --- Bazi Types ---
 export interface BaziResponse {
+  taibuText?: string;
+  taibuJson?: unknown;
   base_info: {
     sex: string;
     name: string;
@@ -200,6 +204,8 @@ export interface ZiweiPalace {
 }
 
 export interface ZiweiResponse {
+  taibuText?: string;
+  taibuJson?: unknown;
   base_info: {
     sex: string;
     name: string;
@@ -239,6 +245,8 @@ export interface GuaDetails {
 }
 
 export interface MeihuaResponse {
+  taibuText?: string;
+  taibuJson?: unknown;
   gongli: string;
   nongli: string;
   sizhu_info: {
@@ -298,6 +306,8 @@ export interface ShenshaInfo {
 }
 
 export interface LiuyaoResponse {
+  taibuText?: string;
+  taibuJson?: unknown;
   sex: string;
   model: string;
   gongli: string;

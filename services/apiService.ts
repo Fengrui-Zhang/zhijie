@@ -6,26 +6,12 @@ import {
   ModelType, LiuyaoMode 
 } from '../types';
 
-const ENDPOINTS = {
-  [ModelType.QIMEN]: "/Liupan/qimendunjia",
-  [ModelType.BAZI]: "/Bazi/paipan",
-  [ModelType.ZIWEI]: "/Liupan/zwlpan",
-  [ModelType.MEIHUA]: "/Liupan/meihua",
-  [ModelType.LIUYAO]: "/Liupan/liuyao",
-};
-
-/**
- * Generic Fetcher
- * Optimized to use GET instead of POST because many CORS proxies 
- * have difficulty forwarding POST bodies correctly to the destination.
- * Yuanfenju API supports both GET and POST.
- */
-async function fetchApi<T>(endpoint: string, params: Record<string, string>): Promise<T> {
+async function fetchChart<T>(modelType: ModelType, params: Record<string, unknown>): Promise<T> {
   try {
-    const response = await fetch('/api/fortune', {
+    const response = await fetch('/api/chart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint, params }),
+      body: JSON.stringify({ modelType, params }),
     });
 
     if (!response.ok) {
@@ -36,8 +22,8 @@ async function fetchApi<T>(endpoint: string, params: Record<string, string>): Pr
     const json = await response.json();
     return json.data as T;
   } catch (error: any) {
-    console.error(`Fetch error for ${endpoint}:`, error.message);
-    throw new Error(error.message || 'Failed to connect to API.');
+    console.error(`Chart error for ${modelType}:`, error.message);
+    throw new Error(error.message || '排盘失败，请稍后重试。');
   }
 }
 
@@ -46,47 +32,42 @@ export const fetchQimen = async (params: QimenParams) => {
   const zhen = params.zhen ?? ((params.province && params.city) ? 1 : 2);
   const juModel = params.ju_model ?? 1;
 
-  const requestPayload: Record<string, string> = {
-    type: '1', // Chai Bu
+  const requestPayload: Record<string, unknown> = {
     name: params.name || '匿名',
-    sex: params.sex.toString(),
-    year: params.year.toString(),
-    month: params.month.toString(),
-    day: params.day.toString(),
-    hours: params.hours.toString(),
-    minute: params.minute.toString(),
-    lang: 'zh-cn',
-    ju_model: juModel.toString(),
-    zhen: zhen.toString(),
+    sex: params.sex,
+    year: params.year,
+    month: params.month,
+    day: params.day,
+    hours: params.hours,
+    minute: params.minute,
+    ju_model: juModel,
+    zhen,
+    question: params.question,
   };
 
   if (params.province) requestPayload.province = params.province;
   if (params.city) requestPayload.city = params.city;
 
   if (params.pan_model !== undefined) {
-    requestPayload.pan_model = params.pan_model.toString();
+    requestPayload.pan_model = params.pan_model;
     if (params.pan_model === 0) {
-      requestPayload.fei_pan_model = (params.fei_pan_model ?? 1).toString();
+      requestPayload.fei_pan_model = params.fei_pan_model ?? 1;
     }
   }
 
-  return fetchApi<QimenResponse>(ENDPOINTS[ModelType.QIMEN], requestPayload);
+  return fetchChart<QimenResponse>(ModelType.QIMEN, requestPayload);
 };
 
 // --- 2. Bazi ---
 export const fetchBazi = async (params: BaseParams) => {
-  const isZhen = (params.province && params.city) ? '1' : '0';
-
-  return fetchApi<BaziResponse>(ENDPOINTS[ModelType.BAZI], {
-    type: '1', 
+  return fetchChart<BaziResponse>(ModelType.BAZI, {
     name: params.name || '匿名',
-    sex: params.sex.toString(),
-    year: params.year.toString(),
-    month: params.month.toString(),
-    day: params.day.toString(),
-    hours: params.hours.toString(),
-    minute: params.minute.toString(),
-    zhen: isZhen,
+    sex: params.sex,
+    year: params.year,
+    month: params.month,
+    day: params.day,
+    hours: params.hours,
+    minute: params.minute,
     province: params.province || '',
     city: params.city || ''
   });
@@ -94,18 +75,14 @@ export const fetchBazi = async (params: BaseParams) => {
 
 // --- 3. Ziwei ---
 export const fetchZiwei = async (params: BaseParams) => {
-  const isZhen = (params.province && params.city) ? '1' : '0';
-
-  return fetchApi<ZiweiResponse>(ENDPOINTS[ModelType.ZIWEI], {
-    type: '1',
+  return fetchChart<ZiweiResponse>(ModelType.ZIWEI, {
     name: params.name || '匿名',
-    sex: params.sex.toString(),
-    year: params.year.toString(),
-    month: params.month.toString(),
-    day: params.day.toString(),
-    hours: params.hours.toString(),
-    minute: params.minute.toString(),
-    zhen: isZhen,
+    sex: params.sex,
+    year: params.year,
+    month: params.month,
+    day: params.day,
+    hours: params.hours,
+    minute: params.minute,
     province: params.province || '',
     city: params.city || ''
   });
@@ -114,35 +91,36 @@ export const fetchZiwei = async (params: BaseParams) => {
 const buildModePayload = (params: BaseParams) => {
   const panModel = params.pan_model || LiuyaoMode.AUTO;
 
-  const requestPayload: Record<string, string> = {
-    sex: params.sex.toString(),
-    born_year: params.born_year ? params.born_year.toString() : '1990',
-    pan_model: panModel.toString(),
+  const requestPayload: Record<string, unknown> = {
+    sex: params.sex,
+    born_year: params.born_year || 1990,
+    pan_model: panModel,
+    name: params.name || '匿名',
+    question: (params as QimenParams).question || '',
   };
 
-  if (panModel === LiuyaoMode.CUSTOM_TIME || panModel === LiuyaoMode.LIFETIME) {
-    requestPayload.year = params.year.toString();
-    requestPayload.month = params.month.toString();
-    requestPayload.day = params.day.toString();
-    requestPayload.hours = params.hours.toString();
-    requestPayload.minute = params.minute.toString();
-  }
-  else if (panModel === LiuyaoMode.MANUAL) {
-    requestPayload.gua_yao1 = (params.gua_yao1 ?? 0).toString();
-    requestPayload.gua_yao2 = (params.gua_yao2 ?? 0).toString();
-    requestPayload.gua_yao3 = (params.gua_yao3 ?? 0).toString();
-    requestPayload.gua_yao4 = (params.gua_yao4 ?? 0).toString();
-    requestPayload.gua_yao5 = (params.gua_yao5 ?? 0).toString();
-    requestPayload.gua_yao6 = (params.gua_yao6 ?? 0).toString();
+  requestPayload.year = params.year;
+  requestPayload.month = params.month;
+  requestPayload.day = params.day;
+  requestPayload.hours = params.hours;
+  requestPayload.minute = params.minute;
+
+  if (panModel === LiuyaoMode.MANUAL) {
+    requestPayload.gua_yao1 = params.gua_yao1 ?? 0;
+    requestPayload.gua_yao2 = params.gua_yao2 ?? 0;
+    requestPayload.gua_yao3 = params.gua_yao3 ?? 0;
+    requestPayload.gua_yao4 = params.gua_yao4 ?? 0;
+    requestPayload.gua_yao5 = params.gua_yao5 ?? 0;
+    requestPayload.gua_yao6 = params.gua_yao6 ?? 0;
   }
   else if (panModel === LiuyaoMode.NUMBER || panModel === LiuyaoMode.SINGLE_NUM) {
-    requestPayload.number = (params.number || 0).toString();
-    requestPayload.yao_add_time = (params.yao_add_time ?? 0).toString();
+    requestPayload.number = params.number || 0;
+    requestPayload.yao_add_time = params.yao_add_time ?? 0;
   }
   else if (panModel === LiuyaoMode.DOUBLE_NUM) {
-    requestPayload.number_up = (params.number_up || 0).toString();
-    requestPayload.number_down = (params.number_down || 0).toString();
-    requestPayload.yao_add_time = (params.yao_add_time ?? 0).toString();
+    requestPayload.number_up = params.number_up || 0;
+    requestPayload.number_down = params.number_down || 0;
+    requestPayload.yao_add_time = params.yao_add_time ?? 0;
   }
 
   return requestPayload;
@@ -150,24 +128,27 @@ const buildModePayload = (params: BaseParams) => {
 
 // --- 4. Meihua (All Modes) ---
 export const fetchMeihua = async (params: BaseParams) => {
-  return await fetchApi<MeihuaResponse>(
-    ENDPOINTS[ModelType.MEIHUA],
-    buildModePayload(params)
-  );
+  return await fetchChart<MeihuaResponse>(ModelType.MEIHUA, buildModePayload(params));
 };
 
 // --- 5. Liuyao (All Modes) ---
 export const fetchLiuyao = async (params: BaseParams) => {
-  return await fetchApi<LiuyaoResponse>(
-    ENDPOINTS[ModelType.LIUYAO],
-    buildModePayload(params)
-  );
+  return await fetchChart<LiuyaoResponse>(ModelType.LIUYAO, buildModePayload(params));
 };
 
 
 // --- Prompt Formatters ---
 
 export const formatQimenPrompt = (data: QimenResponse, question: string) => {
+  if (data.taibuText) {
+    return `【任务要求】
+你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。
+
+${data.taibuText}
+
+【用户问题】
+${question.trim() || '无'}`;
+  }
   const {
     name,
     sex,
@@ -258,6 +239,12 @@ ${userQuestion}`;
 };
 
 export const formatBaziPrompt = (data: BaziResponse) => {
+  if (data.taibuText) {
+    return `【八字命理排盘】
+${data.taibuText}
+
+喜用神分析需AI自行推断。`;
+  }
   const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
   const shenshaInfo = detail_info?.shensha
     ? `年柱: ${detail_info.shensha.year}\n  月柱: ${detail_info.shensha.month}\n  日柱: ${detail_info.shensha.day}\n  时柱: ${detail_info.shensha.hour}`
@@ -300,6 +287,12 @@ export const formatBaziPrompt = (data: BaziResponse) => {
 };
 
 export const formatZiweiPrompt = (data: ZiweiResponse) => {
+  if (data.taibuText) {
+    return `【紫微斗数排盘】
+${data.taibuText}
+
+请以紫微斗数大师身份，综合分析命身宫及三方四正，论述其天赋、格局高低及人生重点课题。`;
+  }
   const { base_info, detail_info } = data;
   const ming = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '命宫');
   const shen = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '身宫');
@@ -329,6 +322,14 @@ export const formatZiweiPrompt = (data: ZiweiResponse) => {
 };
 
 export const formatMeihuaPrompt = (data: MeihuaResponse, question: string) => {
+  if (data.taibuText) {
+    return `【梅花易数起卦】
+${data.taibuText}
+
+用户求测: "${question}"
+
+请利用梅花易数体用生克之理，分析事情成败、应期及建议。`;
+  }
   const { gua_info, dongyao } = data;
   return `
   【梅花易数起卦】
@@ -345,6 +346,14 @@ export const formatMeihuaPrompt = (data: MeihuaResponse, question: string) => {
 };
 
 export const formatLiuyaoPrompt = (data: LiuyaoResponse, question: string) => {
+  if (data.taibuText) {
+    return `【六爻纳甲筮法】
+${data.taibuText}
+
+用户问题: "${question}"
+
+请基于六亲、六神、世应及五行生克，结合变卦与空亡神煞，详细推断吉凶成败。`;
+  }
   const { gua_info, sizhu_info, shensha_info, kongwang } = data;
   const ben = gua_info.bengua;
   const bian = gua_info.biangua;

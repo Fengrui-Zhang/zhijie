@@ -1,5 +1,5 @@
 {
   "name": "Yuanfen ZhiJie",
-  "description": "A mystical divination application using the Yuanfenju Qimen API for charting and DeepSeek R1 for expert interpretation.",
+  "description": "A divination application using local Taibu chart algorithms and expert AI interpretation.",
   "requestFramePermissions": []
 }

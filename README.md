@@ -53,7 +53,6 @@
 2. Set environment variables in `.env.local`:
    - `DEEPSEEK_API_KEY="your_deepseek_api_key"`
    - `ARK_API_KEY="your_doubao_ark_api_key"`
-   - `YUANFENJU_API_KEY="your_yuanfenju_api_key"`
    - `EMBEDDING_PROVIDER="dashscope"`
    - `EMBEDDING_BASE_URL="https://dashscope.aliyuncs.com"`
    - `EMBEDDING_MODEL="text-embedding-v3"`
@@ -62,6 +61,5 @@
 3. Run the app:
    `npm run dev`
 
-缘份居API和deepseek API可访问官网：
-  `https://doc.yuanfenju.com/`
+DeepSeek API 可访问官网：
   `https://www.deepseek.com/`
