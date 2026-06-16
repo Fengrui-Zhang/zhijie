@@ -15,8 +15,60 @@ const formatValue = (value: unknown): string => {
   return String(value);
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const isSimpleValue = (value: unknown): boolean => (
+  value === null
+  || value === undefined
+  || ['string', 'number', 'boolean'].includes(typeof value)
+  || (Array.isArray(value) && value.every((item) => !isPlainObject(item)))
+);
+
+const formatCompactValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (Array.isArray(value)) return value.map(formatCompactValue).filter(Boolean).join('、') || '—';
+  if (!isPlainObject(value)) return String(value);
+
+  const preferred = [
+    'name',
+    'label',
+    'modeLabel',
+    'taiyiName',
+    'taiyiType',
+    'qimenName',
+    'qimenLuck',
+    'position',
+    'positionDesc',
+    'wuXing',
+  ];
+  const parts = preferred
+    .map((key) => value[key])
+    .filter((item) => item !== undefined && item !== null && item !== '')
+    .map(String);
+
+  return parts.length ? Array.from(new Set(parts)).join(' / ') : `结构项 ${Object.keys(value).length} 项`;
+};
+
+const formatStarLabel = (key: string): string => {
+  const labels: Record<string, string> = {
+    primaryStar: '主星',
+    yearStar: '年计',
+    monthStar: '月计',
+    dayStar: '日计',
+    hourStar: '时计',
+    guestStar: '客星',
+    hostStar: '主算',
+    dingStar: '定目',
+    wenchangStar: '文昌',
+    jishiStar: '计神',
+  };
+  return labels[key] || key.replace(/Star$/, '');
+};
+
 const objectEntries = (value: unknown) => (
-  value && typeof value === 'object' && !Array.isArray(value)
+  isPlainObject(value)
     ? Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined && item !== '')
     : []
 );
@@ -85,7 +137,7 @@ const CompactEntryList = ({ entries }: { entries: Array<[string, unknown]> }) =>
       {entries.map(([key, value]) => (
         <div key={key} className="flex justify-between gap-3 rounded-xl bg-white/55 px-3 py-2">
           <span className="shrink-0 font-semibold text-stone-500">{key}</span>
-          <span className="min-w-0 break-words text-right">{formatValue(value)}</span>
+          <span className="min-w-0 break-words text-right">{formatCompactValue(value)}</span>
         </div>
       ))}
     </div>
@@ -144,19 +196,66 @@ const TaiyiBlock = ({ data }: { data: any }) => {
   if (!data) return null;
   const metaEntries = objectEntries(data.boardMeta);
   const timeEntries = objectEntries(data.datetimeContext);
-  const coreEntries = objectEntries(data).filter(([key]) => !['boardMeta', 'datetimeContext'].includes(key)).slice(0, 9);
+  const excludedKeys = new Set(['boardMeta', 'datetimeContext', 'coreBoard', 'palaces', 'stars']);
+  const coreEntries = objectEntries(data)
+    .filter(([key, value]) => !excludedKeys.has(key) && isSimpleValue(value))
+    .slice(0, 9);
+  const coreBoard = isPlainObject(data.coreBoard) ? data.coreBoard : {};
+  const starEntries = Object.entries(coreBoard)
+    .filter(([key, value]) => key.endsWith('Star') && isPlainObject(value)) as Array<[string, Record<string, unknown>]>;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <SectionCard title="局式信息">
-        <CompactEntryList entries={metaEntries.length ? metaEntries : coreEntries.slice(0, 4)} />
-      </SectionCard>
-      <SectionCard title="时间干支">
-        <CompactEntryList entries={timeEntries} />
-      </SectionCard>
-      <SectionCard title="关键结构">
-        <CompactEntryList entries={coreEntries} />
-      </SectionCard>
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="局式信息">
+          <CompactEntryList entries={metaEntries.length ? metaEntries : coreEntries.slice(0, 4)} />
+        </SectionCard>
+        <SectionCard title="时间干支">
+          <CompactEntryList entries={timeEntries} />
+        </SectionCard>
+        <SectionCard title="关键结构">
+          <CompactEntryList entries={coreEntries} />
+        </SectionCard>
+      </div>
+
+      {starEntries.length > 0 && (
+        <SectionCard title="星曜要点">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {starEntries.map(([key, star]) => {
+              const position = [star.position, star.positionDesc].filter(Boolean).join(' / ');
+              const tags = [star.taiyiType, star.qimenLuck, star.wuXing].filter(Boolean).map(String);
+              const summary = [star.taiyiName, star.qimenName].filter(Boolean).join(' · ');
+              const song = typeof star.song === 'string' ? star.song.replace(/\s+/g, ' ').trim() : '';
+
+              return (
+                <div key={key} className="rounded-2xl border border-white/65 bg-white/60 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold text-stone-400">{formatStarLabel(key)}</div>
+                      <div className="mt-1 text-base font-bold text-stone-800">{summary || '—'}</div>
+                    </div>
+                    {position && (
+                      <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        {position}
+                      </span>
+                    )}
+                  </div>
+                  {tags.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {tags.map((tag) => (
+                        <span key={tag} className="rounded-lg border border-stone-200 bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-stone-500">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {song && <div className="mt-3 line-clamp-2 text-xs leading-5 text-stone-500">{song}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };
@@ -245,7 +344,7 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-800">{title}</div>
-            <div className="mt-1 text-xs text-stone-500">已使用本地排盘算法生成，后续对话会自动拼接此盘面。</div>
+            <div className="mt-1 text-xs text-stone-500">可继续在下方提问，系统会带入当前盘面。</div>
           </div>
         </div>
         <EntryList entries={baseEntries} />
