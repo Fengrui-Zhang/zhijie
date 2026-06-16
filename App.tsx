@@ -1149,6 +1149,7 @@ const App: React.FC = () => {
   const [professionalCaseOptions, setProfessionalCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseOptions, setFortuneCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseId, setFortuneCaseId] = useState<string>('');
+  const autoFortuneChartKeyRef = useRef('');
   const [professionalCasesLoading, setProfessionalCasesLoading] = useState(false);
   const [professionalSelectedCaseId, setProfessionalSelectedCaseId] = useState<string | null>(null);
   const [professionalBusy, setProfessionalBusy] = useState(false);
@@ -3016,6 +3017,7 @@ const App: React.FC = () => {
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
     setModelType(type);
+    autoFortuneChartKeyRef.current = '';
     clearViewState();
     if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
       setUseKnowledge(false);
@@ -5608,6 +5610,20 @@ const App: React.FC = () => {
     requestSectionScroll('chat');
     await sendFollowUpMessage(message);
   };
+
+  useEffect(() => {
+    const isFortuneReading = modelType === ModelType.DAILY_FORTUNE || modelType === ModelType.MONTHLY_FORTUNE;
+    if (!isFortuneReading || step !== 'input' || !fortuneCaseId || loading || isTyping) return;
+    const targetDate = timeMode === 'custom' && customDate ? new Date(customDate) : new Date();
+    if (Number.isNaN(targetDate.getTime())) return;
+    const keyDate = modelType === ModelType.MONTHLY_FORTUNE
+      ? `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}`
+      : `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
+    const key = `${modelType}:${fortuneCaseId}:${keyDate}`;
+    if (autoFortuneChartKeyRef.current === key) return;
+    autoFortuneChartKeyRef.current = key;
+    handleCalculate({ targetDate });
+  }, [modelType, step, fortuneCaseId, loading, isTyping, timeMode, customDate]);
 
   const toggleLine = (idx: number) => {
     const newLines = [...manualLines];
