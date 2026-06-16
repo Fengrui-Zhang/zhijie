@@ -6875,13 +6875,13 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderChatWorkspace = () => (
-    <div className="glass-panel rounded-[32px] p-6 md:p-8">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
+    <div className="glass-panel flex h-[calc(100vh-128px)] min-h-[620px] flex-col overflow-hidden rounded-[32px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
           <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             role="switch"
@@ -6907,58 +6907,97 @@ const App: React.FC<AppProps> = ({
         </div>
       </div>
 
-      <div className="glass-panel-soft flex h-[62vh] min-h-[480px] flex-col overflow-hidden rounded-[30px] border border-white/60">
-        <div className="glass-chat-bg glass-scrollbar flex-1 space-y-4 overflow-y-auto p-4">
-          {standaloneChatMessages.length === 0 && (
-            <div className="flex h-full items-center justify-center text-center text-sm leading-7 text-stone-500">
-              可直接提问，也可以先进入某个排盘结果页，让问题自动携带盘面上下文。
+      <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-8">
+        {standaloneChatMessages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <div className="text-xl font-bold text-stone-700">今天想问什么？</div>
+            <div className="mt-2 max-w-lg text-sm leading-7 text-stone-500">
+              可直接提问，也可以先进入排盘结果页，让问题自动携带盘面上下文。
             </div>
-          )}
-          {standaloneChatMessages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[88%] rounded-[24px] p-4 text-sm leading-7 shadow-sm ${
-                msg.role === 'user'
-                  ? 'glass-panel-dark text-white'
-                  : 'glass-panel-soft text-stone-800'
-              }`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {msg.content}
-                </ReactMarkdown>
+            <div className="mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-2">
+              {[
+                '结合最近运势，今天适合推进什么？',
+                '帮我把当前问题拆成可行动的建议',
+                '参考古籍解释一个盘面判断',
+                '把结论整理成简洁要点',
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => setStandaloneChatInput(prompt)}
+                  className="rounded-2xl border border-white/65 bg-white/58 px-4 py-3 text-left text-sm text-stone-600 transition hover:bg-white/85 hover:text-stone-900"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-4xl space-y-5">
+            {standaloneChatMessages.map((msg) => (
+              <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'model' && (
-                  <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
+                  <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70 text-xs font-bold text-stone-500">
+                    解
+                  </div>
+                )}
+                <div className={`max-w-[86%] rounded-[22px] px-4 py-3 text-sm leading-7 shadow-sm ${
+                  msg.role === 'user'
+                    ? 'rounded-tr-md bg-stone-900 text-white'
+                    : 'rounded-tl-md border border-white/65 bg-white/72 text-stone-800'
+                }`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                  {msg.role === 'model' && (
+                    <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
+                  )}
+                </div>
+                {msg.role === 'user' && (
+                  <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-stone-900 text-xs font-bold text-amber-200">
+                    我
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
-          {standaloneChatLoading && (
-            <div className="glass-chip inline-flex rounded-full px-3 py-1.5 text-xs text-stone-500">
-              正在回复...
-            </div>
-          )}
-        </div>
-        {standaloneChatError && (
-          <div className="border-t border-red-100 bg-red-50/70 px-4 py-2 text-xs text-red-600">
-            {standaloneChatError}
+            ))}
+            {standaloneChatLoading && (
+              <div className="inline-flex rounded-full border border-white/65 bg-white/70 px-3 py-1.5 text-xs text-stone-500">
+                正在回复...
+              </div>
+            )}
           </div>
         )}
-        <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/58 p-3 backdrop-blur-xl">
-          <div className="flex gap-2">
-            <input
-              value={standaloneChatInput}
-              onChange={(event) => setStandaloneChatInput(event.target.value)}
-              placeholder="输入你的问题..."
-              className="glass-input min-w-0 flex-1 rounded-2xl border border-white/70 px-4 py-3 text-sm outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!standaloneChatInput.trim() || standaloneChatLoading}
-              className="glass-cta rounded-2xl px-5 py-3 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              发送
-            </button>
-          </div>
-        </form>
       </div>
+
+      {standaloneChatError && (
+        <div className="border-t border-red-100 bg-red-50/70 px-4 py-2 text-xs text-red-600">
+          {standaloneChatError}
+        </div>
+      )}
+      <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/60 p-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
+          <textarea
+            value={standaloneChatInput}
+            onChange={(event) => setStandaloneChatInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void handleStandaloneChatSubmit(event as unknown as React.FormEvent<HTMLFormElement>);
+              }
+            }}
+            placeholder="输入你的问题..."
+            rows={1}
+            className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400"
+          />
+          <button
+            type="submit"
+            disabled={!standaloneChatInput.trim() || standaloneChatLoading}
+            className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            发送
+          </button>
+        </div>
+      </form>
     </div>
   );
 
