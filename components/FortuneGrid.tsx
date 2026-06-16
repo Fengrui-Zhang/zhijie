@@ -12,6 +12,7 @@ type Props = {
 
 type DimensionKey = 'overall' | 'career' | 'love' | 'wealth' | 'health' | 'social';
 type InterpretationMode = 'colloquial' | 'professional' | 'technical';
+type ShareMetric = { key: string; label: string; level: string; value: number; color: string };
 
 const SCORE_ITEMS: Array<{ key: DimensionKey; label: string; icon: string; color: string }> = [
   { key: 'overall', label: '综合运势', icon: '☆', color: 'text-orange-500' },
@@ -94,6 +95,150 @@ const asList = (value: unknown): string[] => {
   return [];
 };
 
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const getShareMetrics = (fortune: any): ShareMetric[] =>
+  SCORE_ITEMS.map((item) => {
+    const level = String(fortune?.[item.key] || '平');
+    return {
+      key: item.key,
+      label: item.label.replace('运势', '').replace('运', ''),
+      level,
+      value: Math.max(8, Math.min(100, Number(fortune?._chart?.[item.key]) || levelValue(level))),
+      color: level === '大吉' || level === '吉' || level === '中吉'
+        ? '#16a34a'
+        : level === '平'
+          ? '#d97706'
+          : '#dc2626',
+    };
+  });
+
+const buildShareSvg = ({
+  title,
+  subtitle,
+  lines,
+  metrics,
+  yi,
+  ji,
+}: {
+  title: string;
+  subtitle: string;
+  lines: string[];
+  metrics: ShareMetric[];
+  yi: string[];
+  ji: string[];
+}) => {
+  const width = 760;
+  const metricStartY = 160;
+  const lineHeight = 42;
+  const textStartY = metricStartY + metrics.length * lineHeight + 34;
+  const yiJiStartY = textStartY + Math.min(4, lines.length) * 34 + 30;
+  const height = Math.max(620, yiJiStartY + 112);
+
+  const metricRows = metrics.map((item, index) => {
+    const y = metricStartY + index * lineHeight;
+    const barWidth = Math.round(410 * (item.value / 100));
+    return `
+      <text x="72" y="${y + 17}" fill="#57534e" font-size="22" font-weight="600">${escapeXml(item.label)}</text>
+      <rect x="172" y="${y}" width="410" height="18" rx="9" fill="#f1eee9" />
+      <rect x="172" y="${y}" width="${barWidth}" height="18" rx="9" fill="${item.color}" />
+      <text x="614" y="${y + 17}" fill="${item.color}" font-size="22" font-weight="700" text-anchor="end">${escapeXml(item.level)}</text>
+    `;
+  }).join('');
+
+  const textLines = lines.slice(0, 4).map((line, index) => `
+    <text x="72" y="${textStartY + index * 34}" fill="#44403c" font-size="21">${escapeXml(line.slice(0, 34))}</text>
+  `).join('');
+
+  const yiLines = yi.slice(0, 3).map((item, index) => `
+    <text x="94" y="${yiJiStartY + 38 + index * 27}" fill="#047857" font-size="19">${escapeXml(item.slice(0, 12))}</text>
+  `).join('');
+  const jiLines = ji.slice(0, 3).map((item, index) => `
+    <text x="438" y="${yiJiStartY + 38 + index * 27}" fill="#b91c1c" font-size="19">${escapeXml(item.slice(0, 12))}</text>
+  `).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff7ed" />
+      <stop offset="52%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#1c1917" flood-opacity="0.14" />
+    </filter>
+  </defs>
+  <rect width="760" height="${height}" rx="34" fill="url(#bg)" />
+  <rect x="32" y="32" width="696" height="${height - 64}" rx="28" fill="#ffffff" opacity="0.72" stroke="#fde68a" filter="url(#shadow)" />
+  <text x="72" y="88" fill="#1c1917" font-size="34" font-weight="800">${escapeXml(title)}</text>
+  <text x="72" y="122" fill="#a16207" font-size="20" font-weight="600">${escapeXml(subtitle)}</text>
+  ${metricRows}
+  <line x1="72" y1="${textStartY - 24}" x2="688" y2="${textStartY - 24}" stroke="#f5e6c8" stroke-width="2" />
+  ${textLines}
+  <rect x="72" y="${yiJiStartY}" width="280" height="96" rx="18" fill="#ecfdf5" stroke="#bbf7d0" />
+  <text x="94" y="${yiJiStartY + 25}" fill="#047857" font-size="18" font-weight="800">宜</text>
+  ${yiLines}
+  <rect x="416" y="${yiJiStartY}" width="280" height="96" rx="18" fill="#fff1f2" stroke="#fecdd3" />
+  <text x="438" y="${yiJiStartY + 25}" fill="#b91c1c" font-size="18" font-weight="800">忌</text>
+  ${jiLines}
+  <line x1="72" y1="${height - 78}" x2="688" y2="${height - 78}" stroke="#f5e6c8" stroke-width="2" />
+  <text x="72" y="${height - 42}" fill="#a16207" font-size="18" font-weight="800">元分 · 智解</text>
+  <text x="688" y="${height - 42}" fill="#a8a29e" font-size="17" text-anchor="end">AI 命理运势卡片</text>
+</svg>`;
+};
+
+const downloadBlob = (filename: string, blob: Blob) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const downloadShareImage = async (baseFilename: string, svg: string) => {
+  const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    const loaded = new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = reject;
+    });
+    image.src = svgUrl;
+    await loaded;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth || 760;
+    canvas.height = image.naturalHeight || 760;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas unsupported');
+    context.drawImage(image, 0, 0);
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Image export failed'));
+      }, 'image/png', 0.95);
+    });
+    downloadBlob(`${baseFilename}.png`, pngBlob);
+  } catch {
+    downloadBlob(`${baseFilename}.svg`, svgBlob);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
+};
+
 const ChipList = ({ items, tone = 'neutral', limit }: { items: string[]; tone?: 'good' | 'bad' | 'neutral'; limit?: number }) => {
   const shown = typeof limit === 'number' ? items.slice(0, limit) : items;
   if (!shown.length) return <span className="text-sm text-stone-400">暂无</span>;
@@ -117,15 +262,24 @@ const ChipList = ({ items, tone = 'neutral', limit }: { items: string[]; tone?: 
 const ShareDialog = ({
   open,
   title,
+  subtitle,
   lines,
+  metrics,
+  yi = [],
+  ji = [],
   onClose,
 }: {
   open: boolean;
   title: string;
+  subtitle: string;
   lines: string[];
+  metrics: ShareMetric[];
+  yi?: string[];
+  ji?: string[];
   onClose: () => void;
 }) => {
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   if (!open) return null;
   const text = [title, ...lines].filter(Boolean).join('\n');
   const handleCopy = async () => {
@@ -137,25 +291,95 @@ const ShareDialog = ({
       setCopied(false);
     }
   };
+  const svg = buildShareSvg({ title, subtitle, lines, metrics, yi, ji });
+  const handleDownload = async () => {
+    await downloadShareImage(title.replace(/[^\u4e00-\u9fffA-Za-z0-9_-]+/g, '-'), svg);
+  };
+  const handleShare = async () => {
+    if (!navigator.share) {
+      await handleCopy();
+      return;
+    }
+    try {
+      await navigator.share({ title, text });
+      setShared(true);
+      window.setTimeout(() => setShared(false), 1600);
+    } catch {
+      setShared(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/30 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_90px_rgba(28,25,23,0.22)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/30 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_90px_rgba(28,25,23,0.22)]">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="text-lg font-bold text-stone-800">分享摘要</div>
           <button type="button" onClick={onClose} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-stone-500 hover:bg-stone-50">
             关闭
           </button>
         </div>
-        <div className="rounded-2xl border border-stone-100 bg-stone-50/80 p-4 text-sm leading-7 text-stone-700">
-          <div className="mb-2 text-base font-bold text-stone-900">{title}</div>
-          {lines.map((line) => (
-            <div key={line}>{line}</div>
-          ))}
+
+        <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
+          <div className="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5 shadow-sm">
+            <div className="text-center">
+              <div className="text-xl font-bold text-stone-900">{title}</div>
+              <div className="mt-1 text-sm font-semibold text-amber-700">{subtitle}</div>
+            </div>
+            <div className="mt-5 space-y-3">
+              {metrics.map((item) => (
+                <div key={item.key}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-stone-600">{item.label}</span>
+                    <span className="font-bold" style={{ color: item.color }}>{item.level}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+                    <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 rounded-2xl border border-amber-100 bg-white/70 p-3 text-xs leading-6 text-stone-600">
+              {lines.slice(0, 3).map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+            {(yi.length > 0 || ji.length > 0) && (
+              <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3">
+                  <div className="mb-1 font-bold text-emerald-700">宜</div>
+                  {yi.slice(0, 3).map((item) => <div key={item} className="truncate text-emerald-800">{item}</div>)}
+                </div>
+                <div className="rounded-2xl border border-red-100 bg-red-50/80 p-3">
+                  <div className="mb-1 font-bold text-red-600">忌</div>
+                  {ji.slice(0, 3).map((item) => <div key={item} className="truncate text-red-700">{item}</div>)}
+                </div>
+              </div>
+            )}
+            <div className="mt-5 flex items-center justify-between border-t border-amber-100 pt-3 text-xs">
+              <span className="font-bold text-amber-700">元分 · 智解</span>
+              <span className="text-stone-400">AI 命理运势卡片</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-stone-100 bg-stone-50/80 p-4 text-sm leading-7 text-stone-700">
+            <div className="mb-2 text-base font-bold text-stone-900">文字摘要</div>
+            {lines.map((line) => (
+              <div key={line}>{line}</div>
+            ))}
+          </div>
         </div>
-        <button type="button" onClick={handleCopy} className="mt-4 w-full rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-amber-200 transition hover:bg-stone-800">
-          {copied ? '已复制' : '复制摘要'}
-        </button>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <button type="button" onClick={handleDownload} className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-700 transition hover:bg-stone-50">
+            保存图片
+          </button>
+          <button type="button" onClick={handleShare} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100">
+            {shared ? '已分享' : '系统分享'}
+          </button>
+          <button type="button" onClick={handleCopy} className="rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-amber-200 transition hover:bg-stone-800">
+            {copied ? '已复制' : '复制摘要'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -512,6 +736,10 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         title={`${formatDateZh(currentDate)} 运势`}
+        subtitle={`流日 ${fortune.dayStem || ''}${fortune.dayBranch || ''} · 主神 ${fortune.tenGod || '—'}`}
+        metrics={getShareMetrics(fortune)}
+        yi={yi}
+        ji={ji}
         lines={[
           `综合：${fortune.overall || '平'}，主神：${fortune.tenGod || '—'}`,
           `事业：${fortune.career || '平'}，感情：${fortune.love || '平'}，财运：${fortune.wealth || '平'}`,
@@ -706,6 +934,10 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         title={`${year}年${month}月运势`}
+        subtitle={`流月 ${fortune.monthStem || ''}${fortune.monthBranch || ''} · 主运 ${fortune.tenGod || '—'}`}
+        metrics={getShareMetrics(fortune)}
+        yi={calendar.filter((item: any) => ['大吉', '吉', '中吉'].includes(String(item.level))).slice(0, 3).map((item: any) => `${item.day}日 ${item.level}`)}
+        ji={calendar.filter((item: any) => ['小凶', '凶'].includes(String(item.level))).slice(0, 3).map((item: any) => `${item.day}日 ${item.level}`)}
         lines={[
           `流月：${fortune.monthStem || ''}${fortune.monthBranch || ''}，主运十神：${fortune.tenGod || '—'}`,
           `综合：${fortune.overall || '平'}，事业：${fortune.career || '平'}，财运：${fortune.wealth || '平'}`,
