@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { useSession, signOut } from 'next-auth/react';
 import {
   DEFAULT_ANALYSIS_MODEL,
-  DOUBAO_SEED_PRO_MODEL,
+  DEFAULT_REASONING_MODEL,
   type AnalysisModel,
   type ChatModel,
 } from './lib/analysis-models';
@@ -167,7 +167,7 @@ const GUEST_CASE_RELATIONS_STORAGE_KEY = 'guest-divination-case-relations:v1';
 const GUEST_FORTUNE_LIMIT = 1;
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
-const KLINE_CHAT_MODEL: ChatModel = DOUBAO_SEED_PRO_MODEL;
+const KLINE_CHAT_MODEL: ChatModel = DEFAULT_REASONING_MODEL;
 
 const buildModelContent = (reasoning: string, answer: string) => {
   if (reasoning.trim()) {

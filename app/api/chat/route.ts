@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import {
-  DOUBAO_SEED_LITE_MODEL,
-  DOUBAO_SEED_PRO_MODEL,
-  isChatModel,
+  resolveChatModel,
 } from '../../../lib/analysis-models';
 import { prisma } from '../../../lib/prisma';
 import { formatKnowledgeContext, retrieveKnowledge } from '../../../utils/knowledge';
@@ -65,7 +63,7 @@ export async function POST(request: Request) {
   const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
   const stream = body.stream === true;
   const knowledge = body.knowledge as KnowledgeRequest | undefined;
-  const requestedModel = isChatModel(body.model) ? body.model : DOUBAO_SEED_LITE_MODEL;
+  const requestedModel = resolveChatModel(body.model);
 
   if (!messages || messages.length === 0) {
     return NextResponse.json(
@@ -114,24 +112,23 @@ export async function POST(request: Request) {
     }
   }
 
-  const apiKey = process.env.ARK_API_KEY;
+  const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ARK_API_KEY is missing.' },
+      { error: 'DEEPSEEK_API_KEY is missing.' },
       { status: 500 }
     );
   }
 
-  const apiUrl = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+  const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
+  const apiUrl = `${baseUrl}/chat/completions`;
   const requestBody: Record<string, unknown> = {
     model: requestedModel,
     messages: finalMessages,
     temperature,
     stream,
   };
-
-  requestBody.thinking = { type: 'enabled' };
 
   let response: Response;
   try {

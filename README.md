@@ -52,7 +52,7 @@
    `npm install`
 2. Set environment variables in `.env.local`:
    - `DEEPSEEK_API_KEY="your_deepseek_api_key"`
-   - `ARK_API_KEY="your_doubao_ark_api_key"`
+   - `DEEPSEEK_BASE_URL="https://api.deepseek.com"`
    - `EMBEDDING_PROVIDER="dashscope"`
    - `EMBEDDING_BASE_URL="https://dashscope.aliyuncs.com"`
    - `EMBEDDING_MODEL="text-embedding-v3"`
