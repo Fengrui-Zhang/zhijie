@@ -96,10 +96,10 @@ const ToggleButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
+    className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
       active
-        ? 'border-blue-500 bg-blue-500 text-white'
-        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+        ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+        : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75 hover:text-stone-900'
     }`}
   >
     {children}
@@ -157,10 +157,13 @@ export default function LifeReadingForm({
   };
 
   return (
-    <div className="mx-auto max-w-3xl rounded-lg border border-stone-200 bg-white p-5 shadow-sm md:p-6">
-      <div className="mb-5 text-center">
-        <h2 className="text-2xl font-bold text-stone-900">{modelLabel}排盘</h2>
-        <p className="mt-1 text-sm text-stone-500">填写出生信息，生成命盘后可继续请求 AI 解读</p>
+    <div className="mx-auto max-w-4xl rounded-[30px] border border-white/60 bg-white/35 p-5 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-6">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-5">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">出生信息</div>
+          <h2 className="mt-1 text-2xl font-bold text-stone-900">{modelLabel}排盘</h2>
+        </div>
+        <p className="text-sm text-stone-500">填写出生信息，生成命盘后可继续请求 AI 解读</p>
       </div>
 
       <div className="space-y-5">
@@ -171,7 +174,7 @@ export default function LifeReadingForm({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="请输入姓名"
-            className="w-full rounded-md border border-stone-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
+            className="glass-input w-full rounded-2xl px-4 py-3 text-sm outline-none"
           />
         </div>
 
@@ -194,7 +197,7 @@ export default function LifeReadingForm({
         </div>
 
         {calendarType === 'pillars' ? (
-          <div className="rounded-lg border border-stone-200 p-4">
+          <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
             <div className="mb-3 text-sm font-semibold text-stone-700">输入四柱</div>
             <div className="grid gap-3 md:grid-cols-4">
               {(['year', 'month', 'day', 'hour'] as const).map((key, index) => {
@@ -206,14 +209,14 @@ export default function LifeReadingForm({
                       <select
                         value={value.charAt(0)}
                         onChange={(event) => updatePillar(key, event.target.value, value.charAt(1) || '子')}
-                        className="rounded-md border border-stone-200 bg-white p-2 text-sm"
+                        className="glass-input glass-select rounded-2xl p-2.5 text-sm outline-none"
                       >
                         {STEMS.map((item) => <option key={item} value={item}>{item}</option>)}
                       </select>
                       <select
                         value={value.charAt(1)}
                         onChange={(event) => updatePillar(key, value.charAt(0) || '甲', event.target.value)}
-                        className="rounded-md border border-stone-200 bg-white p-2 text-sm"
+                        className="glass-input glass-select rounded-2xl p-2.5 text-sm outline-none"
                       >
                         {BRANCHES.map((item) => <option key={item} value={item}>{item}</option>)}
                       </select>
@@ -228,19 +231,19 @@ export default function LifeReadingForm({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="mb-1 block text-xs text-stone-500">年</label>
-                <select value={year} onChange={(event) => setYear(Number(event.target.value))} className="w-full rounded-md border border-stone-200 bg-white p-3 text-sm">
+                <select value={year} onChange={(event) => setYear(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {YEAR_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-stone-500">月</label>
-                <select value={month} onChange={(event) => setMonth(Number(event.target.value))} className="w-full rounded-md border border-stone-200 bg-white p-3 text-sm">
+                <select value={month} onChange={(event) => setMonth(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {MONTH_OPTIONS.map((item) => <option key={item} value={item}>{calendarType === 'lunar' ? LUNAR_MONTH_NAMES[item] : `${item}月`}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-stone-500">日</label>
-                <select value={Math.min(day, dayCount)} onChange={(event) => setDay(Number(event.target.value))} className="w-full rounded-md border border-stone-200 bg-white p-3 text-sm">
+                <select value={Math.min(day, dayCount)} onChange={(event) => setDay(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {days.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </div>
@@ -256,7 +259,7 @@ export default function LifeReadingForm({
             <button
               type="button"
               onClick={() => setTimeOpen(true)}
-              className="flex w-full items-center justify-between rounded-md border border-stone-200 px-4 py-3 text-left hover:bg-stone-50"
+              className="glass-chip flex w-full items-center justify-between rounded-2xl border border-white/60 px-4 py-3 text-left transition hover:bg-white/75"
             >
               <span className="font-semibold text-stone-800">出生时间</span>
               <span className="text-sm text-stone-500">{timeSummary}</span>
@@ -286,13 +289,13 @@ export default function LifeReadingForm({
 
       {timeOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4">
-          <div className="w-full max-w-3xl rounded-lg bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-stone-100 px-6 py-4">
+          <div className="glass-panel w-full max-w-3xl overflow-hidden rounded-[30px] shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
+            <div className="glass-panel-soft flex items-center justify-between border-b border-white/50 px-6 py-4">
               <div className="text-lg font-bold text-stone-900">出生时辰</div>
               <button type="button" onClick={() => setTimeOpen(false)} className="text-2xl leading-none text-stone-400 hover:text-stone-700">x</button>
             </div>
             <div className="space-y-6 p-6">
-              <div className="rounded-md border border-stone-200 p-4">
+              <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
                 <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
                 <input
                   type="time"
@@ -303,7 +306,7 @@ export default function LifeReadingForm({
                     setMinute(m);
                     setTimeInputMode('exact');
                   }}
-                  className="w-full rounded-md border border-stone-200 p-3 text-center font-mono text-lg"
+                  className="glass-input w-full rounded-2xl p-3 text-center font-mono text-lg outline-none"
                 />
               </div>
               <div>
@@ -324,8 +327,8 @@ export default function LifeReadingForm({
                           setTimeInputMode('quick');
                           setUseTrueSolar(false);
                         }}
-                        className={`rounded-md border px-2 py-3 text-center transition ${
-                          selected ? 'border-blue-500 bg-blue-500 text-white' : 'border-stone-200 text-stone-700 hover:bg-stone-50'
+                        className={`rounded-2xl border px-2 py-3 text-center transition ${
+                          selected ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75'
                         }`}
                       >
                         <div className="font-bold">{item.name}</div>
@@ -336,9 +339,9 @@ export default function LifeReadingForm({
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 border-t border-stone-100 p-4">
-              <button type="button" onClick={() => setTimeOpen(false)} className="rounded-md border border-stone-200 px-4 py-3 font-semibold text-stone-700">取消</button>
-              <button type="button" onClick={() => setTimeOpen(false)} className="rounded-md bg-blue-500 px-4 py-3 font-semibold text-white">确定</button>
+            <div className="grid grid-cols-2 gap-3 border-t border-white/50 p-4">
+              <button type="button" onClick={() => setTimeOpen(false)} className="glass-chip rounded-2xl border border-white/60 px-4 py-3 font-semibold text-stone-700">取消</button>
+              <button type="button" onClick={() => setTimeOpen(false)} className="glass-cta rounded-2xl px-4 py-3 font-semibold text-amber-200">确定</button>
             </div>
           </div>
         </div>

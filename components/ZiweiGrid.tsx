@@ -60,11 +60,11 @@ const ganzhiYear = (year: number) => {
 const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
 const Star = ({ star, type }: { star: { 星名: string; 亮度?: string; 四化?: string }; type: 'major' | 'minor' | 'misc' }) => {
-  const color = type === 'major' ? 'text-blue-600' : type === 'minor' ? 'text-rose-500' : 'text-stone-500';
+  const color = type === 'major' ? 'text-blue-700' : type === 'minor' ? 'text-rose-600' : 'text-stone-500';
   return (
     <span className={`mr-1 inline-flex items-center gap-0.5 text-xs font-semibold ${color}`}>
       {star.星名}
-      {star.四化 && <span className="rounded bg-amber-100 px-0.5 text-[10px] text-amber-700">{star.四化}</span>}
+      {star.四化 && <span className="rounded bg-amber-100/90 px-0.5 text-[10px] text-amber-700">{star.四化}</span>}
       {star.亮度 && <span className="text-[10px] text-stone-400">{star.亮度}</span>}
     </span>
   );
@@ -78,6 +78,28 @@ const FlowBadge = ({ label, value, className }: { label: string; value?: string;
     </span>
   );
 };
+
+const CycleButton = ({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`shrink-0 rounded-2xl border px-3 py-2 text-center transition ${
+      active
+        ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_14px_30px_rgba(28,25,23,0.18)]'
+        : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+    }`}
+  >
+    {children}
+  </button>
+);
 
 const PalaceCard = ({
   palace,
@@ -95,23 +117,23 @@ const PalaceCard = ({
   onClick: () => void;
 }) => {
   const highlight = selected
-    ? 'border-blue-500 bg-blue-50 shadow-sm'
+    ? 'border-amber-300 bg-amber-50/75 shadow-[0_14px_34px_rgba(245,158,11,0.14)]'
     : square
-      ? 'border-green-400 bg-green-50'
+      ? 'border-emerald-300 bg-emerald-50/60'
       : flowTypes.length
         ? 'border-purple-300 bg-purple-50/60'
-        : 'border-stone-200 bg-stone-50 hover:bg-white';
+        : 'border-white/60 bg-white/35 hover:bg-white/65';
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex min-h-[132px] flex-col rounded-lg border-2 p-2 text-left transition ${highlight}`}
+      className={`relative flex min-h-[132px] flex-col rounded-2xl border p-2.5 text-left transition backdrop-blur-xl ${highlight}`}
     >
       <div className="mb-1 flex items-center justify-between">
         <div className="text-sm font-bold text-stone-900">
           {palace.宫位}
           {palace.是否身宫 === '是' && <span className="ml-1 rounded bg-orange-100 px-1 py-0.5 text-[10px] text-orange-600">身宫</span>}
-          {palace.是否来因宫 === '是' && <span className="ml-1 rounded bg-blue-100 px-1 py-0.5 text-[10px] text-blue-600">来因宫</span>}
+          {palace.是否来因宫 === '是' && <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-700">来因宫</span>}
         </div>
         <div className="text-xs text-stone-500">{palace.干支}</div>
       </div>
@@ -121,7 +143,7 @@ const PalaceCard = ({
         {showMisc && (palace.杂曜 || []).map((star, index) => <Star key={`x-${index}`} star={star} type="misc" />)}
       </div>
       {flowTypes.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1 border-t border-stone-200/70 pt-1">
+        <div className="mt-1 flex flex-wrap gap-1 border-t border-white/60 pt-1">
           {flowTypes.includes('decadal') && <FlowBadge label="限" value="" className="bg-purple-100 text-purple-600" />}
           {flowTypes.includes('yearly') && <FlowBadge label="年" value="" className="bg-blue-100 text-blue-600" />}
           {flowTypes.includes('monthly') && <FlowBadge label="月" value="" className="bg-green-100 text-green-600" />}
@@ -229,13 +251,17 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
   const palaceByBranch = (index: number) => palaces.find((item) => branchIndex(item.干支?.slice(-1) || '') === index);
 
   if (!canonical) {
-    return <div className="mx-auto my-6 max-w-3xl rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-500">紫微排盘数据格式异常</div>;
+    return <div className="glass-panel-soft mx-auto my-6 max-w-3xl rounded-[28px] border border-white/60 p-4 text-sm text-stone-500">紫微排盘数据格式异常</div>;
   }
 
   return (
-    <div className="mx-auto my-6 w-full max-w-6xl rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex justify-end gap-2">
-        <button type="button" onClick={() => setShowMisc((value) => !value)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600">
+    <div className="mx-auto my-6 w-full max-w-6xl rounded-[30px] border border-white/60 bg-white/35 p-4 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">紫微斗数</div>
+          <h3 className="mt-1 text-2xl font-bold text-stone-900">{data.base_info.name || '命盘'}（{data.base_info.sex || '—'}）</h3>
+        </div>
+        <button type="button" onClick={() => setShowMisc((value) => !value)} className="glass-chip rounded-2xl border border-white/60 px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-white/75">
           {showMisc ? '隐藏杂曜' : '显示杂曜'}
         </button>
       </div>
@@ -246,7 +272,7 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
             if (rowIndex === 1 && colIndex === 1) {
               const pillars = String(basic.四柱 || '').split(/\s+/);
               return (
-                <div key="center" className="col-span-2 row-span-2 flex flex-col justify-center rounded-lg border border-stone-200 bg-white p-3 text-center">
+                <div key="center" className="glass-panel-soft col-span-2 row-span-2 flex flex-col justify-center rounded-2xl border border-white/60 p-3 text-center">
                   <div className="mb-3 grid grid-cols-4 gap-2 text-xs">
                     {['年柱', '月柱', '日柱', '时柱'].map((label, index) => {
                       const value = pillars[index] || data.base_info.gongli?.split(' ')[index] || '';
@@ -261,18 +287,18 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
                       );
                     })}
                   </div>
-                  <div className="border-t border-stone-100 py-2 text-sm text-stone-700">
+                  <div className="border-t border-white/60 py-2 text-sm text-stone-700">
                     <div>阳历 {basic.阳历 || data.base_info.gongli}</div>
                     <div>农历 {basic.农历 || data.base_info.nongli}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>命主：<span className="font-bold text-purple-600">{basic.命主 || data.base_info.mingzhu}</span></div>
                     <div>身主：<span className="font-bold">{basic.身主 || data.base_info.shenzhu}</span></div>
-                    <div>命宫：<span className="text-blue-600">{data.base_info.minggong}</span></div>
+                    <div>命宫：<span className="text-amber-700">{data.base_info.minggong}</span></div>
                     <div>身宫：<span className="text-orange-500">{data.base_info.shengong}</span></div>
                   </div>
-                  {basic.真太阳时 && <div className="mt-2 text-xs text-blue-600">真太阳时 {basic.真太阳时.真太阳时}</div>}
-                  <div className="mt-2"><span className="rounded bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-600">{basic.五行局 || data.base_info.mingju}</span></div>
+                  {basic.真太阳时 && <div className="mt-2 text-xs text-amber-700">真太阳时 {basic.真太阳时.真太阳时}</div>}
+                  <div className="mt-2"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{basic.五行局 || data.base_info.mingju}</span></div>
                 </div>
               );
             }
@@ -295,21 +321,21 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
         }))}
       </div>
 
-      <div className="mt-5 space-y-4 border-t border-stone-100 pt-4">
+      <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
         <section>
           <div className="mb-2 text-sm font-bold text-stone-800">大限</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {decadalList.map((item) => (
-              <button key={item.index} type="button" onClick={() => {
+              <CycleButton key={item.index} active={selectedDecadalIndex === item.index} onClick={() => {
                 setSelectedDecadalIndex((current) => current === item.index ? null : item.index);
                 setSelectedYear(null);
                 setSelectedMonth(null);
                 setSelectedDay(null);
-              }} className={`shrink-0 rounded-lg border px-3 py-2 text-center ${selectedDecadalIndex === item.index ? 'border-blue-500 bg-blue-500 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+              }}>
                 <div className="text-xs">{item.palace.宫位}</div>
                 <div className="text-sm font-bold">{item.ganZhi}</div>
                 <div className="text-[10px] opacity-70">{item.startAge}-{item.endAge}岁</div>
-              </button>
+              </CycleButton>
             ))}
           </div>
         </section>
@@ -319,14 +345,14 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
             <div className="mb-2 text-sm font-bold text-stone-800">流年</div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {yearlyList.map((item) => (
-                <button key={item.year} type="button" onClick={() => {
+                <CycleButton key={item.year} active={selectedYear === item.year} onClick={() => {
                   setSelectedYear((current) => current === item.year ? null : item.year);
                   setSelectedMonth(null);
                   setSelectedDay(null);
-                }} className={`shrink-0 rounded-lg border px-3 py-2 text-center ${selectedYear === item.year ? 'border-blue-500 bg-blue-500 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+                }}>
                   <div className="text-xs">{item.year}</div>
                   <div className="text-sm font-bold">{item.ganZhi}</div>
-                </button>
+                </CycleButton>
               ))}
             </div>
           </section>
@@ -337,13 +363,13 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
             <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年流月</div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {monthlyList.map((item) => (
-                <button key={item.month} type="button" onClick={() => {
+                <CycleButton key={item.month} active={selectedMonth === item.month} onClick={() => {
                   setSelectedMonth((current) => current === item.month ? null : item.month);
                   setSelectedDay(null);
-                }} className={`shrink-0 rounded-lg border px-3 py-2 text-center ${selectedMonth === item.month ? 'border-blue-500 bg-blue-500 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+                }}>
                   <div className="text-xs">{item.month}月</div>
                   <div className="text-sm font-bold">{item.ganZhi || '-'}</div>
-                </button>
+                </CycleButton>
               ))}
             </div>
           </section>
@@ -354,10 +380,10 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
             <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年{selectedMonth}月流日</div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {dailyList.map((item) => (
-                <button key={item.day} type="button" onClick={() => setSelectedDay((current) => current === item.day ? null : item.day)} className={`shrink-0 rounded-lg border px-3 py-2 text-center ${selectedDay === item.day ? 'border-blue-500 bg-blue-500 text-white' : 'border-stone-200 bg-white text-stone-700'}`}>
+                <CycleButton key={item.day} active={selectedDay === item.day} onClick={() => setSelectedDay((current) => current === item.day ? null : item.day)}>
                   <div className="text-xs">{item.day}日</div>
                   <div className="text-sm font-bold">{item.ganZhi || '-'}</div>
-                </button>
+                </CycleButton>
               ))}
             </div>
           </section>

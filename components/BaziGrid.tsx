@@ -35,10 +35,10 @@ const ChipButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`shrink-0 rounded-lg border px-3 py-2 text-center transition ${
+    className={`shrink-0 rounded-2xl border px-3 py-2 text-center transition ${
       active
-        ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
-        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+        ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_14px_30px_rgba(28,25,23,0.18)]'
+        : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75 hover:text-stone-900'
     }`}
   >
     {children}
@@ -197,24 +197,29 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
   };
 
   return (
-    <div className="mx-auto my-5 w-full max-w-5xl rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 text-center">
-        <h3 className="text-lg font-bold text-stone-900">{base_info.name}（{base_info.sex}）</h3>
-        <p className="text-xs text-stone-500">{base_info.gongli}{base_info.nongli ? ` · ${base_info.nongli}` : ''}</p>
-        <p className="mt-1 text-xs text-stone-500">起运：{base_info.qiyun || '—'}</p>
-        {base_info.zhen && <p className="mt-1 text-xs text-blue-600">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</p>}
+    <div className="mx-auto my-5 w-full max-w-6xl rounded-[30px] border border-white/60 bg-white/35 p-4 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">四柱八字</div>
+          <h3 className="mt-1 text-2xl font-bold text-stone-900">{base_info.name}（{base_info.sex}）</h3>
+        </div>
+        <div className="text-right text-xs leading-6 text-stone-500">
+          <div>{base_info.gongli}{base_info.nongli ? ` · ${base_info.nongli}` : ''}</div>
+          <div>起运：{base_info.qiyun || '—'}</div>
+          {base_info.zhen && <div className="text-amber-700">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</div>}
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-stone-100 bg-white">
+      <div className="glass-panel-soft overflow-x-auto rounded-[26px] border border-white/60">
         <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0 text-center">
           <thead>
             <tr>
-              <th className="w-20 border-b border-stone-100 bg-stone-50 p-3 text-xs font-semibold text-stone-400">四柱</th>
+              <th className="w-20 border-b border-white/60 bg-white/35 p-3 text-xs font-semibold text-stone-400">四柱</th>
               {tableColumns.map((column) => (
                 <th
                   key={column.key}
-                  className={`border-b border-l border-stone-100 p-3 ${
-                    column.kind === 'flow' ? 'bg-blue-50/70 text-blue-700' : 'bg-stone-50 text-stone-800'
+                  className={`border-b border-l border-white/60 p-3 ${
+                    column.kind === 'flow' ? 'bg-amber-50/70 text-amber-800' : 'bg-white/35 text-stone-800'
                   }`}
                 >
                   <div className="text-base font-bold">{column.title}</div>
@@ -226,12 +231,12 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
           <tbody>
             {rowLabels.map((row) => (
               <tr key={row}>
-                <th className="border-b border-stone-100 bg-stone-50 p-3 text-xs font-semibold text-stone-500">{row}</th>
+                <th className="border-b border-white/60 bg-white/30 p-3 text-xs font-semibold text-stone-500">{row}</th>
                 {tableColumns.map((column) => {
                   const content = column.values[row as keyof typeof column.values] || '—';
                   const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
                   return (
-                    <td key={`${row}-${column.key}`} className="border-b border-l border-stone-100 p-3 align-middle">
+                    <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-3 align-middle">
                       <div
                         className={`mx-auto max-w-[150px] whitespace-normal break-keep text-center leading-5 ${
                           row === '天干' || row === '地支' ? `text-3xl font-bold ${colorClass}` : 'text-xs text-stone-700'
@@ -248,7 +253,7 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         </table>
       </div>
 
-      <div className="mt-5 space-y-4 border-t border-stone-100 pt-4">
+      <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
         <section>
           <div className="mb-2 text-sm font-bold text-stone-800">大运</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
