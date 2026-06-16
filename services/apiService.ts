@@ -60,32 +60,12 @@ export const fetchQimen = async (params: QimenParams) => {
 
 // --- 2. Bazi ---
 export const fetchBazi = async (params: BaseParams) => {
-  return fetchChart<BaziResponse>(ModelType.BAZI, {
-    name: params.name || '匿名',
-    sex: params.sex,
-    year: params.year,
-    month: params.month,
-    day: params.day,
-    hours: params.hours,
-    minute: params.minute,
-    province: params.province || '',
-    city: params.city || ''
-  });
+  return fetchChart<BaziResponse>(ModelType.BAZI, { ...params, name: params.name || '匿名' });
 };
 
 // --- 3. Ziwei ---
 export const fetchZiwei = async (params: BaseParams) => {
-  return fetchChart<ZiweiResponse>(ModelType.ZIWEI, {
-    name: params.name || '匿名',
-    sex: params.sex,
-    year: params.year,
-    month: params.month,
-    day: params.day,
-    hours: params.hours,
-    minute: params.minute,
-    province: params.province || '',
-    city: params.city || ''
-  });
+  return fetchChart<ZiweiResponse>(ModelType.ZIWEI, { ...params, name: params.name || '匿名' });
 };
 
 const buildModePayload = (params: BaseParams) => {

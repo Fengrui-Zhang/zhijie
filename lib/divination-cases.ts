@@ -16,7 +16,27 @@ export type CaseChartParams = {
   minute?: number;
   province?: string;
   city?: string;
+  district?: string;
+  birthPlace?: string;
+  longitude?: number;
+  latitude?: number;
+  useTrueSolar?: boolean;
+  timeInputMode?: 'exact' | 'quick';
+  calendarType?: 'solar' | 'lunar' | 'pillars';
+  isLeapMonth?: boolean;
+  pillars?: {
+    year: string;
+    month: string;
+    day: string;
+    hour: string;
+  };
   specialTags?: string[];
+  professionalFeature?: string;
+  sourceModelType?: string;
+  compatibilityChartData?: any;
+  rechartSource?: string;
+  rechartAt?: string;
+  rechartVersion?: number;
 };
 
 export interface CaseSessionItem {
@@ -66,6 +86,46 @@ const toText = (value: unknown) => {
   return trimmed || undefined;
 };
 
+const toBoolean = (value: unknown) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    if (value === 'true' || value === '1') return true;
+    if (value === 'false' || value === '0') return false;
+  }
+  return undefined;
+};
+
+const toFiniteNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const toCalendarType = (value: unknown): CaseChartParams['calendarType'] => {
+  if (value === 'solar' || value === 'lunar' || value === 'pillars') return value;
+  return undefined;
+};
+
+const toTimeInputMode = (value: unknown): CaseChartParams['timeInputMode'] => {
+  if (value === 'exact' || value === 'quick') return value;
+  return undefined;
+};
+
+const toPillars = (value: unknown): CaseChartParams['pillars'] => {
+  if (!value || typeof value !== 'object') return undefined;
+  const input = value as Record<string, unknown>;
+  const year = toText(input.year);
+  const month = toText(input.month);
+  const day = toText(input.day);
+  const hour = toText(input.hour);
+  if (!year || !month || !day || !hour) return undefined;
+  return { year, month, day, hour };
+};
+
 export const normalizeInitialAnalysisData = (value: unknown): InitialAnalysisData | null => {
   if (!value || typeof value !== 'object') return null;
   const input = value as Record<string, unknown>;
@@ -87,7 +147,7 @@ export const normalizeCaseChartParams = (value: unknown): CaseChartParams => {
   const specialTags = Array.isArray(input.specialTags)
     ? input.specialTags.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : undefined;
-  return {
+  const result: CaseChartParams = {
     name: toText(input.name),
     sex: toNumber(input.sex),
     year: toNumber(input.year),
@@ -97,7 +157,32 @@ export const normalizeCaseChartParams = (value: unknown): CaseChartParams => {
     minute: toNumber(input.minute),
     province: toText(input.province),
     city: toText(input.city),
+    district: toText(input.district),
+    birthPlace: toText(input.birthPlace),
+    longitude: toFiniteNumber(input.longitude),
+    latitude: toFiniteNumber(input.latitude),
+    useTrueSolar: toBoolean(input.useTrueSolar),
+    timeInputMode: toTimeInputMode(input.timeInputMode),
+    calendarType: toCalendarType(input.calendarType),
+    isLeapMonth: toBoolean(input.isLeapMonth),
+    pillars: toPillars(input.pillars),
     specialTags,
+    professionalFeature: toText(input.professionalFeature),
+    sourceModelType: toText(input.sourceModelType),
+    compatibilityChartData: input.compatibilityChartData,
+    rechartSource: toText(input.rechartSource),
+    rechartAt: toText(input.rechartAt),
+    rechartVersion: toNumber(input.rechartVersion),
+  };
+
+  Object.keys(result).forEach((key) => {
+    if (result[key as keyof CaseChartParams] === undefined) {
+      delete result[key as keyof CaseChartParams];
+    }
+  });
+
+  return {
+    ...result,
   };
 };
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '../../../../lib/auth';
 import { backfillDivinationCases } from '../../../../lib/case-migration';
 import {
@@ -180,7 +181,7 @@ export async function PUT(
     where: { id },
     data: {
       title: title || buildCaseTitle(existing.modelType, chartParams),
-      chartParams,
+      chartParams: chartParams as Prisma.InputJsonValue,
       chartData,
       klineData,
       initialAnalysisData,

@@ -15,6 +15,7 @@ dist-ssr
 *.local
 .next
 app/generated
+backups/
 
 # Editor directories and files
 .vscode/*

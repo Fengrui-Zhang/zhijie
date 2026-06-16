@@ -7,6 +7,7 @@ import {
   normalizeCaseChartParams,
 } from '../../../lib/divination-cases';
 import { prisma } from '../../../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       modelType,
       title: title || buildCaseTitle(modelType, chartParams),
-      chartParams,
+      chartParams: chartParams as Prisma.InputJsonValue,
       chartData,
       klineData,
       initialAnalysisData,
