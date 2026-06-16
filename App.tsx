@@ -691,7 +691,7 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
 );
 
 type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
-type SettingsWorkspaceTab = 'profile' | 'general' | 'security';
+type SettingsWorkspaceTab = 'profile' | 'general' | 'charts' | 'knowledge' | 'help' | 'security';
 
 const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
   records: '/records',
@@ -714,9 +714,12 @@ const SETTINGS_WORKSPACE_TABS: Array<{
   icon: string;
   description: string;
 }> = [
-  { id: 'profile', label: '账户', group: '账户', icon: '人', description: '昵称、邮箱与额度' },
-  { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与使用偏好' },
-  { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号管理' },
+  { id: 'profile', label: '我的', group: '账户', icon: '人', description: '账户与额度' },
+  { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与记录' },
+  { id: 'charts', label: '命盘', group: '资料', icon: '盘', description: '八字与紫微信息' },
+  { id: 'knowledge', label: '知识参考', group: '资料', icon: '书', description: '问答引用设置' },
+  { id: 'help', label: '帮助', group: '支持', icon: '？', description: '使用规则说明' },
+  { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号' },
 ];
 
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
@@ -2018,7 +2021,7 @@ const App: React.FC<AppProps> = ({
   }, [hydrateFortuneCaseOptions, modelType]);
 
   useEffect(() => {
-    if (workspaceView !== 'chat') return;
+    if (workspaceView !== 'chat' && workspaceView !== 'settings') return;
     hydrateStandaloneCaseOptions();
   }, [hydrateStandaloneCaseOptions, workspaceView]);
 
@@ -6728,6 +6731,91 @@ const App: React.FC<AppProps> = ({
     </nav>
   );
 
+  const renderMobileQuickNav = () => (
+    <div className="mb-4 rounded-[24px] border border-white/65 bg-white/58 p-3 shadow-[0_18px_42px_rgba(28,25,23,0.10)] backdrop-blur-xl xl:hidden">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-[11px] font-bold tracking-[0.18em] text-stone-400">常用入口</div>
+        <select
+          value=""
+          onChange={(event) => {
+            const value = event.target.value;
+            if (!value) return;
+            if (value.startsWith('model:')) {
+              handleModelChange(value.replace('model:', '') as ModelType);
+            } else if (value.startsWith('workspace:')) {
+              navigateWorkspace(value.replace('workspace:', '') as Exclude<WorkspaceView, 'divination'>);
+            } else if (value.startsWith('professional:')) {
+              openProfessionalFeature(value.replace('professional:', ''));
+            }
+            event.currentTarget.value = '';
+          }}
+          className="rounded-full border border-stone-200 bg-white/75 px-3 py-1.5 text-xs font-semibold text-stone-600 outline-none"
+          aria-label="更多功能"
+        >
+          <option value="">更多功能</option>
+          <option value={`model:${ModelType.LIUYAO}`}>六爻纳甲</option>
+          <option value={`model:${ModelType.MEIHUA}`}>梅花易数</option>
+          <option value={`model:${ModelType.DALIUREN}`}>大六壬</option>
+          <option value={`model:${ModelType.TAIYI}`}>太乙神数</option>
+          <option value={`model:${ModelType.XIAOLIUREN}`}>小六壬</option>
+          <option value={`model:${ModelType.ALMANAC}`}>黄历/择日</option>
+          <option value={`professional:${PROFESSIONAL_FEATURE_JOINT}`}>八字+紫微联合分析</option>
+          <option value={`professional:${PROFESSIONAL_FEATURE_BAZI_COMPAT}`}>八字合盘</option>
+          <option value="workspace:settings">设置</option>
+        </select>
+      </div>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+        {[
+          { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
+          { id: ModelType.ZIWEI, label: '紫微', action: () => handleModelChange(ModelType.ZIWEI), active: modelType === ModelType.ZIWEI && workspaceView === 'divination' },
+          { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
+          { id: ModelType.MONTHLY_FORTUNE, label: '月运', action: () => handleModelChange(ModelType.MONTHLY_FORTUNE), active: modelType === ModelType.MONTHLY_FORTUNE && workspaceView === 'divination' },
+          { id: ModelType.QIMEN, label: '奇门', action: () => handleModelChange(ModelType.QIMEN), active: modelType === ModelType.QIMEN && workspaceView === 'divination' },
+          { id: 'records', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
+          { id: 'chat', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={item.action}
+            className={`rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${
+              item.active
+                ? 'glass-panel-dark border-transparent text-amber-200'
+                : 'border-white/70 bg-white/55 text-stone-600 hover:bg-white'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderMobileBottomNav = () => (
+    <nav className="fixed inset-x-3 bottom-3 z-20 rounded-[24px] border border-white/70 bg-white/78 p-2 shadow-[0_18px_48px_rgba(28,25,23,0.18)] backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
+      <div className="grid grid-cols-5 gap-1">
+        {[
+          { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
+          { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
+          { id: ModelType.QIMEN, label: '奇门', action: () => handleModelChange(ModelType.QIMEN), active: modelType === ModelType.QIMEN && workspaceView === 'divination' },
+          { id: 'records-bottom', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
+          { id: 'chat-bottom', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={item.action}
+            className={`rounded-2xl px-2 py-2 text-xs font-bold transition ${
+              item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+
   const getRecordCategory = (item: SessionItem): 'life' | 'forecast' | 'fortune' | 'tool' | 'chat' => {
     if (item.modelType === 'chat') return 'chat';
     if ([ModelType.BAZI, ModelType.ZIWEI].includes(item.modelType as ModelType)) return 'life';
@@ -7353,6 +7441,173 @@ const App: React.FC<AppProps> = ({
             </div>
           )}
 
+          {settingsWorkspaceTab === 'charts' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-lg font-bold text-stone-800">我的命盘</div>
+                  <div className="mt-1 text-sm text-stone-500">集中查看八字和紫微命例，日运、月运会优先使用这里的八字命例。</div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange(ModelType.BAZI)}
+                    className="glass-chip rounded-2xl px-4 py-2 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                  >
+                    新增八字
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange(ModelType.ZIWEI)}
+                    className="glass-chip rounded-2xl px-4 py-2 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                  >
+                    新增紫微
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  ['全部命例', standaloneCaseOptions.length],
+                  ['八字命例', standaloneCaseOptions.filter((item) => item.modelType === ModelType.BAZI).length],
+                  ['紫微命例', standaloneCaseOptions.filter((item) => item.modelType === ModelType.ZIWEI).length],
+                ].map(([label, count]) => (
+                  <div key={label} className="rounded-2xl border border-white/65 bg-white/60 p-4">
+                    <div className="text-xs text-stone-400">{label}</div>
+                    <div className="mt-2 text-2xl font-bold text-stone-800">{count}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-hidden rounded-3xl border border-white/65 bg-white/55">
+                {standaloneCaseOptions.length === 0 ? (
+                  <div className="px-5 py-10 text-center">
+                    <div className="text-base font-bold text-stone-700">暂无命例</div>
+                    <div className="mt-2 text-sm text-stone-500">先新增八字或紫微命例，再使用运势和联合分析。</div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-stone-100">
+                    {standaloneCaseOptions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          handleModelChange(item.modelType as ModelType);
+                          setTimeout(() => void loadCaseDetail(item.id), 80);
+                        }}
+                        className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-white/70"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="truncate text-sm font-bold text-stone-800">{getCaseDisplayName(item)}</span>
+                            <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                              {getCaseModelDisplayLabel(item.modelType)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-stone-400">
+                            更新：{formatSessionDate(item.updatedAt || item.createdAt)}
+                          </div>
+                        </div>
+                        <span className="rounded-full border border-stone-200 bg-white/70 px-3 py-1 text-xs font-semibold text-stone-500">
+                          打开
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {settingsWorkspaceTab === 'knowledge' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-lg font-bold text-stone-800">知识参考</div>
+                <div className="mt-1 text-sm text-stone-500">控制问答是否参考内置资料。开关只影响 AI 提问，不影响排盘。</div>
+              </div>
+              <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl border border-white/65 bg-white/58">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">排盘问答参考古籍</div>
+                    <div className="mt-1 text-xs text-stone-400">八字、奇门等支持携带内置资料片段。</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={useKnowledge}
+                    onClick={() => setUseKnowledge((current) => !current)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      useKnowledge ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {useKnowledge ? '已开启' : '已关闭'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">独立聊天参考资料</div>
+                    <div className="mt-1 text-xs text-stone-400">新聊天中可选择四柱八字或奇门遁甲资料。</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={standaloneChatUseKnowledge}
+                    onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      standaloneChatUseKnowledge ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {standaloneChatUseKnowledge ? '已开启' : '已关闭'}
+                  </button>
+                </div>
+                <div className="px-5 py-4">
+                  <div className="text-sm font-bold text-stone-700">默认资料方向</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      ['bazi', '四柱八字'],
+                      ['qimen', '奇门遁甲'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setStandaloneChatKnowledgeBoard(value as 'bazi' | 'qimen')}
+                        className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                          standaloneChatKnowledgeBoard === value
+                            ? 'glass-panel-dark border-transparent text-amber-200'
+                            : 'border-stone-200 bg-white/65 text-stone-600 hover:bg-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsWorkspaceTab === 'help' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-lg font-bold text-stone-800">帮助</div>
+                <div className="mt-1 text-sm text-stone-500">常见使用规则和记录逻辑。</div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  ['排盘是否消耗额度？', '不消耗。只有主动请求 AI 解读、重新分析或追问时才消耗额度。'],
+                  ['为什么记录里没有刚看的盘？', '只浏览排盘不会保存历史；发生 AI 对话后才会进入记录。'],
+                  ['日运和月运如何选择命例？', '它们会读取已保存的八字命例，可在页面顶部切换命主。'],
+                  ['如何让回答带盘面？', '在排盘结果页直接提问，系统会自动携带当前盘面上下文。'],
+                ].map(([title, content]) => (
+                  <div key={title} className="rounded-3xl border border-white/65 bg-white/58 p-5">
+                    <div className="text-sm font-bold text-stone-800">{title}</div>
+                    <div className="mt-2 text-sm leading-7 text-stone-500">{content}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {settingsWorkspaceTab === 'security' && (
             <div className="space-y-5">
               <div>
@@ -7924,6 +8179,8 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
+      {renderMobileBottomNav()}
+
       <div className="flex flex-1 overflow-hidden min-h-0">
         <div className="hidden xl:block fixed left-3 top-[106px] z-10">
           {renderModuleNavigation(false)}
@@ -7951,10 +8208,8 @@ const App: React.FC<AppProps> = ({
             : undefined
         }
       >
-        <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-6">
-        <div className="xl:hidden">
-          {renderModuleNavigation(true)}
-        </div>
+        <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
+        {renderMobileQuickNav()}
         {workspaceView === 'records' && renderRecordsWorkspace()}
         {workspaceView === 'chat' && renderChatWorkspace()}
         {workspaceView === 'settings' && renderSettingsWorkspace()}
