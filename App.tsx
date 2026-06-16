@@ -722,6 +722,33 @@ const SETTINGS_WORKSPACE_TABS: Array<{
   { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号' },
 ];
 
+const KNOWLEDGE_REFERENCE_BOARDS = [
+  {
+    id: 'bazi',
+    title: '四柱八字资料',
+    status: '已接入',
+    file: 'data/index/bazi.json',
+    coverage: ['四柱八字问答', '八字命例分析', '独立聊天'],
+    description: '用于补充十神、格局、用神、断语等传统资料片段。',
+  },
+  {
+    id: 'qimen',
+    title: '奇门遁甲资料',
+    status: '已接入',
+    file: 'data/index/qimen.json',
+    coverage: ['奇门遁甲问答', '占卜追问', '独立聊天'],
+    description: '用于补充九宫、八门、九星、神盘和断局依据。',
+  },
+  {
+    id: 'planned',
+    title: '待补充资料',
+    status: '待建索引',
+    file: 'data/knowledge/liuyao、meihua、ziweidoushu',
+    coverage: ['六爻纳甲', '梅花易数', '紫微斗数'],
+    description: '目录已预留，后续补充文本并生成索引后可进入检索。',
+  },
+];
+
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
   [LiuyaoMode.AUTO, '时间起卦'],
   [LiuyaoMode.CUSTOM_TIME, '指定时间'],
@@ -7696,6 +7723,46 @@ const App: React.FC<AppProps> = ({
                 <div className="text-lg font-bold text-stone-800">知识参考</div>
                 <div className="mt-1 text-sm text-stone-500">控制问答是否参考内置资料。开关只影响 AI 提问，不影响排盘。</div>
               </div>
+
+              <div className="grid gap-3 lg:grid-cols-3">
+                {KNOWLEDGE_REFERENCE_BOARDS.map((board) => {
+                  const active = board.status === '已接入';
+                  return (
+                    <div
+                      key={board.id}
+                      className={`rounded-3xl border p-5 ${
+                        active
+                          ? 'border-emerald-100 bg-emerald-50/45'
+                          : 'border-stone-200 bg-white/50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-stone-800">{board.title}</div>
+                          <div className="mt-1 text-xs leading-6 text-stone-500">{board.description}</div>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                          active ? 'bg-emerald-100 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                        }`}>
+                          {board.status}
+                        </span>
+                      </div>
+                      <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-400">索引</div>
+                      <div className="mt-1 truncate rounded-2xl border border-white/70 bg-white/62 px-3 py-2 text-xs font-medium text-stone-500">
+                        {board.file}
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {board.coverage.map((item) => (
+                          <span key={item} className="rounded-full border border-white/70 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl border border-white/65 bg-white/58">
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
@@ -7751,6 +7818,23 @@ const App: React.FC<AppProps> = ({
                         {label}
                       </button>
                     ))}
+                  </div>
+                </div>
+                <div className="px-5 py-4">
+                  <div className="text-sm font-bold text-stone-700">引用展示规则</div>
+                  <div className="mt-3 grid gap-3 text-sm leading-7 text-stone-600 md:grid-cols-3">
+                    <div className="rounded-2xl border border-white/65 bg-white/56 p-4">
+                      <div className="font-bold text-stone-700">检索</div>
+                      <div className="mt-1 text-xs leading-6 text-stone-500">AI 提问时按问题和盘面摘要检索资料片段。</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/65 bg-white/56 p-4">
+                      <div className="font-bold text-stone-700">注入</div>
+                      <div className="mt-1 text-xs leading-6 text-stone-500">只把高相关片段作为参考上下文，不改变本地排盘结果。</div>
+                    </div>
+                    <div className="rounded-2xl border border-white/65 bg-white/56 p-4">
+                      <div className="font-bold text-stone-700">来源</div>
+                      <div className="mt-1 text-xs leading-6 text-stone-500">回答下方会显示资料标题、来源和相关度，便于核对。</div>
+                    </div>
                   </div>
                 </div>
               </div>
