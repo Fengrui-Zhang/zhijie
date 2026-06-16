@@ -13,7 +13,7 @@ export interface PublicSiteSettings {
 
 export const DEFAULT_REGISTRATION_CONTACT = '微信：zixu9498422';
 export const DEFAULT_WELCOME_INTRO = [
-  '融合本地排盘算法，排盘信息完整准确，减少人工换算误差。',
+  '排盘流程完整清晰，减少人工换算误差。',
   '参考四柱八字与奇门遁甲古籍资料，断卦有依据，判断更可靠。',
   '专业优化 AI 提示词，提问更简单，回答更精准。',
   '新注册用户默认 15 次提问额度；每日 8:00 会将低于 3 次的账号补足至 3 次。访客排盘不消耗次数，AI 解读与追问受访客额度限制。',
