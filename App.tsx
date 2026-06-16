@@ -5859,6 +5859,8 @@ const App: React.FC<AppProps> = ({
   useEffect(() => {
     const isFortuneReading = modelType === ModelType.DAILY_FORTUNE || modelType === ModelType.MONTHLY_FORTUNE;
     if (!isFortuneReading || step !== 'input' || !fortuneCaseId || loading || isTyping) return;
+    if (authStatus === 'loading') return;
+    if (!isLoggedIn && !guestModeEnabled) return;
     const targetDate = timeMode === 'custom' && customDate ? new Date(customDate) : new Date();
     if (Number.isNaN(targetDate.getTime())) return;
     const keyDate = modelType === ModelType.MONTHLY_FORTUNE
@@ -5868,7 +5870,7 @@ const App: React.FC<AppProps> = ({
     if (autoFortuneChartKeyRef.current === key) return;
     autoFortuneChartKeyRef.current = key;
     handleCalculate({ targetDate });
-  }, [modelType, step, fortuneCaseId, loading, isTyping, timeMode, customDate]);
+  }, [modelType, step, fortuneCaseId, loading, isTyping, timeMode, customDate, authStatus, isLoggedIn, guestModeEnabled]);
 
   const toggleLine = (idx: number) => {
     const newLines = [...manualLines];
