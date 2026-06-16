@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --glass-bg: rgba(255, 252, 248, 0.62);
   --glass-bg-strong: rgba(255, 251, 245, 0.78);
