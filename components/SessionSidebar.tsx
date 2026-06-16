@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 
 const MODEL_LABELS: Record<string, string> = {
+  chat: '聊天',
   qimen: '奇门遁甲',
   bazi: '四柱八字',
   ziwei: '紫微斗数',
@@ -19,6 +20,7 @@ const MODEL_LABELS: Record<string, string> = {
 };
 
 const MODEL_ICONS: Record<string, string> = {
+  chat: '聊',
   qimen: '☰',
   bazi: '命',
   ziwei: '紫',

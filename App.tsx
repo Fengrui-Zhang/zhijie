@@ -652,6 +652,7 @@ const getGanzhiYear = (year: number) => {
 };
 
 const MODEL_LABELS: Record<string, string> = {
+  chat: '聊天',
   qimen: '奇门遁甲',
   bazi: '四柱八字',
   ziwei: '紫微斗数',
@@ -1397,13 +1398,14 @@ const App: React.FC<AppProps> = ({
   // Chat
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [recordsSearch, setRecordsSearch] = useState('');
-  const [recordsFilter, setRecordsFilter] = useState<'all' | 'life' | 'forecast' | 'fortune' | 'tool'>('all');
+  const [recordsFilter, setRecordsFilter] = useState<'all' | 'life' | 'forecast' | 'fortune' | 'tool' | 'chat'>('all');
   const [standaloneChatInput, setStandaloneChatInput] = useState('');
   const [standaloneChatMessages, setStandaloneChatMessages] = useState<ChatMessage[]>([]);
   const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
   const [standaloneChatError, setStandaloneChatError] = useState('');
   const [standaloneChatUseKnowledge, setStandaloneChatUseKnowledge] = useState(true);
   const [standaloneChatKnowledgeBoard, setStandaloneChatKnowledgeBoard] = useState<'bazi' | 'qimen'>('bazi');
+  const [standaloneSessionId, setStandaloneSessionId] = useState<string | null>(null);
   const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
   const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
@@ -2457,6 +2459,40 @@ const App: React.FC<AppProps> = ({
       if (!res.ok) return;
       const data = await res.json();
       const sessionChartParams = (data.chartParams || {}) as Record<string, unknown>;
+
+      if (data.modelType === 'chat') {
+        const msgs: ChatMessage[] = (data.messages || []).map(
+          (m: { id: string; role: string; content: string; createdAt: string }) => ({
+            id: m.id,
+            role: m.role as 'user' | 'model',
+            content: m.content,
+            timestamp: new Date(m.createdAt),
+          })
+        );
+        clearChatSession();
+        setActiveSessionId(id);
+        setStandaloneSessionId(id);
+        setWorkspaceView('chat');
+        setStandaloneChatMessages(msgs);
+        setStandaloneChatInput('');
+        setStandaloneChatError('');
+        setStandaloneChatLoading(false);
+        setStandaloneSelectedCaseIds(
+          Array.isArray(sessionChartParams.sourceCaseIds)
+            ? sessionChartParams.sourceCaseIds.filter((item): item is string => typeof item === 'string')
+            : []
+        );
+        setChatHistory([]);
+        setChartData(null);
+        setActiveChartParams({});
+        setActiveCase(null);
+        setStep('input');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/chat') {
+          window.history.pushState(null, '', '/chat');
+        }
+        return;
+      }
+
       const sessionProfessionalFeature = getProfessionalFeature(sessionChartParams);
       let effectiveChartData = data.chartData;
       let matchedCase: CaseDetail | null = null;
@@ -2563,6 +2599,16 @@ const App: React.FC<AppProps> = ({
   const handleOpenRecordWorkspaceSession = (id: string) => {
     const session = savedSessions.find((item) => item.id === id);
     if (session) {
+      if (session.modelType === 'chat') {
+        setWorkspaceView('chat');
+        setProfessionalSelectedProject(null);
+        setProfessionalModalOpen(false);
+        if (typeof window !== 'undefined' && window.location.pathname !== '/chat') {
+          window.history.pushState(null, '', '/chat');
+        }
+        void handleLoadSession(id);
+        return;
+      }
       const nextModel = session.modelType as ModelType;
       setWorkspaceView('divination');
       setHasSelectedModel(true);
@@ -3422,6 +3468,33 @@ const App: React.FC<AppProps> = ({
       };
       setStandaloneChatMessages((prev) => [...prev, modelMsg]);
       recordKnowledgeSources(modelMsg.id, Array.isArray(data.knowledgeSources) ? data.knowledgeSources : undefined);
+      if (isLoggedIn) {
+        let targetSessionId = standaloneSessionId;
+        if (!targetSessionId) {
+          targetSessionId = await saveSessionToDb(
+            'chat',
+            `聊天 - ${content.slice(0, 20)}`,
+            {
+              sourceCaseIds: selectedCases.map((item) => item.id),
+              knowledgeBoard: standaloneChatUseKnowledge ? standaloneChatKnowledgeBoard : '',
+            },
+            {
+              type: 'standalone_chat',
+              sourceCases: selectedCases.map((item) => ({
+                id: item.id,
+                title: getCaseDisplayName(item),
+                modelType: item.modelType,
+              })),
+            }
+          );
+          setStandaloneSessionId(targetSessionId);
+        }
+        await saveMessagesToDb(targetSessionId, [
+          { role: 'user', content },
+          { role: 'model', content: modelMsg.content },
+        ]);
+        fetchSessions();
+      }
       if (data.knowledgeFailed) {
         setStandaloneChatError(`知识库检索失败，本次回答未使用参考资料：${data.knowledgeFailed}`);
       }
@@ -6655,7 +6728,8 @@ const App: React.FC<AppProps> = ({
     </nav>
   );
 
-  const getRecordCategory = (item: SessionItem): 'life' | 'forecast' | 'fortune' | 'tool' => {
+  const getRecordCategory = (item: SessionItem): 'life' | 'forecast' | 'fortune' | 'tool' | 'chat' => {
+    if (item.modelType === 'chat') return 'chat';
     if ([ModelType.BAZI, ModelType.ZIWEI].includes(item.modelType as ModelType)) return 'life';
     if ([ModelType.DAILY_FORTUNE, ModelType.MONTHLY_FORTUNE].includes(item.modelType as ModelType)) return 'fortune';
     if (item.modelType === ModelType.ALMANAC) return 'tool';
@@ -6668,6 +6742,7 @@ const App: React.FC<AppProps> = ({
     { key: 'forecast', label: '占卜', description: '奇门、六爻等' },
     { key: 'fortune', label: '运势', description: '日运、月运' },
     { key: 'tool', label: '择日', description: '黄历择日' },
+    { key: 'chat', label: '聊天', description: '独立问答' },
   ];
 
   const getRecordTime = (item: SessionItem) => {
