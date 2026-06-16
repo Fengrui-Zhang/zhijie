@@ -1402,6 +1402,7 @@ const App: React.FC<AppProps> = ({
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [recordsSearch, setRecordsSearch] = useState('');
   const [recordsFilter, setRecordsFilter] = useState<'all' | 'life' | 'forecast' | 'fortune' | 'tool' | 'chat'>('all');
+  const [recordsScope, setRecordsScope] = useState<'active' | 'pinned' | 'archived'>('active');
   const [standaloneChatInput, setStandaloneChatInput] = useState('');
   const [standaloneChatMessages, setStandaloneChatMessages] = useState<ChatMessage[]>([]);
   const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
@@ -2422,7 +2423,7 @@ const App: React.FC<AppProps> = ({
 
   const updateSessionInDb = async (
     sessionId: string | null,
-    payload: { title?: string; chartParams?: Record<string, unknown> }
+    payload: { title?: string; chartParams?: Record<string, unknown>; isPinned?: boolean; isArchived?: boolean }
   ) => {
     if (!isLoggedIn || !sessionId) return;
     try {
@@ -2433,6 +2434,44 @@ const App: React.FC<AppProps> = ({
       });
     } catch {
       // silently ignore
+    }
+  };
+
+  const handleUpdateSessionFlags = async (
+    id: string,
+    flags: { isPinned?: boolean; isArchived?: boolean }
+  ) => {
+    const current = savedSessions.find((item) => item.id === id);
+    if (!current) return;
+    const nextFlags = {
+      isPinned: flags.isPinned ?? Boolean(current.isPinned),
+      isArchived: flags.isArchived ?? Boolean(current.isArchived),
+    };
+    setSavedSessions((prev) => prev.map((item) => (
+      item.id === id ? { ...item, ...nextFlags, updatedAt: new Date().toISOString() } : item
+    )));
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextFlags),
+      });
+      if (!res.ok) throw new Error('更新记录失败');
+      const updated = await res.json();
+      setSavedSessions((prev) => prev.map((item) => (
+        item.id === id
+          ? {
+              ...item,
+              isPinned: Boolean(updated.isPinned),
+              isArchived: Boolean(updated.isArchived),
+              updatedAt: updated.updatedAt || item.updatedAt,
+            }
+          : item
+      )));
+    } catch {
+      setSavedSessions((prev) => prev.map((item) => (
+        item.id === id ? current : item
+      )));
     }
   };
 
@@ -6839,17 +6878,28 @@ const App: React.FC<AppProps> = ({
     return Number.isNaN(date.getTime()) ? new Date(0) : date;
   };
 
-  const filteredRecords = savedSessions
+  const scopedRecords = savedSessions.filter((item) => {
+    if (recordsScope === 'archived') return Boolean(item.isArchived);
+    if (recordsScope === 'pinned') return Boolean(item.isPinned) && !item.isArchived;
+    return !item.isArchived;
+  });
+
+  const filteredRecords = scopedRecords
     .filter((item) => {
       if (recordsFilter !== 'all' && getRecordCategory(item) !== recordsFilter) return false;
       const term = recordsSearch.trim().toLowerCase();
       if (!term) return true;
       return (
         item.title.toLowerCase().includes(term) ||
-        (MODEL_LABELS[item.modelType] || item.modelType).toLowerCase().includes(term)
+        (MODEL_LABELS[item.modelType] || item.modelType).toLowerCase().includes(term) ||
+        (item.isPinned ? '置顶' : '').includes(term) ||
+        (item.isArchived ? '归档' : '').includes(term)
       );
     })
-    .sort((a, b) => getRecordTime(b).getTime() - getRecordTime(a).getTime());
+    .sort((a, b) => {
+      if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
+      return getRecordTime(b).getTime() - getRecordTime(a).getTime();
+    });
 
   const recordGroups = filteredRecords.reduce<Array<{ label: string; items: SessionItem[] }>>((groups, item) => {
     const date = getRecordTime(item);
@@ -6873,10 +6923,15 @@ const App: React.FC<AppProps> = ({
 
   const recordCounts = recordFilterOptions.reduce<Record<string, number>>((counts, option) => {
     counts[option.key] = option.key === 'all'
-      ? savedSessions.length
-      : savedSessions.filter((item) => getRecordCategory(item) === option.key).length;
+      ? scopedRecords.length
+      : scopedRecords.filter((item) => getRecordCategory(item) === option.key).length;
     return counts;
   }, {});
+  const recordScopeCounts = {
+    active: savedSessions.filter((item) => !item.isArchived).length,
+    pinned: savedSessions.filter((item) => item.isPinned && !item.isArchived).length,
+    archived: savedSessions.filter((item) => item.isArchived).length,
+  };
   const selectedRecord = filteredRecords.find((item) => item.id === activeSessionId) || filteredRecords[0] || null;
   const latestRecord = savedSessions
     .slice()
@@ -6928,6 +6983,31 @@ const App: React.FC<AppProps> = ({
         >
           新建排盘
         </button>
+      </div>
+
+      <div className="mb-5 flex flex-wrap gap-2 rounded-[22px] border border-white/65 bg-white/48 p-2">
+        {[
+          ['active', '当前记录', recordScopeCounts.active],
+          ['pinned', '置顶', recordScopeCounts.pinned],
+          ['archived', '归档', recordScopeCounts.archived],
+        ].map(([scope, label, count]) => {
+          const selected = recordsScope === scope;
+          return (
+            <button
+              key={scope}
+              type="button"
+              onClick={() => setRecordsScope(scope as typeof recordsScope)}
+              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                selected
+                  ? 'glass-panel-dark text-amber-200'
+                  : 'bg-white/55 text-stone-500 hover:bg-white hover:text-stone-800'
+              }`}
+            >
+              {label}
+              <span className={`ml-2 text-xs ${selected ? 'text-amber-100/80' : 'text-stone-400'}`}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="mb-5 grid gap-3 md:grid-cols-5">
@@ -7037,12 +7117,52 @@ const App: React.FC<AppProps> = ({
                               }`}>
                                 {category}
                               </span>
+                              {item.isPinned && (
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                  selected ? 'bg-white/10 text-amber-100/80' : 'bg-amber-50 text-amber-700'
+                                }`}>
+                                  置顶
+                                </span>
+                              )}
+                              {item.isArchived && (
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                  selected ? 'bg-white/10 text-amber-100/70' : 'bg-stone-100 text-stone-500'
+                                }`}>
+                                  归档
+                                </span>
+                              )}
                             </div>
                             <div className={`mt-1 text-xs ${selected ? 'text-amber-100/75' : 'text-stone-500'}`}>
                               更新：{formatRecordAge(item)} · {messageCount} 条消息
                             </div>
                           </button>
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleUpdateSessionFlags(item.id, { isPinned: !item.isPinned })}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                item.isPinned
+                                  ? selected
+                                    ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                  : selected
+                                    ? 'border-amber-200/30 text-amber-100/80 hover:bg-white/10'
+                                    : 'border-stone-200 text-stone-500 hover:border-amber-200 hover:text-amber-700'
+                              }`}
+                            >
+                              {item.isPinned ? '取消置顶' : '置顶'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleUpdateSessionFlags(item.id, { isArchived: !item.isArchived })}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                selected
+                                  ? 'border-stone-200/30 text-amber-100/80 hover:bg-white/10'
+                                  : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-white/70'
+                              }`}
+                            >
+                              {item.isArchived ? '取消归档' : '归档'}
+                            </button>
                             <button
                               type="button"
                               onClick={() => handleOpenRecordWorkspaceSession(item.id)}
@@ -7120,6 +7240,16 @@ const App: React.FC<AppProps> = ({
                       <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                         {getRecordCategoryLabel(selectedRecord)}
                       </span>
+                      {selectedRecord.isPinned && (
+                        <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          置顶
+                        </span>
+                      )}
+                      {selectedRecord.isArchived && (
+                        <span className="rounded-full border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-500">
+                          归档
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2 rounded-2xl border border-white/60 bg-white/58 px-3 py-3 text-xs leading-6 text-stone-500">
@@ -7128,6 +7258,20 @@ const App: React.FC<AppProps> = ({
                     <div>消息：{getRecordMessageCount(selectedRecord)} 条</div>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleUpdateSessionFlags(selectedRecord.id, { isPinned: !selectedRecord.isPinned })}
+                      className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+                    >
+                      {selectedRecord.isPinned ? '取消置顶' : '置顶'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleUpdateSessionFlags(selectedRecord.id, { isArchived: !selectedRecord.isArchived })}
+                      className="rounded-2xl border border-stone-200 bg-white/60 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-white"
+                    >
+                      {selectedRecord.isArchived ? '取消归档' : '归档'}
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenRecordWorkspaceSession(selectedRecord.id)}

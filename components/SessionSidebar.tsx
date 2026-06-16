@@ -42,6 +42,8 @@ export interface SessionItem {
   title: string;
   createdAt: string;
   updatedAt?: string;
+  isPinned?: boolean;
+  isArchived?: boolean;
   _count?: {
     messages?: number;
   };
@@ -71,7 +73,12 @@ function groupByDate(sessions: SessionItem[]) {
   const yesterday = new Date(today.getTime() - 86400000);
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-  for (const s of sessions) {
+  const ordered = sessions.slice().sort((a, b) => {
+    if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
+    return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+  });
+
+  for (const s of ordered) {
     const d = new Date(s.createdAt);
     let label: string;
     if (d >= today) {
@@ -191,8 +198,10 @@ export default function SessionSidebar({
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-sm leading-snug font-medium">{item.title}</div>
-                    <div className="text-xs text-stone-400 mt-1">
-                      {MODEL_LABELS[item.modelType] || item.modelType}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-stone-400">
+                      <span>{MODEL_LABELS[item.modelType] || item.modelType}</span>
+                      {item.isPinned && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">置顶</span>}
+                      {item.isArchived && <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-500">归档</span>}
                     </div>
                   </div>
                   <button

@@ -21,6 +21,8 @@ export async function GET() {
       id: true,
       modelType: true,
       title: true,
+      isPinned: true,
+      isArchived: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { messages: true } },

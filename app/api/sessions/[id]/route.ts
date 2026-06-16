@@ -75,12 +75,16 @@ export async function PUT(
   const title = typeof body.title === 'string' ? body.title.trim() : undefined;
   const chartParams =
     body.chartParams && typeof body.chartParams === 'object' ? body.chartParams : undefined;
+  const isPinned = typeof body.isPinned === 'boolean' ? body.isPinned : undefined;
+  const isArchived = typeof body.isArchived === 'boolean' ? body.isArchived : undefined;
 
   const updated = await prisma.divinationSession.update({
     where: { id },
     data: {
       ...(title !== undefined ? { title } : {}),
       ...(chartParams !== undefined ? { chartParams } : {}),
+      ...(isPinned !== undefined ? { isPinned } : {}),
+      ...(isArchived !== undefined ? { isArchived } : {}),
       updatedAt: new Date(),
     },
   });
