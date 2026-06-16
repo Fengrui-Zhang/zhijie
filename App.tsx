@@ -1117,7 +1117,7 @@ const App: React.FC = () => {
   const [lifeDay, setLifeDay] = useState(todayForLifeForm.getDate());
   const [lifeHour, setLifeHour] = useState(9);
   const [lifeMinute, setLifeMinute] = useState(0);
-  const [lifeTimeInputMode, setLifeTimeInputMode] = useState<'exact' | 'quick'>('quick');
+  const [lifeTimeInputMode, setLifeTimeInputMode] = useState<'exact' | 'quick'>('exact');
   const [lifeUseTrueSolar, setLifeUseTrueSolar] = useState(false);
   const [lifeIsLeapMonth, setLifeIsLeapMonth] = useState(false);
   const [lifePillars, setLifePillars] = useState({ year: '甲子', month: '甲子', day: '甲子', hour: '甲子' });
@@ -1408,7 +1408,7 @@ const App: React.FC = () => {
     setLifeDay(now.getDate());
     setLifeHour(9);
     setLifeMinute(0);
-    setLifeTimeInputMode('quick');
+    setLifeTimeInputMode('exact');
     setLifeUseTrueSolar(false);
     setLifeIsLeapMonth(false);
     setLifePillars({ year: '甲子', month: '甲子', day: '甲子', hour: '甲子' });

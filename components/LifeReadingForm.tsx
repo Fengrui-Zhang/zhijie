@@ -309,7 +309,7 @@ export default function LifeReadingForm({
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <label className="text-xs font-bold text-stone-500">快捷选择时辰</label>
-                  <span className="text-xs text-stone-400">点击后按时辰排盘，不使用真太阳时</span>
+                  <span className="text-xs text-stone-400">快捷选择会关闭真太阳时</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                   {HOUR_OPTIONS.map((item) => {

@@ -219,12 +219,6 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
                 >
                   <div className="text-base font-bold">{column.title}</div>
                   {column.subtitle && <div className="mt-1 text-[10px] font-normal text-stone-500">{column.subtitle}</div>}
-                  {column.kind === 'flow' && column.ganZhi && (
-                    <div className="mt-2 flex justify-center gap-1 text-xl">
-                      <span className={getWuxingColor(column.ganZhi.charAt(0))}>{column.ganZhi.charAt(0)}</span>
-                      <span className={getWuxingColor(column.ganZhi.charAt(1))}>{column.ganZhi.charAt(1)}</span>
-                    </div>
-                  )}
                 </th>
               ))}
             </tr>
