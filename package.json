@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "postinstall": "npm install --prefix taibu/packages/core && npm run build --prefix taibu/packages/core && prisma generate",
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "(prisma migrate deploy || true) && next build",
     "start": "next start",
@@ -27,7 +27,7 @@
     "react-dom": "^19.2.1",
     "react-markdown": "9.0.1",
     "remark-gfm": "4.0.0",
-    "taibu-core": "file:taibu/packages/core"
+    "taibu-core": "^3.4.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
