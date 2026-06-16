@@ -22,6 +22,7 @@ export async function GET() {
       title: true,
       createdAt: true,
       updatedAt: true,
+      _count: { select: { messages: true } },
     },
   });
 

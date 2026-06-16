@@ -40,6 +40,9 @@ export interface SessionItem {
   title: string;
   createdAt: string;
   updatedAt?: string;
+  _count?: {
+    messages?: number;
+  };
 }
 
 interface SessionSidebarProps {

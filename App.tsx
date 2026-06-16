@@ -6558,6 +6558,14 @@ const App: React.FC<AppProps> = ({
       : savedSessions.filter((item) => getRecordCategory(item) === option.key).length;
     return counts;
   }, {});
+  const selectedRecord = filteredRecords.find((item) => item.id === activeSessionId) || filteredRecords[0] || null;
+  const latestRecord = savedSessions
+    .slice()
+    .sort((a, b) => getRecordTime(b).getTime() - getRecordTime(a).getTime())[0] || null;
+  const getRecordCategoryLabel = (item: SessionItem) => (
+    recordFilterOptions.find((option) => option.key === getRecordCategory(item))?.label || '记录'
+  );
+  const getRecordMessageCount = (item: SessionItem) => item._count?.messages ?? 0;
 
   const formatSessionDate = (value: string) => {
     const date = new Date(value);
@@ -6654,81 +6662,182 @@ const App: React.FC<AppProps> = ({
         <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
           正在读取记录...
         </div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-14 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/70 bg-white/65 text-2xl text-stone-400">
+            录
+          </div>
+          <div className="mt-5 text-base font-bold text-stone-700">暂无记录</div>
+          <div className="mt-2 text-sm text-stone-500">完成 AI 对话后，记录会显示在这里。</div>
+          <button
+            type="button"
+            onClick={() => handleModelChange(ModelType.BAZI)}
+            className="glass-cta mt-6 rounded-2xl px-5 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
+          >
+            新建排盘
+          </button>
+        </div>
       ) : (
-        <div className="space-y-5">
-          {recordGroups.map((group) => (
-            <section key={group.label} className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <div className="text-xs font-bold tracking-[0.18em] text-stone-400">{group.label}</div>
-                <div className="text-xs text-stone-400">{group.items.length} 条</div>
-              </div>
-              <div className="space-y-2">
-                {group.items.map((item) => {
-                  const selected = activeSessionId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className={`group rounded-[22px] border px-4 py-3 transition ${
-                        selected
-                          ? 'glass-panel-dark border-transparent text-amber-100'
-                          : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void handleLoadSession(item.id)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="truncate text-base font-bold">{item.title}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] ${
-                              selected ? 'bg-white/10 text-amber-100' : 'bg-white/70 text-stone-500'
-                            }`}>
-                              {MODEL_LABELS[item.modelType] || item.modelType}
-                            </span>
-                          </div>
-                          <div className={`mt-1 text-xs ${selected ? 'text-amber-100/75' : 'text-stone-500'}`}>
-                            更新：{formatRecordAge(item)} · 创建：{formatSessionDate(item.createdAt)}
-                          </div>
-                        </button>
-                        <div className="flex items-center gap-2">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-5">
+            {recordGroups.map((group) => (
+              <section key={group.label} className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <div className="text-xs font-bold tracking-[0.18em] text-stone-400">{group.label}</div>
+                  <div className="text-xs text-stone-400">{group.items.length} 条</div>
+                </div>
+                <div className="space-y-2">
+                  {group.items.map((item) => {
+                    const selected = activeSessionId === item.id;
+                    const category = getRecordCategoryLabel(item);
+                    const messageCount = getRecordMessageCount(item);
+                    return (
+                      <div
+                        key={item.id}
+                        className={`group rounded-[22px] border px-4 py-3 transition ${
+                          selected
+                            ? 'glass-panel-dark border-transparent text-amber-100'
+                            : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <button
                             type="button"
                             onClick={() => void handleLoadSession(item.id)}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                              selected
-                                ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
-                                : 'border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-white/70'
-                            }`}
+                            className="min-w-0 flex-1 text-left"
                           >
-                            打开
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="truncate text-base font-bold">{item.title}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                selected ? 'bg-white/10 text-amber-100' : 'bg-white/70 text-stone-500'
+                              }`}>
+                                {MODEL_LABELS[item.modelType] || item.modelType}
+                              </span>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] ${
+                                selected ? 'bg-white/10 text-amber-100/80' : 'bg-stone-50 text-stone-400'
+                              }`}>
+                                {category}
+                              </span>
+                            </div>
+                            <div className={`mt-1 text-xs ${selected ? 'text-amber-100/75' : 'text-stone-500'}`}>
+                              更新：{formatRecordAge(item)} · {messageCount} 条消息
+                            </div>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteSession(item.id)}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                              selected
-                                ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
-                                : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
-                            }`}
-                          >
-                            删除
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleLoadSession(item.id)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                selected
+                                  ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
+                                  : 'border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-white/70'
+                              }`}
+                            >
+                              打开
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSession(item.id)}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                                selected
+                                  ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
+                                  : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
+                              }`}
+                            >
+                              删除
+                            </button>
+                          </div>
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          <aside className="space-y-4">
+            <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
+              <div className="text-xs font-bold tracking-[0.18em] text-stone-400">记录概览</div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/60 bg-white/60 px-3 py-3">
+                  <div className="text-[11px] text-stone-400">总记录</div>
+                  <div className="mt-1 text-xl font-bold text-stone-800">{savedSessions.length}</div>
+                </div>
+                <div className="rounded-2xl border border-white/60 bg-white/60 px-3 py-3">
+                  <div className="text-[11px] text-stone-400">当前筛选</div>
+                  <div className="mt-1 text-xl font-bold text-stone-800">{filteredRecords.length}</div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                {recordFilterOptions.filter((option) => option.key !== 'all').map((option) => {
+                  const count = recordCounts[option.key] || 0;
+                  const ratio = savedSessions.length ? Math.round((count / savedSessions.length) * 100) : 0;
+                  return (
+                    <div key={option.key} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-stone-500">
+                        <span>{option.label}</span>
+                        <span>{count} · {ratio}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
+                        <div className="h-full rounded-full bg-amber-400/80" style={{ width: `${ratio}%` }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </section>
-          ))}
-        </div>
-      )}
+            </div>
 
-      {!sessionsLoading && authStatus !== 'loading' && filteredRecords.length === 0 && (
-        <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
-          暂无记录。完成 AI 对话后，记录会显示在这里。
+            <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
+              <div className="text-xs font-bold tracking-[0.18em] text-stone-400">当前记录</div>
+              {selectedRecord ? (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <div className="text-lg font-bold leading-7 text-stone-800">{selectedRecord.title}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full border border-white/70 bg-white/70 px-2.5 py-1 text-xs font-semibold text-stone-600">
+                        {MODEL_LABELS[selectedRecord.modelType] || selectedRecord.modelType}
+                      </span>
+                      <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        {getRecordCategoryLabel(selectedRecord)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 rounded-2xl border border-white/60 bg-white/58 px-3 py-3 text-xs leading-6 text-stone-500">
+                    <div>创建：{formatSessionDate(selectedRecord.createdAt)}</div>
+                    <div>更新：{formatSessionDate(selectedRecord.updatedAt || selectedRecord.createdAt)}</div>
+                    <div>消息：{getRecordMessageCount(selectedRecord)} 条</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadSession(selectedRecord.id)}
+                      className="glass-cta flex-1 rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
+                    >
+                      打开记录
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteSession(selectedRecord.id)}
+                      className="rounded-2xl border border-red-200 bg-red-50/60 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:border-red-300 hover:text-red-600"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 text-sm text-stone-400">请选择一条记录。</div>
+              )}
+            </div>
+
+            {latestRecord && (
+              <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 text-sm leading-7 text-stone-600">
+                <div className="text-xs font-bold tracking-[0.18em] text-stone-400">最近更新</div>
+                <div className="mt-3 font-bold text-stone-800">{latestRecord.title}</div>
+                <div className="text-xs text-stone-500">{formatRecordAge(latestRecord)}</div>
+              </div>
+            )}
+          </aside>
         </div>
       )}
     </div>
