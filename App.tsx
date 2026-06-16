@@ -538,11 +538,13 @@ interface ChatMessage {
   role: 'user' | 'model';
   content: string;
   timestamp: Date;
+  knowledgeSources?: KnowledgeSourceSummary[];
 }
 
 type PersistedChatMessage = {
   role: string;
   content: string;
+  knowledgeSources?: KnowledgeSourceSummary[];
 };
 
 type MessageVersionEntry = {
@@ -568,6 +570,7 @@ type GuestStoredSession = {
     role: 'user' | 'model';
     content: string;
     timestamp: string;
+    knowledgeSources?: KnowledgeSourceSummary[];
   }>;
   guestFollowUpCount: number;
   createdAt: string;
@@ -2366,6 +2369,7 @@ const App: React.FC<AppProps> = ({
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
+        knowledgeSources: msg.knowledgeSources,
       })),
       guestFollowUpCount: nextFollowUpCount ?? item.guestFollowUpCount,
       updatedAt: new Date().toISOString(),
@@ -2437,7 +2441,7 @@ const App: React.FC<AppProps> = ({
 
   const saveMessagesToDb = async (
     sessionId: string | null,
-    messages: { role: string; content: string }[]
+    messages: PersistedChatMessage[]
   ) => {
     if (!isLoggedIn || !sessionId || messages.length === 0) return;
     try {
@@ -2550,11 +2554,12 @@ const App: React.FC<AppProps> = ({
 
       if (data.modelType === 'chat') {
         const msgs: ChatMessage[] = (data.messages || []).map(
-          (m: { id: string; role: string; content: string; createdAt: string }) => ({
+          (m: { id: string; role: string; content: string; createdAt: string; knowledgeSources?: KnowledgeSourceSummary[] }) => ({
             id: m.id,
             role: m.role as 'user' | 'model',
             content: m.content,
             timestamp: new Date(m.createdAt),
+            knowledgeSources: Array.isArray(m.knowledgeSources) ? m.knowledgeSources : undefined,
           })
         );
         clearChatSession();
@@ -2562,6 +2567,11 @@ const App: React.FC<AppProps> = ({
         setStandaloneSessionId(id);
         setWorkspaceView('chat');
         setStandaloneChatMessages(msgs);
+        setMessageSourceMap(Object.fromEntries(
+          msgs
+            .filter((msg) => msg.knowledgeSources?.length)
+            .map((msg) => [msg.id, msg.knowledgeSources as KnowledgeSourceSummary[]])
+        ));
         setStandaloneChatInput('');
         setStandaloneChatError('');
         setStandaloneChatLoading(false);
@@ -2624,15 +2634,21 @@ const App: React.FC<AppProps> = ({
       }
 
       const msgs: ChatMessage[] = (data.messages || []).map(
-        (m: { id: string; role: string; content: string; createdAt: string }) => ({
+        (m: { id: string; role: string; content: string; createdAt: string; knowledgeSources?: KnowledgeSourceSummary[] }) => ({
           id: m.id,
           role: m.role as 'user' | 'model',
           content: m.content,
           timestamp: new Date(m.createdAt),
+          knowledgeSources: Array.isArray(m.knowledgeSources) ? m.knowledgeSources : undefined,
         })
       );
       resetMessageVersions();
       setChatHistory(msgs);
+      setMessageSourceMap(Object.fromEntries(
+        msgs
+          .filter((msg) => msg.knowledgeSources?.length)
+          .map((msg) => [msg.id, msg.knowledgeSources as KnowledgeSourceSummary[]])
+      ));
       pendingCaseSessionScrollRef.current = true;
 
       if (msgs.length > 0) {
@@ -2745,9 +2761,15 @@ const App: React.FC<AppProps> = ({
       role: msg.role,
       content: msg.content,
       timestamp: new Date(msg.timestamp),
+      knowledgeSources: Array.isArray(msg.knowledgeSources) ? msg.knowledgeSources : undefined,
     }));
     resetMessageVersions();
     setChatHistory(msgs);
+    setMessageSourceMap(Object.fromEntries(
+      msgs
+        .filter((msg) => msg.knowledgeSources?.length)
+        .map((msg) => [msg.id, msg.knowledgeSources as KnowledgeSourceSummary[]])
+    ));
     setGuestFollowUpCount(storedSession.guestFollowUpCount || 0);
     pendingCaseSessionScrollRef.current = true;
 
@@ -2808,7 +2830,18 @@ const App: React.FC<AppProps> = ({
       ...prev,
       [messageId]: sources,
     }));
+    setChatHistory((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, knowledgeSources: sources } : msg))
+    );
+    setStandaloneChatMessages((prev) =>
+      prev.map((msg) => (msg.id === messageId ? { ...msg, knowledgeSources: sources } : msg))
+    );
   };
+
+  const withKnowledgeSources = <T extends ChatMessage>(
+    message: T,
+    sources?: KnowledgeSourceSummary[]
+  ): T => (sources?.length ? { ...message, knowledgeSources: sources } : message);
 
   const buildMessageVersionEntry = (messageId: string, content: string, timestamp?: Date): MessageVersionEntry => ({
     id: `${messageId}-${timestamp?.getTime() ?? Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3574,14 +3607,15 @@ const App: React.FC<AppProps> = ({
       if (!res.ok) {
         throw new Error(data.error || '发送失败');
       }
-      const modelMsg: ChatMessage = {
+      const modelSources = Array.isArray(data.knowledgeSources) ? data.knowledgeSources : undefined;
+      const modelMsg: ChatMessage = withKnowledgeSources({
         id: `standalone-m-${Date.now()}`,
         role: 'model',
         content: data.content || '暂无回复',
         timestamp: new Date(),
-      };
+      }, modelSources);
       setStandaloneChatMessages((prev) => [...prev, modelMsg]);
-      recordKnowledgeSources(modelMsg.id, Array.isArray(data.knowledgeSources) ? data.knowledgeSources : undefined);
+      recordKnowledgeSources(modelMsg.id, modelSources);
       if (isLoggedIn) {
         let targetSessionId = standaloneSessionId;
         if (!targetSessionId) {
@@ -3605,7 +3639,7 @@ const App: React.FC<AppProps> = ({
         }
         await saveMessagesToDb(targetSessionId, [
           { role: 'user', content },
-          { role: 'model', content: modelMsg.content },
+          { role: 'model', content: modelMsg.content, knowledgeSources: modelMsg.knowledgeSources },
         ]);
         fetchSessions();
       }
@@ -4024,12 +4058,12 @@ const App: React.FC<AppProps> = ({
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       const finalMessages: ChatMessage[] = [
         userMsg,
-        {
+        withKnowledgeSources({
           id: modelId,
           role: 'model',
           content: finalContent,
           timestamp: new Date(),
-        },
+        }, finalState.knowledgeSources),
       ];
 
       setChatHistory(finalMessages);
@@ -5169,12 +5203,12 @@ const App: React.FC<AppProps> = ({
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
-      const finalModelMessage: ChatMessage = {
+      const finalModelMessage: ChatMessage = withKnowledgeSources({
         id: modelId,
         role: 'model',
         content: finalContent,
         timestamp: new Date(),
-      };
+      }, finalState.knowledgeSources);
       const finalMessages = [userMsg, finalModelMessage];
       setChatHistory(finalMessages);
 
@@ -5186,7 +5220,7 @@ const App: React.FC<AppProps> = ({
       if (isLoggedIn) {
         await saveMessagesToDb(currentSessionId, [
           { role: 'user', content: userContent },
-          { role: 'model', content: finalContent },
+          { role: 'model', content: finalContent, knowledgeSources: finalState.knowledgeSources },
         ]);
         fetchSessions();
         const detailRes = await fetch(`/api/cases/${targetCase.id}`);
@@ -5494,7 +5528,11 @@ const App: React.FC<AppProps> = ({
   };
 
   const toPersistedMessages = (messages: ChatMessage[]): PersistedChatMessage[] =>
-    messages.map((msg) => ({ role: msg.role, content: msg.content }));
+    messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      knowledgeSources: msg.knowledgeSources,
+    }));
 
   const persistCurrentMessages = useCallback(async (messages: ChatMessage[]) => {
     if (isLoggedIn) {
@@ -5616,12 +5654,12 @@ const App: React.FC<AppProps> = ({
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       const finalMessages: ChatMessage[] = [
         userMsg,
-        {
+        withKnowledgeSources({
           id: modelId,
           role: 'model',
           content: finalContent,
           timestamp: new Date(),
-        },
+        }, finalState.knowledgeSources),
       ];
 
       setChatHistory(finalMessages);
@@ -5670,6 +5708,7 @@ const App: React.FC<AppProps> = ({
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp.toISOString(),
+            knowledgeSources: msg.knowledgeSources,
           })),
           updatedAt: new Date().toISOString(),
         }));
@@ -5779,11 +5818,11 @@ const App: React.FC<AppProps> = ({
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       const finalMessages: ChatMessage[] = [
         ...nextMessagesBase,
-        {
+        withKnowledgeSources({
           ...placeholder,
           content: finalContent,
           timestamp: new Date(),
-        },
+        }, finalState.knowledgeSources),
       ];
       const nextVersionState = (() => {
         const existingEntries = messageVersionMap[messageId]?.entries ?? [
@@ -5934,11 +5973,11 @@ const App: React.FC<AppProps> = ({
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
       const finalMessages: ChatMessage[] = [
         ...nextMessagesBase,
-        {
+        withKnowledgeSources({
           ...placeholder,
           content: finalContent,
           timestamp: new Date(),
-        },
+        }, finalState.knowledgeSources),
       ];
 
       setChatHistory(finalMessages);
@@ -5978,6 +6017,7 @@ const App: React.FC<AppProps> = ({
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp.toISOString(),
+            knowledgeSources: msg.knowledgeSources,
           })),
           updatedAt: new Date().toISOString(),
         }));
@@ -6080,7 +6120,7 @@ const App: React.FC<AppProps> = ({
         updateChatMessage(modelId, finalContent);
         await saveMessagesToDb(sessionId, [
           { role: 'user', content: outgoingMessage },
-          { role: 'model', content: finalContent },
+          { role: 'model', content: finalContent, knowledgeSources: finalState.knowledgeSources },
         ]);
         fetchUserProfile();
       } else {
@@ -6089,7 +6129,7 @@ const App: React.FC<AppProps> = ({
         setGuestFollowUpCount(nextGuestFollowUpCount);
         setChatHistory((prev) => {
           const next = prev.map((msg) =>
-            msg.id === modelId ? { ...msg, content: finalContent } : msg
+            msg.id === modelId ? { ...msg, content: finalContent, knowledgeSources: finalState.knowledgeSources } : msg
           );
           if (sessionId) {
             updateGuestCaseSessionMessages(sessionId, next, nextGuestFollowUpCount);
@@ -6112,6 +6152,7 @@ const App: React.FC<AppProps> = ({
                 role: msg.role,
                 content: msg.content,
                 timestamp: msg.timestamp.toISOString(),
+                knowledgeSources: msg.knowledgeSources,
               })),
               guestFollowUpCount: nextGuestFollowUpCount,
               createdAt: now,
@@ -7530,7 +7571,7 @@ const App: React.FC<AppProps> = ({
                 }`}>
                   <MarkdownContent content={msg.content} />
                   {msg.role === 'model' && (
-                    <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
+                    <KnowledgeSourceSummaryPanel sources={msg.knowledgeSources || messageSourceMap[msg.id]} />
                   )}
                 </div>
                 {msg.role === 'user' && (
@@ -9671,7 +9712,7 @@ const App: React.FC<AppProps> = ({
                           </div>
                         )}
                         {msg.role === 'model' && (
-                          <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
+                          <KnowledgeSourceSummaryPanel sources={msg.knowledgeSources || messageSourceMap[msg.id]} />
                         )}
                         {msg.role === 'model' && (
                           <div className="mt-4 flex justify-end">

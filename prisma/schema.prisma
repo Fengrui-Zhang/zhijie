@@ -113,6 +113,7 @@ model ChatMessage {
   sessionId String
   role      String
   content   String
+  knowledgeSources Json?
   createdAt DateTime @default(now())
   session   DivinationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

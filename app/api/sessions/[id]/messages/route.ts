@@ -55,10 +55,11 @@ export async function POST(
   const messages = Array.isArray(body) ? body : [body];
 
   const created = await prisma.chatMessage.createMany({
-    data: messages.map((msg: { role: string; content: string }) => ({
+    data: messages.map((msg: { role: string; content: string; knowledgeSources?: unknown }) => ({
       sessionId: id,
       role: msg.role,
       content: msg.content,
+      knowledgeSources: Array.isArray(msg.knowledgeSources) ? msg.knowledgeSources : undefined,
     })),
   });
 
@@ -100,10 +101,11 @@ export async function PUT(
   await prisma.$transaction([
     prisma.chatMessage.deleteMany({ where: { sessionId: id } }),
     prisma.chatMessage.createMany({
-      data: messages.map((msg: { role: string; content: string }) => ({
+      data: messages.map((msg: { role: string; content: string; knowledgeSources?: unknown }) => ({
         sessionId: id,
         role: msg.role,
         content: msg.content,
+        knowledgeSources: Array.isArray(msg.knowledgeSources) ? msg.knowledgeSources : undefined,
       })),
     }),
     prisma.divinationSession.update({
