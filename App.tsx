@@ -2442,6 +2442,23 @@ const App: React.FC<AppProps> = ({
     }
   };
 
+  const handleOpenRecordWorkspaceSession = (id: string) => {
+    const session = savedSessions.find((item) => item.id === id);
+    if (session) {
+      const nextModel = session.modelType as ModelType;
+      setWorkspaceView('divination');
+      setHasSelectedModel(true);
+      setProfessionalSelectedProject(null);
+      setProfessionalModalOpen(false);
+      setModelType(nextModel);
+      const nextRoute = MODEL_ROUTES[nextModel];
+      if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
+        window.history.pushState(null, '', nextRoute);
+      }
+    }
+    void handleLoadSession(id);
+  };
+
   const handleLoadGuestCaseSession = (sessionId: string) => {
     const storedSession = readGuestCaseSessions().find((item) => item.id === sessionId);
     if (!storedSession) return;
@@ -6703,7 +6720,7 @@ const App: React.FC<AppProps> = ({
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <button
                             type="button"
-                            onClick={() => void handleLoadSession(item.id)}
+                            onClick={() => handleOpenRecordWorkspaceSession(item.id)}
                             className="min-w-0 flex-1 text-left"
                           >
                             <div className="flex flex-wrap items-center gap-2">
@@ -6726,7 +6743,7 @@ const App: React.FC<AppProps> = ({
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => void handleLoadSession(item.id)}
+                              onClick={() => handleOpenRecordWorkspaceSession(item.id)}
                               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                                 selected
                                   ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
@@ -6811,7 +6828,7 @@ const App: React.FC<AppProps> = ({
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => void handleLoadSession(selectedRecord.id)}
+                      onClick={() => handleOpenRecordWorkspaceSession(selectedRecord.id)}
                       className="glass-cta flex-1 rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
                     >
                       打开记录

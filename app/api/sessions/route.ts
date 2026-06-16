@@ -14,6 +14,7 @@ export async function GET() {
     where: {
       userId: session.user.id,
       createdAt: { gte: cutoff },
+      messages: { some: {} },
     },
     orderBy: { createdAt: 'desc' },
     select: {
