@@ -620,6 +620,28 @@ const MODEL_LABELS: Record<string, string> = {
   bazi_compatibility: '八字合盘',
 };
 
+const MODEL_ROUTES: Partial<Record<ModelType, string>> = {
+  [ModelType.BAZI]: '/bazi',
+  [ModelType.ZIWEI]: '/ziwei',
+  [ModelType.DAILY_FORTUNE]: '/daily',
+  [ModelType.MONTHLY_FORTUNE]: '/monthly',
+  [ModelType.QIMEN]: '/qimen',
+  [ModelType.LIUYAO]: '/liuyao',
+  [ModelType.MEIHUA]: '/meihua',
+  [ModelType.DALIUREN]: '/daliuren',
+  [ModelType.TAIYI]: '/taiyi',
+  [ModelType.XIAOLIUREN]: '/xiaoliuren',
+  [ModelType.ALMANAC]: '/almanac',
+};
+
+const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).reduce(
+  (acc, [model, route]) => {
+    if (route) acc[route] = model as ModelType;
+    return acc;
+  },
+  {} as Record<string, ModelType>
+);
+
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
   [LiuyaoMode.AUTO, '时间起卦'],
   [LiuyaoMode.CUSTOM_TIME, '指定时间'],
@@ -1113,7 +1135,11 @@ const buildInitialAnalysisBundle = (
   };
 };
 
-const App: React.FC = () => {
+type AppProps = {
+  initialModelType?: ModelType;
+};
+
+const App: React.FC<AppProps> = ({ initialModelType = ModelType.BAZI }) => {
   const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
   const [showAuth, setShowAuth] = useState(false);
@@ -1176,7 +1202,7 @@ const App: React.FC = () => {
 
   // --- State ---
   const [hasSelectedModel, setHasSelectedModel] = useState(true);
-  const [modelType, setModelType] = useState<ModelType>(ModelType.BAZI);
+  const [modelType, setModelType] = useState<ModelType>(initialModelType);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'input' | 'chart'>('input');
   
@@ -3011,12 +3037,38 @@ const App: React.FC = () => {
     setKnowledgeHint(null);
   }, []);
 
+  useEffect(() => {
+    const syncModelFromPath = () => {
+      if (typeof window === 'undefined') return;
+      const routedModel = ROUTE_MODELS[window.location.pathname];
+      if (routedModel && routedModel !== modelType) {
+        setHasSelectedModel(true);
+        setProfessionalSelectedProject(null);
+        setProfessionalModalOpen(false);
+        setModelType(routedModel);
+        autoFortuneChartKeyRef.current = '';
+        clearViewState();
+        if (![ModelType.QIMEN, ModelType.BAZI].includes(routedModel)) {
+          setUseKnowledge(false);
+        }
+        setTimeMode(routedModel === ModelType.BAZI || routedModel === ModelType.ZIWEI ? 'custom' : 'now');
+      }
+    };
+
+    window.addEventListener('popstate', syncModelFromPath);
+    return () => window.removeEventListener('popstate', syncModelFromPath);
+  }, [clearViewState, modelType]);
+
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
     setHasSelectedModel(true);
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
     setModelType(type);
+    const nextRoute = MODEL_ROUTES[type];
+    if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
+      window.history.pushState(null, '', nextRoute);
+    }
     autoFortuneChartKeyRef.current = '';
     clearViewState();
     if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
