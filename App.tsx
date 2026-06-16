@@ -7334,6 +7334,8 @@ const App: React.FC<AppProps> = ({
                   ? '选择命例或新建资料后开始进阶分析'
                   : isCaseModel
                     ? '管理命例、排盘并进入 AI 分析'
+                    : isFortuneReading
+                      ? '选择命例与日期，生成专属运势面板'
                     : '先完成排盘，再基于盘面发起解读'}
               </div>
             </div>
@@ -7557,7 +7559,7 @@ const App: React.FC<AppProps> = ({
             ) : (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
               {/* Question (Divination) */}
-              {!isLifeReading && (
+              {!isLifeReading && !isFortuneReading && (
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">所求何事</label>
                   <textarea 
@@ -7629,7 +7631,7 @@ const App: React.FC<AppProps> = ({
               )}
 
               {/* Birth Year (Meihua & Liuyao) */}
-              {!isLifeReading && showBornYear && (
+              {!isLifeReading && !isFortuneReading && showBornYear && (
                  <div>
                    <label className="block text-stone-700 font-bold mb-2">出生年份（选填，用于起卦依据）</label>
                    <input 
@@ -7644,6 +7646,7 @@ const App: React.FC<AppProps> = ({
 
               {!isLifeReading && <div className="grid md:grid-cols-2 gap-6">
                 {/* Gender */}
+                {!isFortuneReading && (
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">性别</label>
                   <div className="flex gap-4">
@@ -7651,6 +7654,7 @@ const App: React.FC<AppProps> = ({
                     <button onClick={() => setGender(1)} className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 1 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}>女 (坤)</button>
                   </div>
                 </div>
+                )}
 
                 {/* Time Input for Standard Models (Qimen, Meihua, Bazi, Ziwei) */}
                 {showStandardTimeInput && (
