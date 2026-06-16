@@ -23,33 +23,6 @@ const hiddenText = (stems?: string, gods?: string) => {
   return stemList.map((stem, index) => `${stem}${godList[index] ? `(${godList[index]})` : ''}`).join(' ');
 };
 
-const FlowColumn = ({
-  title,
-  subtitle,
-  ganZhi,
-  meta,
-}: {
-  title: string;
-  subtitle?: string;
-  ganZhi?: string;
-  meta?: string;
-}) => {
-  if (!ganZhi) return null;
-  const gan = ganZhi.charAt(0);
-  const zhi = ganZhi.charAt(1);
-  return (
-    <div className="min-w-[78px] rounded-lg border border-blue-100 bg-blue-50/70 p-2 text-center">
-      <div className="text-xs font-semibold text-blue-600">{title}</div>
-      {subtitle && <div className="mt-0.5 text-[10px] text-stone-400">{subtitle}</div>}
-      <div className="mt-2 flex justify-center gap-1 text-xl font-bold">
-        <span className={getWuxingColor(gan)}>{gan}</span>
-        <span className={getWuxingColor(zhi)}>{zhi}</span>
-      </div>
-      {meta && <div className="mt-1 text-[10px] text-stone-500">{meta}</div>}
-    </div>
-  );
-};
-
 const ChipButton = ({
   active,
   children,
@@ -111,6 +84,98 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
     return calculateBaziLiuRiData(selectedMonthItem.startDate, selectedMonthItem.endDate, fortuneContext);
   }, [fortuneContext, selectedMonthItem]);
   const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.day === selectedDay) : null;
+  const tableColumns = useMemo(() => {
+    const natalColumns = pillars.map((pillar) => ({
+      kind: 'natal' as const,
+      key: pillar.label,
+      title: pillar.label,
+      subtitle: '',
+      ganZhi: pillar.ganZhi,
+      values: {
+        主星: pillar.tgGod,
+        天干: pillar.gan,
+        地支: pillar.zhi,
+        藏干: pillar.hidden,
+        纳音: pillar.nayin,
+        神煞: pillar.shensha || '—',
+      },
+    }));
+    const flowColumns = [
+      selectedDayun ? {
+        kind: 'flow' as const,
+        key: 'dayun',
+        title: '大运',
+        subtitle: `${selectedDayun.startAge}岁 · ${selectedDayun.startYear}`,
+        ganZhi: selectedDayun.ganZhi,
+        values: {
+          主星: selectedDayun.tenGod || '—',
+          天干: selectedDayun.ganZhi?.charAt(0) || '',
+          地支: selectedDayun.ganZhi?.charAt(1) || '',
+          藏干: hiddenText(
+            selectedDayun.hiddenStems?.map((item: any) => item.stem).join(' '),
+            selectedDayun.hiddenStems?.map((item: any) => item.tenGod).join(' '),
+          ),
+          纳音: selectedDayun.naYin || selectedDayun.nayin || '—',
+          神煞: selectedDayun.shenSha?.join(' ') || '—',
+        },
+      } : null,
+      selectedYearItem ? {
+        kind: 'flow' as const,
+        key: 'liunian',
+        title: '流年',
+        subtitle: `${selectedYearItem.year}年 · ${selectedYearItem.age}岁`,
+        ganZhi: selectedYearItem.ganZhi,
+        values: {
+          主星: selectedYearItem.tenGod || '—',
+          天干: selectedYearItem.gan || selectedYearItem.ganZhi?.charAt(0) || '',
+          地支: selectedYearItem.zhi || selectedYearItem.ganZhi?.charAt(1) || '',
+          藏干: hiddenText(
+            selectedYearItem.hiddenStems?.map((item: any) => item.stem).join(' '),
+            selectedYearItem.hiddenStems?.map((item: any) => item.tenGod).join(' '),
+          ),
+          纳音: selectedYearItem.naYin || selectedYearItem.nayin || '—',
+          神煞: selectedYearItem.shenSha?.join(' ') || '—',
+        },
+      } : null,
+      selectedMonthItem ? {
+        kind: 'flow' as const,
+        key: 'liuyue',
+        title: '流月',
+        subtitle: `${selectedMonthItem.month}月 · ${selectedMonthItem.jieQi || ''}`,
+        ganZhi: selectedMonthItem.ganZhi,
+        values: {
+          主星: selectedMonthItem.tenGod || '—',
+          天干: selectedMonthItem.gan || selectedMonthItem.ganZhi?.charAt(0) || '',
+          地支: selectedMonthItem.zhi || selectedMonthItem.ganZhi?.charAt(1) || '',
+          藏干: hiddenText(
+            selectedMonthItem.hiddenStems?.map((item: any) => item.stem).join(' '),
+            selectedMonthItem.hiddenStems?.map((item: any) => item.tenGod).join(' '),
+          ),
+          纳音: selectedMonthItem.naYin || '—',
+          神煞: selectedMonthItem.shenSha?.join(' ') || '—',
+        },
+      } : null,
+      selectedDayItem ? {
+        kind: 'flow' as const,
+        key: 'liuri',
+        title: '流日',
+        subtitle: `${selectedDayItem.date}`,
+        ganZhi: selectedDayItem.ganZhi,
+        values: {
+          主星: selectedDayItem.tenGod || '—',
+          天干: selectedDayItem.gan || selectedDayItem.ganZhi?.charAt(0) || '',
+          地支: selectedDayItem.zhi || selectedDayItem.ganZhi?.charAt(1) || '',
+          藏干: hiddenText(
+            selectedDayItem.hiddenStems?.map((item: any) => item.stem).join(' '),
+            selectedDayItem.hiddenStems?.map((item: any) => item.tenGod).join(' '),
+          ),
+          纳音: selectedDayItem.naYin || '—',
+          神煞: selectedDayItem.shenSha?.join(' ') || '—',
+        },
+      } : null,
+    ].filter(Boolean);
+    return [...natalColumns, ...flowColumns];
+  }, [liuriList, liuyueList, pillars, selectedDayItem, selectedDayun, selectedMonthItem, selectedYearItem]);
 
   const selectDayun = (index: number) => {
     const next = selectedDayunIndex === index ? null : index;
@@ -140,43 +205,53 @@ const BaziGrid: React.FC<Props> = ({ data }) => {
         {base_info.zhen && <p className="mt-1 text-xs text-blue-600">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</p>}
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="grid min-w-[720px] grid-cols-[80px_repeat(4,1fr)_repeat(4,86px)] gap-2">
-          <div />
-          {pillars.map((pillar) => (
-            <div key={pillar.label} className="rounded-lg bg-stone-50 p-2 text-center text-sm font-bold text-stone-700">{pillar.label}</div>
-          ))}
-          <FlowColumn title="大运" subtitle={selectedDayun ? `${selectedDayun.startAge}岁` : undefined} ganZhi={selectedDayun?.ganZhi} meta={selectedDayun?.startYear ? `${selectedDayun.startYear}起` : undefined} />
-          <FlowColumn title="流年" subtitle={selectedYear ? `${selectedYear}` : undefined} ganZhi={selectedYearItem?.ganZhi} meta={selectedYearItem?.tenGod} />
-          <FlowColumn title="流月" subtitle={selectedMonth ? `${selectedMonth}月` : undefined} ganZhi={selectedMonthItem?.ganZhi} meta={selectedMonthItem?.jieQi} />
-          <FlowColumn title="流日" subtitle={selectedDay ? `${selectedDay}日` : undefined} ganZhi={selectedDayItem?.ganZhi} meta={selectedDayItem?.tenGod} />
-
-          {rowLabels.map((row) => (
-            <React.Fragment key={row}>
-              <div className="flex items-center justify-center rounded-lg bg-stone-50 px-2 text-xs font-semibold text-stone-500">{row}</div>
-              {pillars.map((pillar) => {
-                const content = row === '主星'
-                  ? pillar.tgGod
-                  : row === '天干'
-                    ? pillar.gan
-                    : row === '地支'
-                      ? pillar.zhi
-                      : row === '藏干'
-                        ? pillar.hidden
-                        : row === '纳音'
-                          ? pillar.nayin
-                          : pillar.shensha || '—';
-                const colorClass = row === '天干' || row === '地支' ? getWuxingColor(content) : 'text-stone-700';
-                return (
-                  <div key={`${row}-${pillar.label}`} className="min-h-[42px] rounded-lg border border-stone-100 bg-white p-2 text-center text-xs">
-                    <span className={`${row === '天干' || row === '地支' ? 'text-2xl font-bold' : ''} ${colorClass}`}>{content || '—'}</span>
-                  </div>
-                );
-              })}
-              <div className="col-span-4" />
-            </React.Fragment>
-          ))}
-        </div>
+      <div className="overflow-x-auto rounded-2xl border border-stone-100 bg-white">
+        <table className="w-full min-w-[760px] table-fixed border-separate border-spacing-0 text-center">
+          <thead>
+            <tr>
+              <th className="w-20 border-b border-stone-100 bg-stone-50 p-3 text-xs font-semibold text-stone-400">四柱</th>
+              {tableColumns.map((column) => (
+                <th
+                  key={column.key}
+                  className={`border-b border-l border-stone-100 p-3 ${
+                    column.kind === 'flow' ? 'bg-blue-50/70 text-blue-700' : 'bg-stone-50 text-stone-800'
+                  }`}
+                >
+                  <div className="text-base font-bold">{column.title}</div>
+                  {column.subtitle && <div className="mt-1 text-[10px] font-normal text-stone-500">{column.subtitle}</div>}
+                  {column.kind === 'flow' && column.ganZhi && (
+                    <div className="mt-2 flex justify-center gap-1 text-xl">
+                      <span className={getWuxingColor(column.ganZhi.charAt(0))}>{column.ganZhi.charAt(0)}</span>
+                      <span className={getWuxingColor(column.ganZhi.charAt(1))}>{column.ganZhi.charAt(1)}</span>
+                    </div>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rowLabels.map((row) => (
+              <tr key={row}>
+                <th className="border-b border-stone-100 bg-stone-50 p-3 text-xs font-semibold text-stone-500">{row}</th>
+                {tableColumns.map((column) => {
+                  const content = column.values[row as keyof typeof column.values] || '—';
+                  const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
+                  return (
+                    <td key={`${row}-${column.key}`} className="border-b border-l border-stone-100 p-3 align-middle">
+                      <div
+                        className={`mx-auto max-w-[150px] whitespace-normal break-keep text-center leading-5 ${
+                          row === '天干' || row === '地支' ? `text-3xl font-bold ${colorClass}` : 'text-xs text-stone-700'
+                        }`}
+                      >
+                        {content}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="mt-5 space-y-4 border-t border-stone-100 pt-4">

@@ -1364,11 +1364,36 @@ const App: React.FC = () => {
 
   const applyCaseChartParamsToForm = useCallback((chartParams: unknown) => {
     const params = normalizeCaseChartParams(chartParams);
+    const extendedParams = params as typeof params & {
+      calendarType?: 'solar' | 'lunar' | 'pillars';
+      isLeapMonth?: boolean;
+      timeInputMode?: 'exact' | 'quick';
+      useTrueSolar?: boolean;
+      district?: string;
+      pillars?: { year: string; month: string; day: string; hour: string };
+    };
+    const dateValue = buildCaseDateTimeValue(params);
+    const date = dateValue ? new Date(dateValue) : null;
     setName(params.name || '');
     setGender(params.sex ?? 0);
-    setCustomDate(buildCaseDateTimeValue(params));
+    setCustomDate(dateValue);
+    if (date && !Number.isNaN(date.getTime())) {
+      setLifeYear(date.getFullYear());
+      setLifeMonth(date.getMonth() + 1);
+      setLifeDay(date.getDate());
+      setLifeHour(date.getHours());
+      setLifeMinute(date.getMinutes());
+    }
+    setLifeCalendarType(extendedParams.calendarType || 'solar');
+    setLifeIsLeapMonth(Boolean(extendedParams.isLeapMonth));
+    setLifeTimeInputMode(extendedParams.timeInputMode || 'exact');
+    setLifeUseTrueSolar(Boolean(extendedParams.useTrueSolar));
+    if (extendedParams.pillars && typeof extendedParams.pillars === 'object') {
+      setLifePillars(extendedParams.pillars);
+    }
     setProvince(params.province || '');
     setCity(params.city || '');
+    setDistrict(extendedParams.district || '');
     setTimeMode('custom');
   }, []);
 
@@ -1376,8 +1401,20 @@ const App: React.FC = () => {
     setName('');
     setGender(0);
     setCustomDate('');
+    const now = new Date();
+    setLifeCalendarType('solar');
+    setLifeYear(now.getFullYear());
+    setLifeMonth(now.getMonth() + 1);
+    setLifeDay(now.getDate());
+    setLifeHour(9);
+    setLifeMinute(0);
+    setLifeTimeInputMode('quick');
+    setLifeUseTrueSolar(false);
+    setLifeIsLeapMonth(false);
+    setLifePillars({ year: '甲子', month: '甲子', day: '甲子', hour: '甲子' });
     setProvince('');
     setCity('');
+    setDistrict('');
     setQuestion('');
   }, []);
 
@@ -3872,23 +3909,39 @@ const App: React.FC = () => {
   const handleSaveCase = async () => {
     if (!isCaseModelType(modelType)) return;
     if (requireLoginIfGuestModeDisabled()) return;
-    if (!customDate) {
+    if (lifeCalendarType === 'pillars') {
+      if (!lifePillars.year || !lifePillars.month || !lifePillars.day || !lifePillars.hour) {
+        setError('请填写完整四柱');
+        return;
+      }
+    } else if (!lifeYear || !lifeMonth || !lifeDay) {
       setError('请选择出生日期');
       return;
     }
 
     try {
-      const date = new Date(customDate);
+      const lifePlaceText = buildBirthPlaceText(province, city, district);
+      const lifeCoord = findPlaceCoord(district, city, province);
+      const lifeUsesTrueSolar = lifeCalendarType !== 'pillars' && lifeTimeInputMode === 'exact' && lifeUseTrueSolar && Boolean(lifeCoord);
       const chartParams = {
         name: name || '',
         sex: gender,
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        day: date.getDate(),
-        hours: date.getHours(),
-        minute: date.getMinutes(),
+        year: lifeYear,
+        month: lifeMonth,
+        day: lifeDay,
+        hours: lifeHour,
+        minute: lifeMinute,
         province: province || '',
         city: city || '',
+        district: district || '',
+        birthPlace: lifePlaceText,
+        longitude: lifeUsesTrueSolar ? lifeCoord?.lng : undefined,
+        latitude: lifeUsesTrueSolar ? lifeCoord?.lat : undefined,
+        useTrueSolar: lifeUsesTrueSolar,
+        timeInputMode: lifeTimeInputMode,
+        calendarType: lifeCalendarType,
+        isLeapMonth: lifeIsLeapMonth,
+        pillars: lifeCalendarType === 'pillars' ? lifePillars : undefined,
       };
       const shouldReuseExistingChart = Boolean(
         editingCaseId &&
@@ -6356,7 +6409,7 @@ const App: React.FC = () => {
                           {editingCaseId ? '编辑命例' : '新增命例'}
                         </div>
                         <div className="text-xs text-stone-500">
-                          选择地区即按真太阳时排盘；不选择地区则按普通时间排盘。
+                          支持公历、农历、四柱排盘；精确时间可选择真太阳时，快捷时辰不使用真太阳时。
                         </div>
                       </div>
                       <button
@@ -6372,59 +6425,38 @@ const App: React.FC = () => {
                       </button>
                     </div>
 
-                    <div>
-                      <label className="block text-stone-700 font-bold mb-2">姓名 (可选)</label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="glass-input w-full rounded-2xl p-3"
-                        placeholder="张三"
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-stone-700 font-bold mb-2">性别</label>
-                        <div className="flex gap-4">
-                          <button
-                            type="button"
-                            onClick={() => setGender(0)}
-                            className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 0 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}
-                          >
-                            男 (乾)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setGender(1)}
-                            className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 1 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}
-                          >
-                            女 (坤)
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-stone-700 font-bold mb-2">出生时间 (阳历)</label>
-                        <input
-                          type="datetime-local"
-                          value={customDate}
-                          onChange={(e) => setCustomDate(e.target.value)}
-                          className="glass-input w-full rounded-2xl p-3"
-                        />
-                        {showSolarTimeReminder && (
-                          <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                            当前时间接近时辰交界（前后30分钟），建议选择地区启用真太阳时。
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <LocationSelector
+                    <LifeReadingForm
+                      modelLabel={modelType === ModelType.BAZI ? '八字' : '紫微'}
+                      name={name}
+                      setName={setName}
+                      gender={gender}
+                      setGender={setGender}
+                      calendarType={lifeCalendarType}
+                      setCalendarType={setLifeCalendarType}
+                      year={lifeYear}
+                      setYear={setLifeYear}
+                      month={lifeMonth}
+                      setMonth={setLifeMonth}
+                      day={lifeDay}
+                      setDay={setLifeDay}
+                      hour={lifeHour}
+                      setHour={setLifeHour}
+                      minute={lifeMinute}
+                      setMinute={setLifeMinute}
+                      timeInputMode={lifeTimeInputMode}
+                      setTimeInputMode={setLifeTimeInputMode}
+                      useTrueSolar={lifeUseTrueSolar}
+                      setUseTrueSolar={setLifeUseTrueSolar}
+                      isLeapMonth={lifeIsLeapMonth}
+                      setIsLeapMonth={setLifeIsLeapMonth}
+                      pillars={lifePillars}
+                      setPillars={setLifePillars}
                       province={province}
                       setProvince={setProvince}
                       city={city}
                       setCity={setCity}
+                      district={district}
+                      setDistrict={setDistrict}
                     />
 
                     <button
