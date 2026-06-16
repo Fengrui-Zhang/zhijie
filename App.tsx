@@ -176,9 +176,6 @@ const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 const KLINE_CHAT_MODEL: ChatModel = DEFAULT_REASONING_MODEL;
 
 const buildModelContent = (reasoning: string, answer: string) => {
-  if (reasoning.trim()) {
-    return `${THINKING_START}\n${reasoning}\n${THINKING_END}\n\n${answer}`;
-  }
   return answer;
 };
 
@@ -2516,11 +2513,9 @@ const App: React.FC = () => {
     const messagesHtml = chatHistory.map((msg, index) => {
       const parsed = msg.role === 'model' ? parseModelContent(msg.content) : null;
       const displayText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
-      const reasoningText = msg.role === 'model' && parsed?.reasoning ? parsed.reasoning : '';
       const timeText = msg.timestamp ? new Date(msg.timestamp).toLocaleString('zh-CN', { hour12: false }) : '';
       const roleLabel = msg.role === 'user' ? '用户' : '大师';
       const contentHtml = renderMarkdownToHtml(displayText);
-      const reasoningHtml = reasoningText ? renderMarkdownToHtml(reasoningText) : '';
 
       return `
         <div class="msg ${msg.role}">
@@ -2528,7 +2523,6 @@ const App: React.FC = () => {
             <div class="msg-role">${roleLabel}</div>
             <div class="msg-time">${escapeHtml(timeText)}</div>
           </div>
-          ${reasoningHtml ? `<div class="msg-reasoning"><div class="tag">思考过程</div><div class="msg-text">${reasoningHtml}</div></div>` : ''}
           <div class="msg-text">${contentHtml}</div>
           <div class="msg-index">#${index + 1}</div>
         </div>
@@ -7767,14 +7761,6 @@ const App: React.FC = () => {
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`group max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
-                        {msg.role === 'model' && parsed?.reasoning && (
-                          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
-                            <div className="mb-1 font-semibold">思考过程</div>
-                            <div className="markdown-body text-xs leading-relaxed">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.reasoning}</ReactMarkdown>
-                            </div>
-                          </div>
-                        )}
                         {msg.role === 'user' && !isEditingUserMessage ? (
                           <div className="flex items-end gap-3">
                             <div className="min-w-0 flex-1">
