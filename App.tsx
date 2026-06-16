@@ -2,8 +2,6 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useSession, signOut } from 'next-auth/react';
 import {
   DEFAULT_ANALYSIS_MODEL,
@@ -102,6 +100,7 @@ import GenericTaibuGrid from './components/GenericTaibuGrid';
 import FortuneGrid from './components/FortuneGrid';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
+import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 
 // --- Icons ---
@@ -807,32 +806,57 @@ const KnowledgeSourceSummaryPanel = ({ sources }: { sources?: KnowledgeSourceSum
   const [expanded, setExpanded] = useState(false);
   if (!sources?.length) return null;
 
-  const shownSources = expanded ? sources : sources.slice(0, 3);
+  const shownSources = expanded ? sources : sources.slice(0, 4);
 
   return (
-    <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/75 px-3 py-2 text-xs text-sky-950">
+    <div className="mt-3 border-t border-stone-200/70 pt-3 text-xs text-stone-600">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
-        className="flex w-full items-center justify-between gap-3 text-left font-semibold"
+        className="flex w-full items-center justify-between gap-3 text-left transition hover:text-stone-900"
       >
-        <span>参考了 {sources.length} 条知识库资料</span>
-        <span className="shrink-0 text-sky-600">{expanded ? '收起' : '查看'}</span>
+        <span className="inline-flex items-center gap-2 font-semibold">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[10px] text-amber-700">引</span>
+          <span>参考了 {sources.length} 个来源</span>
+        </span>
+        <span className={`shrink-0 text-stone-400 transition ${expanded ? 'rotate-180' : ''}`}>⌄</span>
       </button>
+
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {shownSources.map((source, index) => (
+          <span
+            key={`${source.id || source.source}-badge-${index}`}
+            title={source.preview || source.source}
+            className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-stone-200 bg-white/70 px-2.5 py-1 text-[11px] text-stone-600"
+          >
+            <span className="shrink-0 text-amber-600">册</span>
+            <span className="truncate">{source.title || source.source || `参考资料 ${index + 1}`}</span>
+          </span>
+        ))}
+        {!expanded && sources.length > shownSources.length && (
+          <span className="rounded-full border border-stone-200 bg-white/50 px-2.5 py-1 text-[11px] text-stone-400">
+            +{sources.length - shownSources.length}
+          </span>
+        )}
+      </div>
+
       {expanded && (
         <div className="mt-2 space-y-2">
-          {shownSources.map((source, index) => (
-            <div key={`${source.id || source.source}-${index}`} className="rounded-xl border border-sky-100 bg-white/75 px-3 py-2">
+          {sources.map((source, index) => (
+            <div key={`${source.id || source.source}-${index}`} className="rounded-xl border border-stone-200/70 bg-white/74 px-3 py-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate font-bold text-stone-800">
                   {source.title || source.source || `参考资料 ${index + 1}`}
                 </span>
-                <span className="shrink-0 text-[10px] text-stone-400">
+                <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500">
                   {Math.round((source.score || 0) * 100)}%
                 </span>
               </div>
+              {source.source && (
+                <div className="mt-1 text-[11px] text-stone-400">{source.source}</div>
+              )}
               {source.preview && (
-                <div className="mt-1 max-h-10 overflow-hidden leading-5 text-stone-500">
+                <div className="mt-1 max-h-14 overflow-hidden leading-5 text-stone-500">
                   {source.preview}
                 </div>
               )}
@@ -6946,9 +6970,7 @@ const App: React.FC<AppProps> = ({
                     ? 'rounded-tr-md bg-stone-900 text-white'
                     : 'rounded-tl-md border border-white/65 bg-white/72 text-stone-800'
                 }`}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.content}
-                  </ReactMarkdown>
+                  <MarkdownContent content={msg.content} />
                   {msg.role === 'model' && (
                     <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
                   )}
@@ -8717,11 +8739,7 @@ const App: React.FC<AppProps> = ({
                         {msg.role === 'user' && !isEditingUserMessage ? (
                           <div className="flex items-end gap-3">
                             <div className="min-w-0 flex-1">
-                              <div className="markdown-body text-sm leading-relaxed">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {msg.content}
-                                </ReactMarkdown>
-                              </div>
+                              <MarkdownContent content={msg.content} className="text-sm leading-relaxed" />
                             </div>
                             <button
                               type="button"
@@ -8743,7 +8761,7 @@ const App: React.FC<AppProps> = ({
                             </button>
                           </div>
                         ) : (
-                          <div className="markdown-body text-sm leading-relaxed">
+                          <div className="text-sm leading-relaxed">
                             {isEditingUserMessage ? (
                               <div className="space-y-3">
                                 <textarea
@@ -8775,9 +8793,7 @@ const App: React.FC<AppProps> = ({
                                 </div>
                               </div>
                             ) : (
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {msg.role === 'model' && parsed ? parsed.answer : msg.content}
-                              </ReactMarkdown>
+                              <MarkdownContent content={msg.role === 'model' && parsed ? parsed.answer : msg.content} />
                             )}
                           </div>
                         )}
@@ -8936,11 +8952,7 @@ const App: React.FC<AppProps> = ({
             </div>
             <div className="glass-chat-bg max-h-[calc(86vh-108px)] overflow-y-auto px-6 py-5">
               <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-5">
-                <div className="markdown-body text-sm leading-7 text-stone-700">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {currentCaseInitialAnalysis.content}
-                  </ReactMarkdown>
-                </div>
+                <MarkdownContent content={currentCaseInitialAnalysis.content} className="text-sm leading-7 text-stone-700" />
               </div>
             </div>
           </div>
