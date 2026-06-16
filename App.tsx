@@ -58,7 +58,10 @@ import {
 // Services
 import { 
   fetchQimen, fetchBazi, fetchZiwei, fetchMeihua, fetchLiuyao,
-  formatQimenPrompt, formatBaziPrompt, formatZiweiPrompt, formatMeihuaPrompt, formatLiuyaoPrompt 
+  fetchDaliuren, fetchTaiyi, fetchXiaoliuren, fetchAlmanac, fetchDailyFortune, fetchMonthlyFortune,
+  formatQimenPrompt, formatBaziPrompt, formatZiweiPrompt, formatMeihuaPrompt, formatLiuyaoPrompt,
+  formatDaliurenPrompt, formatTaiyiPrompt, formatXiaoliurenPrompt, formatAlmanacPrompt,
+  formatDailyFortunePrompt, formatMonthlyFortunePrompt,
 } from './services/apiService';
 import { startQimenChat, sendMessageToDeepseekStream, clearChatSession, restoreChatSession } from './services/deepseekService';
 
@@ -80,6 +83,7 @@ import {
   ZiweiResponse,
   MeihuaResponse,
   LiuyaoResponse,
+  GenericTaibuResponse,
 } from './types';
 
 // Components
@@ -88,6 +92,7 @@ import BaziGrid from './components/BaziGrid';
 import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
+import GenericTaibuGrid from './components/GenericTaibuGrid';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
@@ -526,6 +531,7 @@ type GuestStoredSession = {
 
 const isSupportedGuestSessionType = (value: unknown): value is string => {
   return (
+    Object.values(ModelType).includes(value as ModelType) ||
     isCaseModelType(value) ||
     value === JOINT_BAZI_ZIWEI_SESSION_TYPE ||
     value === BAZI_COMPATIBILITY_SESSION_TYPE
@@ -606,6 +612,12 @@ const MODEL_LABELS: Record<string, string> = {
   ziwei: '紫微斗数',
   meihua: '梅花易数',
   liuyao: '六爻纳甲',
+  daliuren: '大六壬',
+  taiyi: '太乙神数',
+  xiaoliuren: '小六壬',
+  almanac: '黄历/择日',
+  daily_fortune: '每日运势',
+  monthly_fortune: '每月运势',
   joint_bazi_ziwei: '八字+紫微联合',
   bazi_compatibility: '八字合盘',
 };
@@ -914,6 +926,18 @@ const buildSystemInstruction = (
       return `你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。\n\n${formatMeihuaPrompt(cData as any, '')}`;
     case ModelType.LIUYAO:
       return `你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。\n\n${formatLiuyaoPrompt(cData as any, '')}`;
+    case ModelType.DALIUREN:
+      return `你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。\n\n${formatDaliurenPrompt(cData as GenericTaibuResponse, '')}`;
+    case ModelType.TAIYI:
+      return `你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。\n\n${formatTaiyiPrompt(cData as GenericTaibuResponse, '')}`;
+    case ModelType.XIAOLIUREN:
+      return `你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。\n\n${formatXiaoliurenPrompt(cData as GenericTaibuResponse, '')}`;
+    case ModelType.ALMANAC:
+      return `你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。\n\n${formatAlmanacPrompt(cData as GenericTaibuResponse, '')}`;
+    case ModelType.DAILY_FORTUNE:
+      return `你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。\n\n${formatDailyFortunePrompt(cData as GenericTaibuResponse, '')}`;
+    case ModelType.MONTHLY_FORTUNE:
+      return `你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。\n\n${formatMonthlyFortunePrompt(cData as GenericTaibuResponse, '')}`;
     default:
       return '';
   }
@@ -1027,6 +1051,61 @@ const buildInitialAnalysisBundle = (
     };
   }
 
+  if (mType === ModelType.DALIUREN) {
+    return {
+      question,
+      prompt: formatDaliurenPrompt(cData as GenericTaibuResponse, question),
+      systemInstruction: "你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.TAIYI) {
+    return {
+      question,
+      prompt: formatTaiyiPrompt(cData as GenericTaibuResponse, question),
+      systemInstruction: "你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.XIAOLIUREN) {
+    return {
+      question,
+      prompt: formatXiaoliurenPrompt(cData as GenericTaibuResponse, question),
+      systemInstruction: "你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.ALMANAC) {
+    return {
+      question,
+      prompt: formatAlmanacPrompt(cData as GenericTaibuResponse, question),
+      systemInstruction: "你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
+  if (mType === ModelType.DAILY_FORTUNE || mType === ModelType.MONTHLY_FORTUNE) {
+    const isMonthly = mType === ModelType.MONTHLY_FORTUNE;
+    return {
+      question,
+      prompt: isMonthly
+        ? formatMonthlyFortunePrompt(cData as GenericTaibuResponse, question)
+        : formatDailyFortunePrompt(cData as GenericTaibuResponse, question),
+      systemInstruction: isMonthly
+        ? "你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。"
+        : "你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。",
+      knowledgeQuery: question,
+      userContent: buildInitialUserContent(mType, chartParams, question),
+    };
+  }
+
   return {
     question,
     prompt: formatLiuyaoPrompt(cData as LiuyaoResponse, question),
@@ -1070,6 +1149,8 @@ const App: React.FC = () => {
   const [professionalSelectedProject, setProfessionalSelectedProject] = useState<string | null>(null);
   const [professionalMode, setProfessionalMode] = useState<'existing' | 'new'>('existing');
   const [professionalCaseOptions, setProfessionalCaseOptions] = useState<CaseItem[]>([]);
+  const [fortuneCaseOptions, setFortuneCaseOptions] = useState<CaseItem[]>([]);
+  const [fortuneCaseId, setFortuneCaseId] = useState<string>('');
   const [professionalCasesLoading, setProfessionalCasesLoading] = useState(false);
   const [professionalSelectedCaseId, setProfessionalSelectedCaseId] = useState<string | null>(null);
   const [professionalBusy, setProfessionalBusy] = useState(false);
@@ -1487,6 +1568,28 @@ const App: React.FC = () => {
     }
   }, [isLoggedIn, readGuestCases]);
 
+  const hydrateFortuneCaseOptions = useCallback(async () => {
+    if (!isLoggedIn) {
+      const items = readGuestCases()
+        .filter((item) => item.modelType === ModelType.BAZI)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      setFortuneCaseOptions(items);
+      setFortuneCaseId((current) => current || items[0]?.id || '');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/cases?modelType=bazi');
+      if (!res.ok) return;
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : [];
+      setFortuneCaseOptions(items);
+      setFortuneCaseId((current) => current || items[0]?.id || '');
+    } catch {
+      // silently ignore
+    }
+  }, [isLoggedIn, readGuestCases]);
+
   const loadCaseDetail = useCallback(async (caseId: string) => {
     if (!isCaseModel) return;
 
@@ -1684,6 +1787,11 @@ const App: React.FC = () => {
 
     hydrateCasesForModel(modelType);
   }, [hydrateCasesForModel, modelType]);
+
+  useEffect(() => {
+    if (modelType !== ModelType.DAILY_FORTUNE && modelType !== ModelType.MONTHLY_FORTUNE) return;
+    hydrateFortuneCaseOptions();
+  }, [hydrateFortuneCaseOptions, modelType]);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -2853,7 +2961,7 @@ const App: React.FC = () => {
     }
   };
 
-  const knowledgeBoardMap: Record<ModelType, string> = {
+  const knowledgeBoardMap: Partial<Record<ModelType, string>> = {
     [ModelType.QIMEN]: 'qimen',
     [ModelType.BAZI]: 'bazi',
     [ModelType.ZIWEI]: 'ziweidoushu',
@@ -4276,7 +4384,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[targetCase.modelType],
+            board: knowledgeBoardMap[targetCase.modelType] || 'bazi',
             query: knowledgeQuery,
           }
         : undefined;
@@ -4455,7 +4563,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[targetCase.modelType],
+            board: knowledgeBoardMap[targetCase.modelType] || 'bazi',
             query: knowledgeQuery || trimmedQuestion,
           }
         : undefined;
@@ -4594,10 +4702,22 @@ const App: React.FC = () => {
     if (requireLoginIfGuestModeDisabled()) return;
 
     // Validation
-    const isDivination = [ModelType.QIMEN, ModelType.MEIHUA, ModelType.LIUYAO].includes(modelType);
+    const isDivination = [
+      ModelType.QIMEN,
+      ModelType.MEIHUA,
+      ModelType.LIUYAO,
+      ModelType.DALIUREN,
+      ModelType.TAIYI,
+      ModelType.XIAOLIUREN,
+    ].includes(modelType);
+    const isFortuneReading = modelType === ModelType.DAILY_FORTUNE || modelType === ModelType.MONTHLY_FORTUNE;
     
     if (isDivination && !question.trim()) {
       setError("请输入您的问题");
+      return;
+    }
+    if (isFortuneReading && !fortuneCaseId) {
+      setError("请先选择一个八字命例。没有命例时，请先在四柱八字中新增命例。");
       return;
     }
     if ((modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) && lifeCalendarType === 'pillars') {
@@ -4655,32 +4775,40 @@ const App: React.FC = () => {
       } else if (!isLifeReading && timeMode === 'custom' && customDate) {
          date = new Date(customDate);
       }
+      const fortuneCase = isFortuneReading
+        ? fortuneCaseOptions.find((item) => item.id === fortuneCaseId)
+        : null;
+      const fortuneCaseParams = (fortuneCase?.chartParams || {}) as Record<string, any>;
 
       const lifePlaceText = buildBirthPlaceText(province, city, district);
       const lifeCoord = findPlaceCoord(district, city, province);
       const lifeUsesTrueSolar = isLifeReading && lifeTimeInputMode === 'exact' && lifeUseTrueSolar && Boolean(lifeCoord);
 
       const baseParams: any = {
-        year: isLifeReading ? lifeYear : date.getFullYear(),
-        month: isLifeReading ? lifeMonth : date.getMonth() + 1,
-        day: isLifeReading ? lifeDay : date.getDate(),
-        hours: isLifeReading ? lifeHour : date.getHours(),
-        minute: isLifeReading ? lifeMinute : date.getMinutes(),
-        sex: gender,
-        name: name || '某人',
+        year: isFortuneReading ? Number(fortuneCaseParams.year || date.getFullYear()) : (isLifeReading ? lifeYear : date.getFullYear()),
+        month: isFortuneReading ? Number(fortuneCaseParams.month || date.getMonth() + 1) : (isLifeReading ? lifeMonth : date.getMonth() + 1),
+        day: isFortuneReading ? Number(fortuneCaseParams.day || date.getDate()) : (isLifeReading ? lifeDay : date.getDate()),
+        hours: isFortuneReading ? Number(fortuneCaseParams.hours || 9) : (isLifeReading ? lifeHour : date.getHours()),
+        minute: isFortuneReading ? Number(fortuneCaseParams.minute || 0) : (isLifeReading ? lifeMinute : date.getMinutes()),
+        sex: isFortuneReading ? Number(fortuneCaseParams.sex || 0) : gender,
+        name: isFortuneReading ? (fortuneCaseParams.name || fortuneCase?.title || '某人') : (name || '某人'),
         born_year: birthYear ? parseInt(birthYear) : undefined,
-        province: province,
-        city: city,
-        district,
-        birthPlace: lifePlaceText,
-        longitude: lifeUsesTrueSolar ? lifeCoord?.lng : undefined,
-        latitude: lifeUsesTrueSolar ? lifeCoord?.lat : undefined,
-        useTrueSolar: lifeUsesTrueSolar,
-        timeInputMode: isLifeReading ? lifeTimeInputMode : undefined,
-        calendarType: isLifeReading ? lifeCalendarType : undefined,
-        isLeapMonth: isLifeReading ? lifeIsLeapMonth : undefined,
-        pillars: isLifeReading && lifeCalendarType === 'pillars' ? lifePillars : undefined,
+        province: isFortuneReading ? fortuneCaseParams.province : province,
+        city: isFortuneReading ? fortuneCaseParams.city : city,
+        district: isFortuneReading ? fortuneCaseParams.district : district,
+        birthPlace: isFortuneReading ? fortuneCaseParams.birthPlace : lifePlaceText,
+        longitude: isFortuneReading ? fortuneCaseParams.longitude : (lifeUsesTrueSolar ? lifeCoord?.lng : undefined),
+        latitude: isFortuneReading ? fortuneCaseParams.latitude : (lifeUsesTrueSolar ? lifeCoord?.lat : undefined),
+        useTrueSolar: isFortuneReading ? fortuneCaseParams.useTrueSolar : lifeUsesTrueSolar,
+        timeInputMode: isFortuneReading ? fortuneCaseParams.timeInputMode : (isLifeReading ? lifeTimeInputMode : undefined),
+        calendarType: isFortuneReading ? fortuneCaseParams.calendarType : (isLifeReading ? lifeCalendarType : undefined),
+        isLeapMonth: isFortuneReading ? fortuneCaseParams.isLeapMonth : (isLifeReading ? lifeIsLeapMonth : undefined),
+        pillars: isFortuneReading ? fortuneCaseParams.pillars : (isLifeReading && lifeCalendarType === 'pillars' ? lifePillars : undefined),
+        targetYear: isFortuneReading ? date.getFullYear() : undefined,
+        targetMonth: isFortuneReading ? date.getMonth() + 1 : undefined,
+        targetDay: isFortuneReading ? date.getDate() : undefined,
         pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
+        taiyi_mode: modelType === ModelType.TAIYI ? 'hour' : undefined,
         question,
       };
 
@@ -4745,6 +4873,36 @@ const App: React.FC = () => {
           prompt = formatLiuyaoPrompt(resultData, question);
           systemInstruction = "你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。";
           break;
+        case ModelType.DALIUREN:
+          resultData = await fetchDaliuren(baseParams);
+          prompt = formatDaliurenPrompt(resultData, question);
+          systemInstruction = "你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。";
+          break;
+        case ModelType.TAIYI:
+          resultData = await fetchTaiyi(baseParams);
+          prompt = formatTaiyiPrompt(resultData, question);
+          systemInstruction = "你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。";
+          break;
+        case ModelType.XIAOLIUREN:
+          resultData = await fetchXiaoliuren(baseParams);
+          prompt = formatXiaoliurenPrompt(resultData, question);
+          systemInstruction = "你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。";
+          break;
+        case ModelType.ALMANAC:
+          resultData = await fetchAlmanac(baseParams);
+          prompt = formatAlmanacPrompt(resultData, question);
+          systemInstruction = "你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。";
+          break;
+        case ModelType.DAILY_FORTUNE:
+          resultData = await fetchDailyFortune(baseParams);
+          prompt = formatDailyFortunePrompt(resultData, question);
+          systemInstruction = "你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。";
+          break;
+        case ModelType.MONTHLY_FORTUNE:
+          resultData = await fetchMonthlyFortune(baseParams);
+          prompt = formatMonthlyFortunePrompt(resultData, question);
+          systemInstruction = "你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。";
+          break;
       }
 
       setChartData(resultData);
@@ -4752,7 +4910,7 @@ const App: React.FC = () => {
       requestSectionScroll('report');
 
       // --- Save session to DB immediately (before AI streaming) ---
-      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || name || new Date().toLocaleDateString('zh-CN')}`;
+      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || baseParams.name || new Date().toLocaleDateString('zh-CN')}`;
       const sessionChartParams = { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>;
       const newSessionId = await saveSessionToDb(
         modelType,
@@ -4803,7 +4961,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[modelType],
+            board: knowledgeBoardMap[modelType] || 'bazi',
             query: knowledgeQueryText,
           }
         : undefined;
@@ -4952,7 +5110,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[modelType],
+            board: knowledgeBoardMap[modelType] || 'bazi',
             query: bundle.knowledgeQuery || bundle.question,
           }
         : undefined;
@@ -5099,7 +5257,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[modelType],
+            board: knowledgeBoardMap[modelType] || 'bazi',
             query: knowledgeQuery,
           }
         : undefined;
@@ -5253,7 +5411,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[modelType],
+            board: knowledgeBoardMap[modelType] || 'bazi',
             query: knowledgeQuery,
           }
         : undefined;
@@ -5376,7 +5534,7 @@ const App: React.FC = () => {
       const knowledge = useKnowledge && supportsKnowledge
         ? {
             enabled: true,
-            board: knowledgeBoardMap[modelType],
+            board: knowledgeBoardMap[modelType] || 'bazi',
             query: outgoingMessage,
           }
         : undefined;
@@ -5876,9 +6034,11 @@ const App: React.FC = () => {
 
   // --- Render Helpers ---
   const isLifeReading = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
+  const isFortuneReading = modelType === ModelType.DAILY_FORTUNE || modelType === ModelType.MONTHLY_FORTUNE;
   // Only Bazi and Ziwei use location for True Solar Time
   const showLocation = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI || modelType === ModelType.QIMEN;
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
+  const showStandardTimeInput = !isLifeReading && !isLiupanModeModel(modelType);
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
@@ -5891,10 +6051,17 @@ const App: React.FC = () => {
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
     modelType === ModelType.BAZI ? '四柱八字（盲派）' :
     modelType === ModelType.ZIWEI ? '紫微斗数' :
+    modelType === ModelType.DAILY_FORTUNE ? '每日运势' :
+    modelType === ModelType.MONTHLY_FORTUNE ? '每月运势' :
     modelType === ModelType.QIMEN ? '奇门遁甲' :
     modelType === ModelType.LIUYAO ? '六爻纳甲' :
-    '梅花易数';
-  const currentWorkspaceLabel = professionalSelectedProject ? '进阶功能' : isCaseModel ? '命理库' : '占卜排盘';
+    modelType === ModelType.MEIHUA ? '梅花易数' :
+    modelType === ModelType.DALIUREN ? '大六壬' :
+    modelType === ModelType.TAIYI ? '太乙神数' :
+    modelType === ModelType.XIAOLIUREN ? '小六壬' :
+    modelType === ModelType.ALMANAC ? '黄历/择日' :
+    MODEL_LABELS[modelType] || '排盘';
+  const currentWorkspaceLabel = professionalSelectedProject ? '进阶功能' : isCaseModel ? '命理库' : isFortuneReading ? '命理运势' : modelType === ModelType.ALMANAC ? '择日工具' : '占卜排盘';
   const currentCaseInitialAnalysis = activeCase
     ? normalizeInitialAnalysisData(activeCase.initialAnalysisData)
     : null;
@@ -5968,6 +6135,8 @@ const App: React.FC = () => {
           {[
             [ModelType.BAZI, '四柱八字（盲派）'],
             [ModelType.ZIWEI, '紫微斗数'],
+            [ModelType.DAILY_FORTUNE, '每日运势'],
+            [ModelType.MONTHLY_FORTUNE, '每月运势'],
           ].map(([type, label]) => {
             const selected = modelType === type && !professionalSelectedProject;
             return (
@@ -5994,6 +6163,33 @@ const App: React.FC = () => {
             [ModelType.QIMEN, '奇门遁甲'],
             [ModelType.LIUYAO, '六爻纳甲'],
             [ModelType.MEIHUA, '梅花易数'],
+            [ModelType.DALIUREN, '大六壬'],
+            [ModelType.TAIYI, '太乙神数'],
+            [ModelType.XIAOLIUREN, '小六壬'],
+          ].map(([type, label]) => {
+            const selected = modelType === type && !professionalSelectedProject;
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleModelChange(type as ModelType)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+                  selected
+                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+                    : 'border-white/60 bg-white/45 text-stone-700 hover:bg-white/75 hover:text-stone-900'
+                }`}
+              >
+                <span>{label}</span>
+                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">择日工具</div>
+          {[
+            [ModelType.ALMANAC, '黄历/择日'],
           ].map(([type, label]) => {
             const selected = modelType === type && !professionalSelectedProject;
             return (
@@ -6880,6 +7076,29 @@ const App: React.FC = () => {
                 />
               )}
 
+              {isFortuneReading && (
+                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
+                  <label className="block text-stone-700 font-bold mb-2">选择八字命例</label>
+                  {fortuneCaseOptions.length > 0 ? (
+                    <select
+                      value={fortuneCaseId}
+                      onChange={(event) => setFortuneCaseId(event.target.value)}
+                      className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
+                    >
+                      {fortuneCaseOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
+                      暂无八字命例。请先进入“四柱八字（盲派）”新增命例，再生成每日或每月运势。
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Birth Year (Meihua & Liuyao) */}
               {!isLifeReading && showBornYear && (
                  <div>
@@ -6905,10 +7124,10 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Time Input for Standard Models (Qimen, Meihua, Bazi, Ziwei) */}
-                {modelType !== ModelType.LIUYAO && modelType !== ModelType.MEIHUA && (
+                {showStandardTimeInput && (
                   <div>
                     <label className="block text-stone-700 font-bold mb-2">
-                      {isLifeReading ? "出生时间 (阳历)" : "起卦时间"}
+                      {isFortuneReading ? (modelType === ModelType.MONTHLY_FORTUNE ? '运势月份' : '运势日期') : modelType === ModelType.ALMANAC ? '择日日期' : '起盘时间'}
                     </label>
                     {!isLifeReading && (
                       <div className="flex gap-2 mb-2">
@@ -7176,10 +7395,7 @@ const App: React.FC = () => {
             <div ref={reportChartRef} className="space-y-4">
               <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
                  <span className="font-bold text-stone-700">
-                  {modelType === ModelType.QIMEN ? '奇门排盘' : 
-                   modelType === ModelType.BAZI ? '八字命盘' : 
-                   modelType === ModelType.ZIWEI ? '紫微斗数' : 
-                   modelType === ModelType.MEIHUA ? '梅花易数' : '六爻纳甲'}
+                  {MODEL_LABELS[modelType] || '排盘结果'}
                  </span>
                  <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
               </div>
@@ -7260,6 +7476,16 @@ const App: React.FC = () => {
                   {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
                   {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
                   {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
+                  {[
+                    ModelType.DALIUREN,
+                    ModelType.TAIYI,
+                    ModelType.XIAOLIUREN,
+                    ModelType.ALMANAC,
+                    ModelType.DAILY_FORTUNE,
+                    ModelType.MONTHLY_FORTUNE,
+                  ].includes(modelType) && (
+                    <GenericTaibuGrid data={chartData as GenericTaibuResponse} title={MODEL_LABELS[modelType]} />
+                  )}
                 </>
               )}
             </div>

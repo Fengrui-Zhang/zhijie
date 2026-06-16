@@ -4,7 +4,13 @@ export enum ModelType {
   BAZI = 'bazi',
   ZIWEI = 'ziwei',
   MEIHUA = 'meihua',
-  LIUYAO = 'liuyao'
+  LIUYAO = 'liuyao',
+  DALIUREN = 'daliuren',
+  TAIYI = 'taiyi',
+  XIAOLIUREN = 'xiaoliuren',
+  ALMANAC = 'almanac',
+  DAILY_FORTUNE = 'daily_fortune',
+  MONTHLY_FORTUNE = 'monthly_fortune'
 }
 
 export enum LiuyaoMode {
@@ -61,6 +67,21 @@ export interface BaseParams {
   number?: number;
   number_up?: number;
   number_down?: number;
+
+  // Taiyi Specifics
+  taiyi_mode?: 'year' | 'month' | 'day' | 'hour' | 'minute';
+
+  // Fortune target date
+  targetYear?: number;
+  targetMonth?: number;
+  targetDay?: number;
+}
+
+export interface GenericTaibuResponse {
+  taibuText: string;
+  taibuJson: unknown;
+  base_info: Record<string, unknown>;
+  detail_info: Record<string, unknown>;
 }
 
 export interface QimenParams extends BaseParams {

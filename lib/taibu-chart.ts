@@ -42,7 +42,33 @@ import {
   type LiuyaoInput,
   type LiuyaoOutput,
 } from 'taibu-core/liuyao';
+import {
+  calculateDaliuren,
+  toDaliurenJson,
+  toDaliurenText,
+  type DaliurenOutput,
+} from 'taibu-core/daliuren';
+import {
+  calculateTaiyi,
+  toTaiyiJson,
+  toTaiyiText,
+  type TaiyiMode,
+  type TaiyiOutput,
+} from 'taibu-core/taiyi';
+import {
+  calculateXiaoliurenData,
+  toXiaoliurenJson,
+  toXiaoliurenText,
+  type XiaoliurenOutput,
+} from 'taibu-core/xiaoliuren';
+import {
+  calculateDailyAlmanac,
+  toAlmanacJson,
+  toAlmanacText,
+  type AlmanacOutput,
+} from 'taibu-core/almanac';
 import { HEXAGRAMS } from 'taibu-core/data/hexagrams';
+import { Solar } from 'lunar-javascript';
 import { ModelType, LiuyaoMode, type BaseParams, type QimenParams } from '../types';
 
 type ChartRequest = {
@@ -57,6 +83,8 @@ type BirthInput = ReturnType<typeof commonBirthInput>;
 
 const dateTimeString = (params: BaseParams) =>
   `${params.year}-${pad2(params.month)}-${pad2(params.day)}T${pad2(params.hours)}:${pad2(params.minute)}`;
+const dateOnlyString = (params: BaseParams) =>
+  `${params.year}-${pad2(params.month)}-${pad2(params.day)}`;
 const pillar = (value?: { gan: string; zhi: string } | string) => {
   if (!value) return '';
   if (typeof value === 'string') return value;
@@ -547,6 +575,250 @@ function adaptLiuyao(params: BaseParams, chart: LiuyaoOutput) {
   };
 }
 
+function buildGenericBaseInfo(params: BaseParams, extra: Record<string, unknown> = {}) {
+  return {
+    name: params.name || '匿名',
+    sex: sexLabel(params.sex),
+    gongli: `${dateOnlyString(params)} ${pad2(params.hours)}:${pad2(params.minute)}`,
+    question: (params as QimenParams).question || '',
+    ...extra,
+  };
+}
+
+function adaptDaliuren(params: BaseParams, chart: DaliurenOutput) {
+  return {
+    taibuText: toDaliurenText(chart, { detailLevel: 'full' }),
+    taibuJson: toDaliurenJson(chart),
+    base_info: buildGenericBaseInfo(params, {
+      nongli: chart.dateInfo.lunarDate || '',
+      keName: chart.keName,
+      yueJiang: chart.dateInfo.yueJiangName || chart.dateInfo.yueJiang,
+      xun: chart.dateInfo.xun,
+      kongWang: chart.dateInfo.kongWang,
+    }),
+    detail_info: {
+      daliuren: {
+        dateInfo: chart.dateInfo,
+        tianDiPan: chart.tianDiPan,
+        siKe: chart.siKe,
+        sanChuan: chart.sanChuan,
+        keTi: chart.keTi,
+        shenSha: chart.shenSha,
+        gongInfos: chart.gongInfos,
+      },
+    },
+  };
+}
+
+function adaptTaiyi(params: BaseParams, chart: TaiyiOutput) {
+  return {
+    taibuText: toTaiyiText(chart, { detailLevel: 'full' }),
+    taibuJson: toTaiyiJson(chart),
+    base_info: buildGenericBaseInfo(params, {
+      mode: chart.boardMeta.modeLabel,
+      solarDateTime: chart.datetimeContext.solarDateTime,
+      lunarDate: chart.datetimeContext.lunarDate,
+      yearGanZhi: chart.datetimeContext.yearGanZhi,
+      monthGanZhi: chart.datetimeContext.monthGanZhi,
+      dayGanZhi: chart.datetimeContext.dayGanZhi,
+      hourGanZhi: chart.datetimeContext.hourGanZhi,
+    }),
+    detail_info: {
+      taiyi: chart,
+    },
+  };
+}
+
+function solarToLunarMonthDay(params: BaseParams) {
+  const lunar = Solar.fromYmd(params.year, params.month, params.day).getLunar() as any;
+  return {
+    lunarMonth: Number(lunar.getMonth()),
+    lunarDay: Number(lunar.getDay()),
+  };
+}
+
+function adaptXiaoliuren(params: BaseParams, chart: XiaoliurenOutput) {
+  return {
+    taibuText: toXiaoliurenText(chart),
+    taibuJson: toXiaoliurenJson(chart),
+    base_info: buildGenericBaseInfo(params, {
+      lunarMonth: chart.input.lunarMonth,
+      lunarDay: chart.input.lunarDay,
+      shichen: chart.input.shichen,
+      result: chart.result.name,
+      nature: chart.result.nature,
+    }),
+    detail_info: {
+      xiaoliuren: chart,
+    },
+  };
+}
+
+function adaptAlmanac(params: BaseParams, chart: AlmanacOutput) {
+  return {
+    taibuText: toAlmanacText(chart),
+    taibuJson: toAlmanacJson(chart),
+    base_info: buildGenericBaseInfo(params, {
+      date: chart.date,
+      ganZhi: chart.dayInfo.ganZhi,
+      dayStem: chart.dayInfo.stem,
+      dayBranch: chart.dayInfo.branch,
+      tenGod: chart.tenGod || '',
+    }),
+    detail_info: {
+      almanac: chart,
+    },
+  };
+}
+
+const FORTUNE_LEVELS = ['偏弱', '平稳', '小吉', '顺遂', '旺相'];
+const FORTUNE_CATEGORIES = ['综合', '事业', '感情', '财富', '健康', '社交'] as const;
+
+function fortuneScore(seed: string, offset: number) {
+  let total = offset * 17;
+  for (let index = 0; index < seed.length; index += 1) {
+    total += seed.charCodeAt(index) * (index + 3);
+  }
+  return (Math.abs(total) % 5) + 1;
+}
+
+async function buildDailyFortune(params: BaseParams) {
+  const target = {
+    ...params,
+    year: params.targetYear || params.year,
+    month: params.targetMonth || params.month,
+    day: params.targetDay || params.day,
+  };
+  const input = commonBirthInput(params);
+  const bazi = calculateBazi(input);
+  const almanac = await calculateDailyAlmanac({
+    date: dateOnlyString(target),
+    dayMaster: bazi.fourPillars.day.stem,
+    birthYear: params.year,
+    birthMonth: params.month,
+    birthDay: params.day,
+    birthHour: params.hours,
+  });
+  const seed = [
+    params.name || '',
+    dateOnlyString(target),
+    bazi.fourPillars.day.stem,
+    almanac.dayInfo.ganZhi,
+    almanac.tenGod || '',
+  ].join('|');
+  const categories = Object.fromEntries(
+    FORTUNE_CATEGORIES.map((label, index) => {
+      const score = fortuneScore(seed, index);
+      return [label, {
+        score,
+        level: FORTUNE_LEVELS[score - 1],
+      }];
+    })
+  );
+  const advice = [
+    `日主${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}，今日${almanac.dayInfo.ganZhi}。`,
+    almanac.tenGod ? `今日十神侧重：${almanac.tenGod}。` : '今日以日课与命局关系综合判断。',
+    '宜先看整体节奏，再结合具体问题细断。',
+  ];
+  const text = [
+    '【每日运势】',
+    `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,
+    `日期：${dateOnlyString(target)}`,
+    `命局日主：${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
+    `今日干支：${almanac.dayInfo.ganZhi}`,
+    '',
+    ...Object.entries(categories).map(([label, item]: [string, any]) => `${label}：${item.level}（${item.score}/5）`),
+    '',
+    `建议：${advice.join(' ')}`,
+  ].join('\n');
+
+  return {
+    taibuText: text,
+    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), categories, advice },
+    base_info: buildGenericBaseInfo(params, {
+      date: dateOnlyString(target),
+      dayMaster: `${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
+      todayGanZhi: almanac.dayInfo.ganZhi,
+    }),
+    detail_info: {
+      fortune: {
+        type: 'daily',
+        categories,
+        advice,
+        almanac,
+      },
+    },
+  };
+}
+
+async function buildMonthlyFortune(params: BaseParams) {
+  const target = {
+    ...params,
+    year: params.targetYear || params.year,
+    month: params.targetMonth || params.month,
+    day: params.targetDay || params.day,
+  };
+  const input = commonBirthInput(params);
+  const bazi = calculateBazi(input);
+  const midMonthParams = { ...target, day: Math.min(15, target.day || 15) };
+  const almanac = await calculateDailyAlmanac({
+    date: dateOnlyString(midMonthParams),
+    dayMaster: bazi.fourPillars.day.stem,
+    birthYear: params.year,
+    birthMonth: params.month,
+    birthDay: params.day,
+    birthHour: params.hours,
+  });
+  const seed = [
+    params.name || '',
+    `${target.year}-${target.month}`,
+    bazi.fourPillars.day.stem,
+    almanac.dayInfo.ganZhi,
+    almanac.tenGod || '',
+  ].join('|');
+  const categories = Object.fromEntries(
+    FORTUNE_CATEGORIES.map((label, index) => {
+      const score = fortuneScore(seed, index + 8);
+      return [label, {
+        score,
+        level: FORTUNE_LEVELS[score - 1],
+      }];
+    })
+  );
+  const summary = [
+    `${params.year}年${params.month}月以${almanac.dayInfo.ganZhi}为月内参考日课。`,
+    almanac.tenGod ? `本月重点可从${almanac.tenGod}角度观察。` : '本月重点以命局与月内节奏综合观察。',
+    '不输出重要日期提醒，仅保留运势趋势与建议。',
+  ];
+  const text = [
+    '【每月运势】',
+    `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,
+    `月份：${target.year}-${pad2(target.month)}`,
+    `命局日主：${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
+    '',
+    ...Object.entries(categories).map(([label, item]: [string, any]) => `${label}：${item.level}（${item.score}/5）`),
+    '',
+    `总结：${summary.join(' ')}`,
+  ].join('\n');
+
+  return {
+    taibuText: text,
+    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), categories, summary },
+    base_info: buildGenericBaseInfo(params, {
+      month: `${target.year}-${pad2(target.month)}`,
+      dayMaster: `${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
+    }),
+    detail_info: {
+      fortune: {
+        type: 'monthly',
+        categories,
+        summary,
+        almanac,
+      },
+    },
+  };
+}
+
 export async function calculateTaibuChart({ modelType, params }: ChartRequest) {
   switch (modelType) {
     case ModelType.QIMEN: {
@@ -593,6 +865,57 @@ export async function calculateTaibuChart({ modelType, params }: ChartRequest) {
       const chart = await calculateLiuyao(buildLiuyaoInput(base, (base as QimenParams).question || '所问之事'));
       return adaptLiuyao(base, chart);
     }
+    case ModelType.DALIUREN: {
+      const base = params as BaseParams;
+      const chart = calculateDaliuren({
+        date: dateOnlyString(base),
+        hour: base.hours,
+        minute: base.minute,
+        timezone: 'Asia/Shanghai',
+        question: (base as QimenParams).question || undefined,
+        birthYear: base.born_year,
+        gender: gender(base.sex),
+      });
+      return adaptDaliuren(base, chart);
+    }
+    case ModelType.TAIYI: {
+      const base = params as BaseParams;
+      const chart = calculateTaiyi({
+        mode: (base.taiyi_mode || 'hour') as TaiyiMode,
+        date: dateOnlyString(base),
+        hour: base.hours,
+        minute: base.minute,
+        timezone: 'Asia/Shanghai',
+        question: (base as QimenParams).question || undefined,
+      });
+      return adaptTaiyi(base, chart);
+    }
+    case ModelType.XIAOLIUREN: {
+      const base = params as BaseParams;
+      const lunar = solarToLunarMonthDay(base);
+      const chart = calculateXiaoliurenData({
+        lunarMonth: lunar.lunarMonth,
+        lunarDay: lunar.lunarDay,
+        hour: base.hours,
+        question: (base as QimenParams).question || undefined,
+      });
+      return adaptXiaoliuren(base, chart);
+    }
+    case ModelType.ALMANAC: {
+      const base = params as BaseParams;
+      const chart = await calculateDailyAlmanac({
+        date: dateOnlyString(base),
+        birthYear: base.born_year,
+        birthMonth: base.month,
+        birthDay: base.day,
+        birthHour: base.hours,
+      });
+      return adaptAlmanac(base, chart);
+    }
+    case ModelType.DAILY_FORTUNE:
+      return buildDailyFortune(params as BaseParams);
+    case ModelType.MONTHLY_FORTUNE:
+      return buildMonthlyFortune(params as BaseParams);
     default:
       throw new Error('不支持的排盘类型');
   }

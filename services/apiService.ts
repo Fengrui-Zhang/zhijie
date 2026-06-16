@@ -3,6 +3,7 @@ import {
   QimenParams, QimenResponse, 
   BaseParams, BaziResponse, 
   ZiweiResponse, MeihuaResponse, LiuyaoResponse,
+  GenericTaibuResponse,
   ModelType, LiuyaoMode 
 } from '../types';
 
@@ -114,6 +115,30 @@ export const fetchMeihua = async (params: BaseParams) => {
 // --- 5. Liuyao (All Modes) ---
 export const fetchLiuyao = async (params: BaseParams) => {
   return await fetchChart<LiuyaoResponse>(ModelType.LIUYAO, buildModePayload(params));
+};
+
+export const fetchDaliuren = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.DALIUREN, { ...params, name: params.name || '匿名' });
+};
+
+export const fetchTaiyi = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.TAIYI, { ...params, name: params.name || '匿名' });
+};
+
+export const fetchXiaoliuren = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.XIAOLIUREN, { ...params, name: params.name || '匿名' });
+};
+
+export const fetchAlmanac = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.ALMANAC, { ...params, name: params.name || '匿名' });
+};
+
+export const fetchDailyFortune = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.DAILY_FORTUNE, { ...params, name: params.name || '匿名' });
+};
+
+export const fetchMonthlyFortune = async (params: BaseParams) => {
+  return await fetchChart<GenericTaibuResponse>(ModelType.MONTHLY_FORTUNE, { ...params, name: params.name || '匿名' });
 };
 
 
@@ -356,3 +381,67 @@ ${data.taibuText}
   请基于六亲、六神、世应及五行生克，结合变卦与空亡神煞，详细推断吉凶成败。
   `;
 };
+
+const formatGenericTaibuPrompt = (
+  title: string,
+  roleInstruction: string,
+  data: GenericTaibuResponse,
+  question: string
+) => {
+  const userQuestion = question.trim() || '请结合排盘做专业解读。';
+  return `【${title}】
+${data.taibuText || JSON.stringify(data.taibuJson || data.detail_info || data.base_info, null, 2)}
+
+【用户问题】
+${userQuestion}
+
+${roleInstruction}`;
+};
+
+export const formatDaliurenPrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '大六壬排盘',
+    '请以大六壬体系为基础，重点参考四课三传、天将、课体、神煞与所问事项，判断吉凶、趋势和应期。',
+    data,
+    question
+  );
+
+export const formatTaiyiPrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '太乙神数排盘',
+    '请以太乙神数体系为基础，结合局式、主客、星神、格局信号和所问事项做结构化判断。',
+    data,
+    question
+  );
+
+export const formatXiaoliurenPrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '小六壬排盘',
+    '请以小六壬六宫课体为基础，结合所落宫位、五行属性、诗诀和用户问题做直接判断。',
+    data,
+    question
+  );
+
+export const formatAlmanacPrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '黄历择日',
+    '请结合黄历宜忌、日课干支、神煞、冲煞和用户要做的事情，给出是否适合、注意事项与替代建议。',
+    data,
+    question
+  );
+
+export const formatDailyFortunePrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '每日运势',
+    '请结合命局日主、当日干支和分类运势，给出今日重点、风险提醒和可执行建议，不要输出重要日期提醒。',
+    data,
+    question
+  );
+
+export const formatMonthlyFortunePrompt = (data: GenericTaibuResponse, question: string) =>
+  formatGenericTaibuPrompt(
+    '每月运势',
+    '请结合命局日主、月度趋势和分类运势，给出本月重点、节奏安排和可执行建议，不要输出重要日期提醒。',
+    data,
+    question
+  );
