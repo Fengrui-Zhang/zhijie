@@ -649,6 +649,7 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
 );
 
 type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
+type SettingsWorkspaceTab = 'profile' | 'general' | 'security';
 
 const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
   records: '/records',
@@ -663,6 +664,18 @@ const ROUTE_WORKSPACES: Record<string, WorkspaceView> = Object.entries(WORKSPACE
   },
   {} as Record<string, WorkspaceView>
 );
+
+const SETTINGS_WORKSPACE_TABS: Array<{
+  id: SettingsWorkspaceTab;
+  label: string;
+  group: string;
+  icon: string;
+  description: string;
+}> = [
+  { id: 'profile', label: '账户', group: '账户', icon: '人', description: '昵称、邮箱与额度' },
+  { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与使用偏好' },
+  { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号管理' },
+];
 
 const MEIHUA_MODE_OPTIONS: Array<[LiuyaoMode, string]> = [
   [LiuyaoMode.AUTO, '时间起卦'],
@@ -1325,6 +1338,7 @@ const App: React.FC<AppProps> = ({
   const [standaloneChatError, setStandaloneChatError] = useState('');
   const [standaloneChatUseKnowledge, setStandaloneChatUseKnowledge] = useState(true);
   const [standaloneChatKnowledgeBoard, setStandaloneChatKnowledgeBoard] = useState<'bazi' | 'qimen'>('bazi');
+  const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>('profile');
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -6949,52 +6963,172 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderSettingsWorkspace = () => (
-    <div className="glass-panel rounded-[32px] p-6 md:p-8">
-      <div className="mb-6 border-b border-stone-100 pb-5">
+    <div className="glass-panel overflow-hidden rounded-[32px]">
+      <div className="border-b border-stone-100 px-6 py-5 md:px-8">
         <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
         <div className="mt-1 text-2xl font-bold text-stone-800">设置</div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
-          <div className="text-sm font-bold text-stone-700">账号</div>
-          <div className="mt-4 space-y-2 text-sm text-stone-600">
-            <div>昵称：{authSession?.user?.name || '未登录'}</div>
-            <div>邮箱：{authSession?.user?.email || '未登录'}</div>
-            <div>剩余额度：{userQuota ?? '-'}</div>
-          </div>
-        </div>
-        <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5">
-          <div className="text-sm font-bold text-stone-700">安全</div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {!isLoggedIn ? (
-              <button
-                type="button"
-                onClick={() => setShowAuth(true)}
-                className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300"
-              >
-                登录
-              </button>
-            ) : (
-              <>
+      <div className="grid min-h-[520px] lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="border-b border-stone-100 bg-white/35 p-3 lg:border-b-0 lg:border-r">
+          <div className="flex gap-2 overflow-x-auto lg:block lg:space-y-1">
+            {SETTINGS_WORKSPACE_TABS.map((tab) => {
+              const selected = settingsWorkspaceTab === tab.id;
+              return (
                 <button
+                  key={tab.id}
                   type="button"
-                  onClick={() => setShowChangePassword(true)}
-                  className="glass-chip rounded-2xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                  onClick={() => setSettingsWorkspaceTab(tab.id)}
+                  className={`flex min-w-[142px] items-center gap-3 rounded-2xl px-3 py-3 text-left transition lg:w-full ${
+                    selected
+                      ? 'bg-stone-200/70 text-stone-900 shadow-sm'
+                      : 'text-stone-500 hover:bg-white/70 hover:text-stone-800'
+                  }`}
                 >
-                  修改密码
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
+                    selected ? 'bg-white/75 text-stone-800' : 'bg-white/45 text-stone-400'
+                  }`}>
+                    {tab.icon}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold">{tab.label}</span>
+                    <span className={`block truncate text-[11px] ${selected ? 'text-stone-500' : 'text-stone-400'}`}>
+                      {tab.description}
+                    </span>
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAccountSettings(true)}
-                  className="glass-chip rounded-2xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50/80"
-                >
-                  注销账号
-                </button>
-              </>
-            )}
+              );
+            })}
           </div>
-        </div>
+        </aside>
+
+        <section className="min-w-0 p-5 md:p-7">
+          {settingsWorkspaceTab === 'profile' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-lg font-bold text-stone-800">账户信息</div>
+                <div className="mt-1 text-sm text-stone-500">查看当前登录账户与 AI 解读额度。</div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/65 bg-white/60 p-4">
+                  <div className="text-xs text-stone-400">昵称</div>
+                  <div className="mt-2 truncate text-base font-bold text-stone-800">{authSession?.user?.name || '未登录'}</div>
+                </div>
+                <div className="rounded-2xl border border-white/65 bg-white/60 p-4">
+                  <div className="text-xs text-stone-400">邮箱</div>
+                  <div className="mt-2 truncate text-base font-bold text-stone-800">{authSession?.user?.email || '未登录'}</div>
+                </div>
+                <div className="rounded-2xl border border-white/65 bg-white/60 p-4">
+                  <div className="text-xs text-stone-400">剩余额度</div>
+                  <div className="mt-2 text-base font-bold text-stone-800">{userQuota ?? '-'}</div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-white/65 bg-white/55 p-5">
+                <div className="text-sm font-bold text-stone-700">使用规则</div>
+                <div className="mt-3 grid gap-3 text-sm leading-7 text-stone-600 md:grid-cols-2">
+                  <div className="rounded-2xl border border-stone-100 bg-white/55 p-4">排盘浏览不会扣除额度。</div>
+                  <div className="rounded-2xl border border-stone-100 bg-white/55 p-4">只有主动发起 AI 解读或追问时消耗额度。</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsWorkspaceTab === 'general' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-lg font-bold text-stone-800">常规偏好</div>
+                <div className="mt-1 text-sm text-stone-500">保留简洁默认设置，避免干扰排盘和问答。</div>
+              </div>
+              <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl border border-white/65 bg-white/58">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">默认入口</div>
+                    <div className="mt-1 text-xs text-stone-400">进入网站后优先显示四柱八字。</div>
+                  </div>
+                  <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">四柱八字</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">历史记录</div>
+                    <div className="mt-1 text-xs text-stone-400">只保存发生过 AI 对话的会话。</div>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">已启用</span>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">知识参考</div>
+                    <div className="mt-1 text-xs text-stone-400">支持在八字、奇门等问答中参考古籍资料。</div>
+                  </div>
+                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">手动控制</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsWorkspaceTab === 'security' && (
+            <div className="space-y-5">
+              <div>
+                <div className="text-lg font-bold text-stone-800">安全</div>
+                <div className="mt-1 text-sm text-stone-500">管理登录状态、密码与账号。</div>
+              </div>
+              {!isLoggedIn ? (
+                <div className="rounded-3xl border border-white/65 bg-white/58 p-5">
+                  <div className="text-sm font-bold text-stone-700">尚未登录</div>
+                  <div className="mt-1 text-sm text-stone-500">登录后可同步记录并使用账户管理。</div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAuth(true)}
+                    className="glass-cta mt-4 rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300"
+                  >
+                    登录 / 注册
+                  </button>
+                </div>
+              ) : (
+                <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl border border-white/65 bg-white/58">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div>
+                      <div className="text-sm font-bold text-stone-700">修改密码</div>
+                      <div className="mt-1 text-xs text-stone-400">定期更新密码以保护账户。</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowChangePassword(true)}
+                      className="glass-chip rounded-2xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                    >
+                      修改密码
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div>
+                      <div className="text-sm font-bold text-stone-700">退出登录</div>
+                      <div className="mt-1 text-xs text-stone-400">退出当前浏览器上的登录状态。</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void signOut()}
+                      className="glass-chip rounded-2xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                    >
+                      退出
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                    <div>
+                      <div className="text-sm font-bold text-red-600">注销账号</div>
+                      <div className="mt-1 text-xs text-stone-400">永久删除账号前请确认已备份需要的信息。</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAccountSettings(true)}
+                      className="rounded-2xl border border-red-200 bg-red-50/60 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                    >
+                      注销账号
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
