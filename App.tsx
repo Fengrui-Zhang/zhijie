@@ -1315,7 +1315,7 @@ const App: React.FC<AppProps> = ({
   const [editingCaseRelationId, setEditingCaseRelationId] = useState<string | null>(null);
   const [caseRelationEditDraft, setCaseRelationEditDraft] = useState<EditableCaseRelationDraft>({ labelAToB: '', labelBToA: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | null>(null);
+  const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'more' | null>(null);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const analysisModel = DEFAULT_ANALYSIS_MODEL;
   const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
@@ -5399,7 +5399,7 @@ const App: React.FC<AppProps> = ({
       }
 
       setChartData(resultData);
-      setStep('chart');
+      setStep(isFortuneReading ? 'input' : 'chart');
       requestSectionScroll('report');
 
       const sessionChartParams = { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>;
@@ -6077,6 +6077,30 @@ const App: React.FC<AppProps> = ({
     await handleCalculate({ targetDate });
   };
 
+  const handleFortuneCaseChange = (caseId: string) => {
+    autoFortuneChartKeyRef.current = '';
+    setFortuneCaseId(caseId);
+    setChartData(null);
+    setStep('input');
+    setChatHistory([]);
+    clearChatSession();
+  };
+
+  const handleOpenDailyFortuneDate = (targetDate: Date) => {
+    const value = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}T00:00`;
+    autoFortuneChartKeyRef.current = '';
+    setModelType(ModelType.DAILY_FORTUNE);
+    setTimeMode('custom');
+    setCustomDate(value);
+    setChartData(null);
+    setStep('input');
+    setChatHistory([]);
+    clearChatSession();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/daily') {
+      window.history.pushState(null, '', '/daily');
+    }
+  };
+
   const handleFortuneSuggestedAsk = async (message: string) => {
     requestSectionScroll('chat');
     await sendFollowUpMessage(message);
@@ -6555,7 +6579,7 @@ const App: React.FC<AppProps> = ({
   const currentModuleLabel =
     professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
-    modelType === ModelType.BAZI ? '四柱八字（盲派）' :
+    modelType === ModelType.BAZI ? '四柱八字' :
     modelType === ModelType.ZIWEI ? '紫微斗数' :
     modelType === ModelType.DAILY_FORTUNE ? '每日运势' :
     modelType === ModelType.MONTHLY_FORTUNE ? '每月运势' :
@@ -6639,7 +6663,7 @@ const App: React.FC<AppProps> = ({
         <div className="space-y-2">
           <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">命理运势</div>
           {[
-            [ModelType.BAZI, '四柱八字（盲派）'],
+            [ModelType.BAZI, '四柱八字'],
             [ModelType.ZIWEI, '紫微斗数'],
             [ModelType.DAILY_FORTUNE, '每日运势'],
             [ModelType.MONTHLY_FORTUNE, '每月运势'],
@@ -6649,7 +6673,10 @@ const App: React.FC<AppProps> = ({
               <button
                 key={type}
                 type="button"
-                onClick={() => handleModelChange(type as ModelType)}
+                onClick={() => {
+                  handleModelChange(type as ModelType);
+                  if (mobile) setActiveCompactPanel(null);
+                }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
                     ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
@@ -6678,7 +6705,10 @@ const App: React.FC<AppProps> = ({
               <button
                 key={type}
                 type="button"
-                onClick={() => handleModelChange(type as ModelType)}
+                onClick={() => {
+                  handleModelChange(type as ModelType);
+                  if (mobile) setActiveCompactPanel(null);
+                }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
                     ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
@@ -6702,7 +6732,10 @@ const App: React.FC<AppProps> = ({
               <button
                 key={type}
                 type="button"
-                onClick={() => handleModelChange(type as ModelType)}
+                onClick={() => {
+                  handleModelChange(type as ModelType);
+                  if (mobile) setActiveCompactPanel(null);
+                }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
                     ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
@@ -6727,7 +6760,10 @@ const App: React.FC<AppProps> = ({
               <button
                 key={feature}
                 type="button"
-                onClick={() => openProfessionalFeature(feature)}
+                onClick={() => {
+                  openProfessionalFeature(feature);
+                  if (mobile) setActiveCompactPanel(null);
+                }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
                     ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
@@ -6753,7 +6789,10 @@ const App: React.FC<AppProps> = ({
               <button
                 key={view}
                 type="button"
-                onClick={() => navigateWorkspace(view as Exclude<WorkspaceView, 'divination'>)}
+                onClick={() => {
+                  navigateWorkspace(view as Exclude<WorkspaceView, 'divination'>);
+                  if (mobile) setActiveCompactPanel(null);
+                }}
                 className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
                   selected
                     ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
@@ -6770,75 +6809,15 @@ const App: React.FC<AppProps> = ({
     </nav>
   );
 
-  const renderMobileQuickNav = () => (
-    <div className="mb-4 rounded-[24px] border border-white/65 bg-white/58 p-3 shadow-[0_18px_42px_rgba(28,25,23,0.10)] backdrop-blur-xl xl:hidden">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="text-[11px] font-bold tracking-[0.18em] text-stone-400">常用入口</div>
-        <select
-          value=""
-          onChange={(event) => {
-            const value = event.target.value;
-            if (!value) return;
-            if (value.startsWith('model:')) {
-              handleModelChange(value.replace('model:', '') as ModelType);
-            } else if (value.startsWith('workspace:')) {
-              navigateWorkspace(value.replace('workspace:', '') as Exclude<WorkspaceView, 'divination'>);
-            } else if (value.startsWith('professional:')) {
-              openProfessionalFeature(value.replace('professional:', ''));
-            }
-            event.currentTarget.value = '';
-          }}
-          className="rounded-full border border-stone-200 bg-white/75 px-3 py-1.5 text-xs font-semibold text-stone-600 outline-none"
-          aria-label="更多功能"
-        >
-          <option value="">更多功能</option>
-          <option value={`model:${ModelType.LIUYAO}`}>六爻纳甲</option>
-          <option value={`model:${ModelType.MEIHUA}`}>梅花易数</option>
-          <option value={`model:${ModelType.DALIUREN}`}>大六壬</option>
-          <option value={`model:${ModelType.TAIYI}`}>太乙神数</option>
-          <option value={`model:${ModelType.XIAOLIUREN}`}>小六壬</option>
-          <option value={`model:${ModelType.ALMANAC}`}>黄历/择日</option>
-          <option value={`professional:${PROFESSIONAL_FEATURE_JOINT}`}>八字+紫微联合分析</option>
-          <option value={`professional:${PROFESSIONAL_FEATURE_BAZI_COMPAT}`}>八字合盘</option>
-          <option value="workspace:settings">设置</option>
-        </select>
-      </div>
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-        {[
-          { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
-          { id: ModelType.ZIWEI, label: '紫微', action: () => handleModelChange(ModelType.ZIWEI), active: modelType === ModelType.ZIWEI && workspaceView === 'divination' },
-          { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
-          { id: ModelType.MONTHLY_FORTUNE, label: '月运', action: () => handleModelChange(ModelType.MONTHLY_FORTUNE), active: modelType === ModelType.MONTHLY_FORTUNE && workspaceView === 'divination' },
-          { id: ModelType.QIMEN, label: '奇门', action: () => handleModelChange(ModelType.QIMEN), active: modelType === ModelType.QIMEN && workspaceView === 'divination' },
-          { id: 'records', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
-          { id: 'chat', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
-        ].map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={item.action}
-            className={`rounded-2xl border px-2 py-2.5 text-xs font-bold transition ${
-              item.active
-                ? 'glass-panel-dark border-transparent text-amber-200'
-                : 'border-white/70 bg-white/55 text-stone-600 hover:bg-white'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   const renderMobileBottomNav = () => (
     <nav className="fixed inset-x-3 bottom-3 z-20 rounded-[24px] border border-white/70 bg-white/78 p-2 shadow-[0_18px_48px_rgba(28,25,23,0.18)] backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
       <div className="grid grid-cols-5 gap-1">
         {[
           { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
           { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
-          { id: ModelType.QIMEN, label: '奇门', action: () => handleModelChange(ModelType.QIMEN), active: modelType === ModelType.QIMEN && workspaceView === 'divination' },
           { id: 'records-bottom', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
           { id: 'chat-bottom', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
+          { id: 'more-bottom', label: '更多', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
         ].map((item) => (
           <button
             key={item.id}
@@ -6848,7 +6827,8 @@ const App: React.FC<AppProps> = ({
               item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
             }`}
           >
-            {item.label}
+            {item.id === 'more-bottom' && <span className="block text-base leading-none">+</span>}
+            <span className="block">{item.label}</span>
           </button>
         ))}
       </div>
@@ -8299,26 +8279,42 @@ const App: React.FC<AppProps> = ({
             onClick={() => setActiveCompactPanel(null)}
           />
           <div
-            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel === 'history' ? 'translate-x-0' : 'translate-x-full'}`}
+            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel ? 'translate-x-0' : 'translate-x-full'}`}
           >
-            <SessionSidebar
-              sessions={savedSessions}
-              activeSessionId={activeSessionId}
-              onSelect={(id) => {
-                setActiveCompactPanel(null);
-                handleLoadSession(id);
-              }}
-              onDelete={(id) => {
-                handleDeleteSession(id);
-              }}
-              onNewSession={() => {
-                setActiveCompactPanel(null);
-                handleReset();
-              }}
-              collapsed={false}
-              onToggle={() => setActiveCompactPanel(null)}
-              mobile
-            />
+            {activeCompactPanel === 'history' ? (
+              <SessionSidebar
+                sessions={savedSessions}
+                activeSessionId={activeSessionId}
+                onSelect={(id) => {
+                  setActiveCompactPanel(null);
+                  handleLoadSession(id);
+                }}
+                onDelete={(id) => {
+                  handleDeleteSession(id);
+                }}
+                onNewSession={() => {
+                  setActiveCompactPanel(null);
+                  handleReset();
+                }}
+                collapsed={false}
+                onToggle={() => setActiveCompactPanel(null)}
+                mobile
+              />
+            ) : (
+              <div className="h-full overflow-y-auto border-l border-white/70 bg-white/86 p-4 shadow-[0_28px_80px_rgba(28,25,23,0.24)] backdrop-blur-2xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-base font-bold text-stone-800">更多功能</div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveCompactPanel(null)}
+                    className="rounded-full border border-stone-200 px-3 py-1 text-sm text-stone-500"
+                  >
+                    关闭
+                  </button>
+                </div>
+                {renderModuleNavigation(true)}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -8353,7 +8349,6 @@ const App: React.FC<AppProps> = ({
         }
       >
         <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
-        {renderMobileQuickNav()}
         {workspaceView === 'records' && renderRecordsWorkspace()}
         {workspaceView === 'chat' && renderChatWorkspace()}
         {workspaceView === 'settings' && renderSettingsWorkspace()}
@@ -8405,7 +8400,58 @@ const App: React.FC<AppProps> = ({
               />
             )}
 
-            {professionalSelectedProject ? renderProfessionalWorkspace() : hasSelectedModel && (isCaseModel ? (
+            {professionalSelectedProject ? renderProfessionalWorkspace() : hasSelectedModel && (isFortuneReading ? (
+              <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
+                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-bold text-stone-700">
+                        {modelType === ModelType.MONTHLY_FORTUNE ? '每月运势' : '每日运势'}
+                      </div>
+                      <div className="mt-1 text-xs text-stone-500">
+                        运势会根据所选八字命例和日期自动刷新；只有点击智能问答才会请求 AI。
+                      </div>
+                    </div>
+                    {fortuneCaseOptions.length > 0 && (
+                      <select
+                        value={fortuneCaseId}
+                        onChange={(event) => handleFortuneCaseChange(event.target.value)}
+                        className="glass-input glass-select min-w-[220px] rounded-2xl px-4 py-3 text-sm font-semibold outline-none"
+                      >
+                        {fortuneCaseOptions.map((item) => (
+                          <option key={item.id} value={item.id}>{item.title}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {fortuneCaseOptions.length === 0 && (
+                    <div className="mt-4 rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
+                      暂无八字命例。请先进入“四柱八字”新增命例，再查看每日或每月运势。
+                    </div>
+                  )}
+                </div>
+
+                {loading && (
+                  <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-12 text-center text-sm text-stone-500">
+                    <div className="mx-auto mb-3 flex justify-center text-stone-500"><Spinner /></div>
+                    正在生成运势面板...
+                  </div>
+                )}
+
+                {!loading && chartData && (
+                  <FortuneGrid
+                    data={chartData as GenericTaibuResponse}
+                    onDateChange={handleFortuneDateChange}
+                    onOpenDailyDate={handleOpenDailyFortuneDate}
+                    onAsk={handleFortuneSuggestedAsk}
+                    isAsking={isTyping}
+                    caseOptions={fortuneCaseOptions.map((item) => ({ id: item.id, title: item.title }))}
+                    selectedCaseId={fortuneCaseId}
+                    onCaseChange={handleFortuneCaseChange}
+                  />
+                )}
+              </div>
+            ) : isCaseModel ? (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -8682,7 +8728,7 @@ const App: React.FC<AppProps> = ({
                     </select>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
-                      暂无八字命例。请先进入“四柱八字（盲派）”新增命例，再生成每日或每月运势。
+                      暂无八字命例。请先进入“四柱八字”新增命例，再生成每日或每月运势。
                     </div>
                   )}
                 </div>
@@ -8986,7 +9032,7 @@ const App: React.FC<AppProps> = ({
             <div ref={reportChartRef} className="space-y-4">
               <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
                  <span className="font-bold text-stone-700">
-                  {MODEL_LABELS[modelType] || '排盘结果'}
+                  {isFortuneReading ? '运势面板' : (MODEL_LABELS[modelType] || '排盘结果')}
                  </span>
                  <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
               </div>
@@ -9071,8 +9117,12 @@ const App: React.FC<AppProps> = ({
                     <FortuneGrid
                       data={chartData as GenericTaibuResponse}
                       onDateChange={handleFortuneDateChange}
+                      onOpenDailyDate={handleOpenDailyFortuneDate}
                       onAsk={handleFortuneSuggestedAsk}
                       isAsking={isTyping}
+                      caseOptions={fortuneCaseOptions.map((item) => ({ id: item.id, title: item.title }))}
+                      selectedCaseId={fortuneCaseId}
+                      onCaseChange={handleFortuneCaseChange}
                     />
                   )}
                   {[
@@ -9294,8 +9344,29 @@ const App: React.FC<AppProps> = ({
               </div>
             )}
 
+            {chartData && !chatHistory.length && !isTyping && !isCaseModel && !isFortuneReading && (
+              <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <div className="text-lg font-bold text-stone-800">需要进一步解读？</div>
+                    <div className="mt-1 text-sm text-stone-500">
+                      排盘已完成。点击后会把当前盘面与问题一起发送给 AI，并消耗一次额度。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleRerunAnalysis()}
+                    disabled={loading || isTyping}
+                    className="glass-cta rounded-2xl px-5 py-3 text-sm font-bold text-amber-300 disabled:opacity-50"
+                  >
+                    {loading || isTyping ? <Spinner /> : '询问 AI 解读'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Chat */}
-            {(!isCaseModel || chatHistory.length > 0) && (
+            {(chatHistory.length > 0 || isTyping) && (
             <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : '大师解读'}</h3>

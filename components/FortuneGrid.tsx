@@ -6,8 +6,12 @@ import type { GenericTaibuResponse } from '../types';
 type Props = {
   data: GenericTaibuResponse;
   onDateChange?: (date: Date) => void;
+  onOpenDailyDate?: (date: Date) => void;
   onAsk?: (question: string) => void;
   isAsking?: boolean;
+  caseOptions?: Array<{ id: string; title: string }>;
+  selectedCaseId?: string;
+  onCaseChange?: (caseId: string) => void;
 };
 
 type DimensionKey = 'overall' | 'career' | 'love' | 'wealth' | 'health' | 'social';
@@ -35,6 +39,165 @@ const MODE_PREFIX: Record<InterpretationMode, string> = {
   technical: '以十神、五行与日课结构参断，',
 };
 
+const TEN_GOD_INTERPRETATIONS: Record<string, Record<InterpretationMode, string>> = {
+  比肩: {
+    colloquial: '今天适合和朋友合作，互帮互助，一起做事会更顺利。',
+    professional: '比肩临日，同辈助力运旺，宜团队协作，但需注意资源分配。',
+    technical: '日临比肩，主同类助身，比劫旺地宜合作共事，然比劫争财，防财务纷争。',
+  },
+  劫财: {
+    colloquial: '今天可能会有意外花销，钱包要捂紧点，别冲动消费。',
+    professional: '劫财当令，财运波动，投资需谨慎，防小人争利。',
+    technical: '日逢劫财，劫财克正财，主破财之象，忌大额支出及借贷，宜守不宜攻。',
+  },
+  食神: {
+    colloquial: '创意爆棚的一天，适合发挥才华，好点子会更多。',
+    professional: '食神透出，创造力旺盛，利文艺创作，人际关系较和谐。',
+    technical: '食神泄秀，主才华横溢，食伤生财，利技艺展示，身心愉悦之日。',
+  },
+  伤官: {
+    colloquial: '思维很活跃，但说话要注意分寸，容易因为直白得罪人。',
+    professional: '伤官主事，思维敏捷但锋芒过露，需谨言慎行，防口舌是非。',
+    technical: '伤官临日，主聪明伶俐然傲气凌人，伤官见官祸百端，宜收敛锋芒。',
+  },
+  偏财: {
+    colloquial: '今天机会感较强，可能有意外收获，适合关注新的赚钱机会。',
+    professional: '偏财透出，偏财运旺，利投机取巧，但需控制风险。',
+    technical: '偏财临日，主财缘广进，偏财为意外之财，利经商贸易，投资可期。',
+  },
+  正财: {
+    colloquial: '努力工作会有回报，适合脚踏实地把手头事做好。',
+    professional: '正财当令，正财运稳，工作有成，利薪资收入与稳定经营。',
+    technical: '日临正财，主勤劳致富，正财为辛勤所得，宜踏实经营，稳扎稳打。',
+  },
+  七杀: {
+    colloquial: '今天压力可能偏大，但挑战中也有机会，适合果断处理难题。',
+    professional: '七杀透出，压力与机遇并存，利竞争突破，需果断行动。',
+    technical: '七杀临日，主威严肃杀，杀为名利之神，有制则权，无制则灾，宜攻不宜守。',
+  },
+  正官: {
+    colloquial: '今天贵人运不错，工作上可能得到认可或支持。',
+    professional: '正官得位，贵人运旺，利职场晋升，宜拓展人脉。',
+    technical: '正官临日，主官禄显达，官为贵人之星，宜谒贵求名，事业可期。',
+  },
+  偏印: {
+    colloquial: '适合安静学习、看书和思考，少被琐事牵着走。',
+    professional: '偏印主事，利学习研究，思维深邃，宜独处内省。',
+    technical: '偏印临日，主玄学智慧，枭神夺食需防，宜学术研究，不利求财。',
+  },
+  正印: {
+    colloquial: '学习运和长辈缘较好，适合补充知识、请教经验。',
+    professional: '正印透出，学业顺遂，长辈贵人相助，身心安泰。',
+    technical: '正印临日，主文昌显达，印星生身，利学业考试，有靠山庇佑。',
+  },
+};
+
+const SCORE_INTERPRETATIONS: Record<'high' | 'medium' | 'low', Record<InterpretationMode, string>> = {
+  high: {
+    colloquial: '运势很好，可以主动推进，把握眼前机会。',
+    professional: '运势处于高位，利积极进取，可主动出击。',
+    technical: '运势高昂，阳气旺盛，宜攻不宜守，诸事可为。',
+  },
+  medium: {
+    colloquial: '运势平稳，按部就班做事就好。',
+    professional: '运势中平，宜稳健行事，不宜冒进。',
+    technical: '运势中和，阴阳平衡，宜守常规，静待时机。',
+  },
+  low: {
+    colloquial: '今天宜静不宜动，尽量别做重大决定。',
+    professional: '运势低迷，宜韬光养晦，避免冲突。',
+    technical: '运势不振，阴气偏盛，宜潜藏固守，避凶趋吉。',
+  },
+};
+
+const DIMENSION_ADVICE: Record<Exclude<DimensionKey, 'overall'>, Record<'high' | 'medium' | 'low', Record<InterpretationMode, string>>> = {
+  career: {
+    high: {
+      colloquial: '事业运不错，有想法可以大胆试一试。',
+      professional: '事业运强劲，利职场突破，可争取晋升机会。',
+      technical: '官禄临门，事业宫得力，宜进取求名，功名可期。',
+    },
+    medium: {
+      colloquial: '工作按部就班，稳步推进就好。',
+      professional: '事业运平稳，宜坚守本职，厚积薄发。',
+      technical: '事业宫中和，宜守不宜攻，静待贵人提携。',
+    },
+    low: {
+      colloquial: '职场上低调一些，少说多做，避免冲突。',
+      professional: '事业运偏弱，需低调行事，防小人暗算。',
+      technical: '官禄受损，事业宫不利，宜韬晦避祸，防口舌官非。',
+    },
+  },
+  wealth: {
+    high: {
+      colloquial: '财运较顺，适合处理收入、合作和理财计划。',
+      professional: '财运旺盛，利投资经营，可适度扩张。',
+      technical: '财星高照，财库充盈，宜进财不宜守财，利商贸活动。',
+    },
+    medium: {
+      colloquial: '财运平稳，守住已有的节奏就好。',
+      professional: '财运中平，宜稳健理财，不宜投机。',
+      technical: '财宫中和，财星不显，宜守财固本，静待财机。',
+    },
+    low: {
+      colloquial: '别乱花钱，也别轻易做投资决定。',
+      professional: '财运偏弱，需控制支出，防破财之象。',
+      technical: '财星受克，财库空虚，忌大额支出，防劫财破财。',
+    },
+  },
+  love: {
+    high: {
+      colloquial: '感情互动顺畅，适合表达心意或修复关系。',
+      professional: '感情运旺，利情感交流，单身者有望遇良缘。',
+      technical: '桃花临门，情感宫得力，宜婚恋交际，情缘可期。',
+    },
+    medium: {
+      colloquial: '感情平稳，多陪伴、多沟通就好。',
+      professional: '感情运平，宜维护现有关系，增进感情。',
+      technical: '情感宫中和，桃花不显，宜固守情缘，静待良机。',
+    },
+    low: {
+      colloquial: '今天少争吵，多包容对方。',
+      professional: '感情运弱，需多沟通理解，防争执冲突。',
+      technical: '桃花受损，情感宫不利，宜隐忍退让，防情感纷争。',
+    },
+  },
+  health: {
+    high: {
+      colloquial: '精力较足，适合运动健身和整理作息。',
+      professional: '健康运佳，精力旺盛，利体育锻炼。',
+      technical: '身宫得力，元气充沛，宜动不宜静，利养生健体。',
+    },
+    medium: {
+      colloquial: '身体状态正常，保持好习惯即可。',
+      professional: '健康运平，需保持作息规律，注意饮食。',
+      technical: '身宫中和，气血平稳，宜固本培元，调养身心。',
+    },
+    low: {
+      colloquial: '注意休息，别太透支。',
+      professional: '健康运弱，需多休息，避免过劳。',
+      technical: '身宫受损，元气不足，宜静养调息，忌劳心伤神。',
+    },
+  },
+  social: {
+    high: {
+      colloquial: '人际关系顺，适合见人、沟通、谈合作。',
+      professional: '人际运旺，利社交拓展，贵人运佳。',
+      technical: '贵人临门，人缘宫得力，宜广结善缘，贵人相助。',
+    },
+    medium: {
+      colloquial: '人际关系正常，保持和善态度就好。',
+      professional: '人际运平，宜维护现有人脉，不宜冲突。',
+      technical: '人缘宫中和，宜守常规交际，静待贵人提携。',
+    },
+    low: {
+      colloquial: '少参加无效应酬，容易遇到不顺心的人。',
+      professional: '人际运弱，需避免冲突，防小人是非。',
+      technical: '贵人不显，人缘宫不利，宜独处静修，避凶趋吉。',
+    },
+  },
+};
+
 const LEVEL_VALUE: Record<string, number> = {
   大吉: 92,
   吉: 78,
@@ -45,6 +208,53 @@ const LEVEL_VALUE: Record<string, number> = {
 };
 
 const levelValue = (level: string) => LEVEL_VALUE[level] || 52;
+
+const LEVEL_ORDER = ['凶', '小凶', '平', '中吉', '吉', '大吉'];
+
+const compareFortuneLevels = (a?: string, b?: string) => {
+  const ai = LEVEL_ORDER.indexOf(String(a || '平'));
+  const bi = LEVEL_ORDER.indexOf(String(b || '平'));
+  return (ai === -1 ? 2 : ai) - (bi === -1 ? 2 : bi);
+};
+
+const getScoreGrade = (level?: string): 'high' | 'medium' | 'low' => {
+  if (compareFortuneLevels(level, '吉') >= 0) return 'high';
+  if (compareFortuneLevels(level, '平') >= 0) return 'medium';
+  return 'low';
+};
+
+const getModeAdvice = (fortune: any, mode: InterpretationMode): string[] => {
+  const scores: Record<DimensionKey, string> = {
+    overall: String(fortune?.overall || '平'),
+    career: String(fortune?.career || '平'),
+    love: String(fortune?.love || '平'),
+    wealth: String(fortune?.wealth || '平'),
+    health: String(fortune?.health || '平'),
+    social: String(fortune?.social || '平'),
+  };
+  const tenGod = String(fortune?.tenGod || '');
+  const lines = [
+    TEN_GOD_INTERPRETATIONS[tenGod]?.[mode] || TEN_GOD_INTERPRETATIONS.比肩[mode],
+    SCORE_INTERPRETATIONS[getScoreGrade(scores.overall)][mode],
+  ];
+  const dimensions: Array<{ key: Exclude<DimensionKey, 'overall'>; level: string }> = [
+    { key: 'career', level: scores.career },
+    { key: 'wealth', level: scores.wealth },
+    { key: 'love', level: scores.love },
+    { key: 'health', level: scores.health },
+    { key: 'social', level: scores.social },
+  ];
+  const sorted = [...dimensions].sort((a, b) => compareFortuneLevels(b.level, a.level));
+  const highest = sorted[0];
+  const lowest = sorted[sorted.length - 1];
+  if (highest && compareFortuneLevels(highest.level, '吉') >= 0) {
+    lines.push(DIMENSION_ADVICE[highest.key][getScoreGrade(highest.level)][mode]);
+  }
+  if (lowest && highest && lowest.key !== highest.key && compareFortuneLevels(lowest.level, '中吉') < 0) {
+    lines.push(DIMENSION_ADVICE[lowest.key][getScoreGrade(lowest.level)][mode]);
+  }
+  return lines.filter(Boolean);
+};
 
 const levelTone = (level: string) => {
   if (level === '大吉' || level === '吉' || level === '中吉') return 'text-emerald-700';
@@ -62,6 +272,15 @@ const levelBar = (level: string) => {
   if (level === '大吉' || level === '吉' || level === '中吉') return 'bg-emerald-500';
   if (level === '平') return 'bg-amber-500';
   return 'bg-red-500';
+};
+
+const DIMENSION_COLOR: Record<DimensionKey, string> = {
+  overall: '#f59e0b',
+  career: '#3b82f6',
+  love: '#ec4899',
+  wealth: '#22c55e',
+  health: '#ef4444',
+  social: '#8b5cf6',
 };
 
 const parseDate = (value?: string) => {
@@ -87,6 +306,37 @@ const shiftDate = (date: Date, days: number) => {
 const shiftMonth = (year: number, month: number, offset: number) => {
   const next = new Date(year, month - 1 + offset, 1);
   return next;
+};
+
+const smoothPath = (points: Array<{ x: number; y: number }>) => {
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+  return points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x},${point.y}`;
+    const prev = points[index - 1];
+    const midX = (prev.x + point.x) / 2;
+    return `${path} C ${midX},${prev.y} ${midX},${point.y} ${point.x},${point.y}`;
+  }, '');
+};
+
+const CaseSelector = ({
+  caseOptions,
+  selectedCaseId,
+  onCaseChange,
+}: Pick<Props, 'caseOptions' | 'selectedCaseId' | 'onCaseChange'>) => {
+  if (!caseOptions?.length || !onCaseChange) return null;
+  return (
+    <select
+      value={selectedCaseId || caseOptions[0]?.id || ''}
+      onChange={(event) => onCaseChange(event.target.value)}
+      className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2 text-sm font-bold text-stone-700 outline-none transition hover:bg-white"
+      aria-label="选择命主"
+    >
+      {caseOptions.map((item) => (
+        <option key={item.id} value={item.id}>{item.title}</option>
+      ))}
+    </select>
+  );
 };
 
 const asList = (value: unknown): string[] => {
@@ -386,7 +636,7 @@ const ShareDialog = ({
 };
 
 const ScoreBars = ({ fortune }: { fortune: any }) => (
-  <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+  <div className="grid grid-cols-2 gap-x-5 gap-y-4 md:gap-x-8 md:gap-y-5">
     {SCORE_ITEMS.map((item) => {
       const level = String(fortune?.[item.key] || '平');
       const value = fortune?._chart?.[item.key] || fortune?.chartValueMap?.[item.key] || levelValue(level);
@@ -394,7 +644,7 @@ const ScoreBars = ({ fortune }: { fortune: any }) => (
         <div key={item.key}>
           <div className="mb-1.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className={`text-lg leading-none ${item.color}`}>{item.icon}</span>
+              <span className={`text-base leading-none md:text-lg ${item.color}`}>{item.icon}</span>
               <span className="text-sm font-semibold text-stone-600">{item.label}</span>
             </div>
             <span className={`text-sm font-bold ${levelTone(level)}`}>{level}</span>
@@ -415,38 +665,49 @@ const FortuneTrendChart = ({
   trend: any[];
   selectedDate?: string;
 }) => {
-  const [dimension, setDimension] = useState<DimensionKey>('overall');
-  const points = useMemo(() => {
+  const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall']);
+  const series = useMemo(() => {
     if (!trend?.length) return [];
-    return trend.map((item, index) => {
-      const value = item.scores?.[dimension] ?? item.scores?.overall ?? 52;
-      const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
-      const y = 100 - Math.max(12, Math.min(92, value));
-      return { x, y, value, label: item.date, fullDate: item.fullDate };
-    });
-  }, [trend, dimension]);
+    return activeDimensions.map((dimension) => ({
+      dimension,
+      points: trend.map((item, index) => {
+        const value = item.scores?.[dimension] ?? item.scores?.overall ?? 52;
+        const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
+        const y = 100 - Math.max(12, Math.min(92, value));
+        return { x, y, value, label: item.date, fullDate: item.fullDate };
+      }),
+    }));
+  }, [trend, activeDimensions]);
 
-  if (!points.length) return null;
-  const trendDirection = points[points.length - 1].value - points[0].value;
-  const polyline = points.map((item) => `${item.x},${item.y}`).join(' ');
+  if (!series.length) return null;
+  const primaryPoints = series[0]?.points || [];
+  const trendDirection = primaryPoints.length ? primaryPoints[primaryPoints.length - 1].value - primaryPoints[0].value : 0;
+  const toggleDimension = (dimension: DimensionKey) => {
+    setActiveDimensions((current) => {
+      if (current.includes(dimension)) {
+        return current.length === 1 ? current : current.filter((item) => item !== dimension);
+      }
+      return [...current, dimension];
+    });
+  };
 
   return (
-    <div className="glass-panel-soft rounded-[26px] border border-white/60 p-5 md:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[26px] md:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
         <div className="flex items-center gap-3">
-          <div className="text-lg font-bold text-stone-800">7日运势趋势</div>
+          <div className="text-base font-bold text-stone-800 md:text-lg">7日运势趋势</div>
           <div className={`text-sm font-bold ${trendDirection > 5 ? 'text-emerald-600' : trendDirection < -5 ? 'text-red-500' : 'text-stone-500'}`}>
             趋势：{trendDirection > 5 ? '上升' : trendDirection < -5 ? '下降' : '平稳'}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 md:gap-2">
           {SCORE_ITEMS.map((item) => (
             <button
               key={item.key}
               type="button"
-              onClick={() => setDimension(item.key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                dimension === item.key ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/65 text-stone-500 hover:bg-white'
+              onClick={() => toggleDimension(item.key)}
+              className={`rounded-full px-2.5 py-1 text-xs font-bold transition md:px-3 md:py-1.5 ${
+                activeDimensions.includes(item.key) ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/65 text-stone-500 hover:bg-white'
               }`}
             >
               {item.label.replace('运势', '').replace('运', '')}
@@ -454,16 +715,27 @@ const FortuneTrendChart = ({
           ))}
         </div>
       </div>
-      <svg viewBox="0 0 100 100" className="h-64 w-full overflow-visible rounded-[24px] border border-stone-100 bg-white/45 px-2">
+      <svg viewBox="0 0 100 100" className="h-44 w-full overflow-visible rounded-[18px] border border-stone-100 bg-white/45 px-2 md:h-64 md:rounded-[24px]">
         {[20, 40, 60, 80].map((line) => (
           <line key={line} x1="0" y1={100 - line} x2="100" y2={100 - line} stroke="#e7e5e4" strokeWidth="0.35" strokeDasharray="1.5 2" />
         ))}
-        <polyline points={polyline} fill="none" stroke="#f59e0b" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point) => {
+        {series.map((item) => (
+          <path
+            key={item.dimension}
+            d={smoothPath(item.points)}
+            fill="none"
+            stroke={DIMENSION_COLOR[item.dimension]}
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
+          />
+        ))}
+        {primaryPoints.map((point) => {
           const active = selectedDate && point.fullDate === selectedDate;
           return (
             <g key={point.fullDate}>
-              <circle cx={point.x} cy={point.y} r={active ? '4.2' : '2.2'} fill="#f59e0b" stroke={active ? '#fff7ed' : '#ffffff'} strokeWidth={active ? '2.2' : '0.8'} />
+              <circle cx={point.x} cy={point.y} r={active ? '4.2' : '2.2'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke={active ? '#fff7ed' : '#ffffff'} strokeWidth={active ? '2.2' : '0.8'} />
               <text x={point.x} y="108" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}</text>
             </g>
           );
@@ -495,16 +767,16 @@ const AskPanel = ({
   };
 
   return (
-    <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-      <div className="border-b border-white/70 pb-4">
-        <div className="text-lg font-bold text-stone-800">{title}</div>
-        <div className="mt-1 text-sm text-stone-500">针对选中日期提出问题，确认后才会请求 AI 解答。</div>
+    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+      <div className="border-b border-white/70 pb-3 md:pb-4">
+        <div className="text-base font-bold text-stone-800 md:text-lg">{title}</div>
+        <div className="mt-1 text-xs text-stone-500 md:text-sm">针对选中日期提出问题，确认后才会请求 AI 解答。</div>
       </div>
-      <div className="mt-5 rounded-2xl border border-stone-200/80 bg-white/55 p-4">
+      <div className="mt-3 rounded-2xl border border-stone-200/80 bg-white/55 p-3 md:mt-5 md:p-4">
         <div className="text-sm font-bold text-stone-700">选中日期</div>
-        <div className="mt-2 text-xl font-bold text-stone-900">{dateText}</div>
+        <div className="mt-1 text-lg font-bold text-stone-900 md:mt-2 md:text-xl">{dateText}</div>
       </div>
-      <div className="mt-5 flex gap-3">
+      <div className="mt-3 flex gap-2 md:mt-5 md:gap-3">
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -512,27 +784,27 @@ const AskPanel = ({
             if (event.key === 'Enter') submit();
           }}
           placeholder={`询问关于${dateText}的问题...`}
-          className="glass-input min-w-0 flex-1 rounded-2xl px-4 py-3 text-sm outline-none"
+          className="glass-input min-w-0 flex-1 rounded-2xl px-3 py-2.5 text-sm outline-none md:px-4 md:py-3"
         />
         <button
           type="button"
           onClick={() => submit()}
           disabled={!draft.trim() || !onAsk || isAsking}
-          className="glass-cta rounded-2xl px-5 py-3 text-sm font-bold text-amber-300 disabled:opacity-50"
+          className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-300 disabled:opacity-50 md:px-5 md:py-3"
         >
           提问
         </button>
       </div>
-      <div className="mt-5">
-        <div className="mb-3 text-sm font-bold text-stone-600">建议问题：</div>
-        <div className="grid gap-3 md:grid-cols-2">
+      <div className="mt-4 md:mt-5">
+        <div className="mb-2 text-sm font-bold text-stone-600 md:mb-3">建议问题：</div>
+        <div className="grid gap-2 md:grid-cols-2 md:gap-3">
           {suggestions.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => submit(item)}
               disabled={!onAsk || isAsking}
-              className="rounded-2xl border border-white/70 bg-white/55 px-4 py-3 text-left text-sm font-semibold text-stone-700 transition hover:bg-white disabled:opacity-50"
+              className="rounded-2xl border border-white/70 bg-white/55 px-3 py-2.5 text-left text-sm font-semibold text-stone-700 transition hover:bg-white disabled:opacity-50 md:px-4 md:py-3"
             >
               {item}
             </button>
@@ -552,9 +824,9 @@ const DirectionGrid = ({ directions }: { directions?: Record<string, string> }) 
     ['yinGui', '阴贵神'],
   ];
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-2 md:gap-3">
       {items.map(([key, label]) => (
-        <div key={key} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3">
+        <div key={key} className="rounded-2xl border border-white/60 bg-white/50 px-3 py-2.5 md:px-4 md:py-3">
           <div className="text-xs text-stone-400">{label}</div>
           <div className="mt-1 text-sm font-bold text-stone-700">{directions?.[key] || '—'}</div>
         </div>
@@ -563,7 +835,7 @@ const DirectionGrid = ({ directions }: { directions?: Record<string, string> }) 
   );
 };
 
-const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
+const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [showHours, setShowHours] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -576,34 +848,34 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
   const hourly = Array.isArray(almanac.hourlyFortune) ? almanac.hourlyFortune : [];
   const advice = Array.isArray(fortune.advice) ? fortune.advice : [];
 
-  const modeAdvice = advice.map((item: string) => {
-    if (mode === 'professional') return item.replace('适合', '宜').replace('建议', '可酌情');
-    if (mode === 'technical') return `以${fortune.tenGod || '主神'}、日课宜忌参看：${item}`;
-    return item;
-  });
+  const modeAdvice = useMemo(() => {
+    const generated = getModeAdvice(fortune, mode);
+    return generated.length ? generated : advice;
+  }, [advice, fortune, mode]);
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
-        <div className="glass-panel-soft overflow-hidden rounded-[28px] border border-white/60">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/70 p-5 md:p-6">
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-white/70 bg-white/60 px-3 py-2 text-stone-500 hover:bg-white">‹</button>
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] xl:gap-6">
+        <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[28px]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-3 md:gap-4 md:p-6">
+            <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
+              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">‹</button>
               <div>
-                <div className="text-2xl font-bold text-stone-900">{formatDateZh(currentDate)}</div>
+                <div className="text-center text-2xl font-bold text-stone-900 sm:text-left">{formatDateZh(currentDate)}</div>
                 <div className="mt-1 text-sm text-stone-500">农历 {almanac.lunarDate || '—'}</div>
               </div>
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-white/70 bg-white/60 px-3 py-2 text-stone-500 hover:bg-white">›</button>
+              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">›</button>
             </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end md:gap-4">
               <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
               <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
+              <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
               <div className={`rounded-full bg-white/70 px-3 py-1 font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
             </div>
           </div>
 
-          <div className="space-y-6 p-5 md:p-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-4 p-3 md:space-y-6 md:p-6">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
               <div>
                 <div className="mb-2 text-sm font-bold text-emerald-700">宜</div>
                 <ChipList items={yi} tone="good" />
@@ -614,18 +886,18 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-4">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 md:p-4">
                 <div className="mb-3 text-sm font-bold text-stone-700">吉神</div>
                 <ChipList items={asList(almanac.jishen)} tone="good" limit={8} />
               </div>
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-4">
+              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 md:p-4">
                 <div className="mb-3 text-sm font-bold text-stone-700">凶煞</div>
                 <ChipList items={asList(almanac.xiongsha)} tone="bad" limit={8} />
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3">
               {[
                 ['冲煞', almanac.chongSha],
                 ['空亡', almanacPayload.kongWang],
@@ -634,7 +906,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
                 ['二十八宿', `${almanac.lunarMansion || '—'}${almanac.lunarMansionLuck ? `（${almanac.lunarMansionLuck}）` : ''}`],
                 ['纳音', almanac.nayin],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3">
+                <div key={label} className="rounded-2xl border border-white/60 bg-white/50 px-3 py-2.5 md:px-4 md:py-3">
                   <div className="text-xs text-stone-400">{label}</div>
                   <div className="mt-1 text-sm font-bold text-stone-700">{value || '—'}</div>
                 </div>
@@ -644,19 +916,19 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
             <DirectionGrid directions={almanac.directions} />
 
             {almanac.lunarMansionSong && (
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-4 text-sm leading-7 text-stone-600">
+              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 text-sm leading-7 text-stone-600 md:p-4">
                 <span className="font-bold text-stone-700">宿曜歌诀：</span>{almanac.lunarMansionSong}
               </div>
             )}
 
             {hourly.length > 0 && (
-              <div className="border-t border-white/70 pt-5">
+              <div className="border-t border-white/70 pt-4 md:pt-5">
                 <button type="button" onClick={() => setShowHours(!showHours)} className="flex w-full items-center justify-between text-left text-sm font-bold text-stone-700">
                   十二时辰吉凶
                   <span className="text-stone-400">{showHours ? '收起' : '展开'}</span>
                 </button>
                 {showHours && (
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="mt-3 grid gap-2 md:mt-4 md:grid-cols-2 md:gap-3">
                     {hourly.slice(0, 12).map((item: any) => (
                       <div key={item.ganZhi} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3 text-sm">
                         <div className="flex justify-between gap-3">
@@ -673,30 +945,30 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <FortuneTrendChart trend={fortune.trend || []} selectedDate={fortune.date} />
-          <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 md:mb-6">
               <div>
-                <div className="text-lg font-bold text-stone-800">运势分析</div>
+                <div className="text-base font-bold text-stone-800 md:text-lg">运势分析</div>
                 <div className="mt-1 text-sm text-stone-400">日干支：{fortune.dayStem}{fortune.dayBranch}</div>
               </div>
-              <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-white/70 bg-white/60 px-4 py-2 text-sm font-bold text-stone-600">分享</button>
+              <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-white/70 bg-white/60 px-3 py-1.5 text-sm font-bold text-stone-600 md:px-4 md:py-2">分享</button>
             </div>
             <ScoreBars fortune={fortune} />
-            <div className="mt-6 grid gap-4 border-t border-white/70 pt-5 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/70 pt-4 md:mt-6 md:gap-4 md:pt-5">
               <div>
                 <div className="text-xs text-stone-400">幸运色</div>
-                <div className="mt-1 text-xl font-bold text-stone-800">{fortune.luckyColor || '—'}</div>
+                <div className="mt-1 text-lg font-bold text-stone-800 md:text-xl">{fortune.luckyColor || '—'}</div>
               </div>
               <div>
                 <div className="text-xs text-stone-400">吉方位</div>
-                <div className="mt-1 text-xl font-bold text-stone-800">{fortune.luckyDirection || '—'}</div>
+                <div className="mt-1 text-lg font-bold text-stone-800 md:text-xl">{fortune.luckyDirection || '—'}</div>
               </div>
             </div>
-            <div className="mt-6 border-t border-white/70 pt-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-lg font-bold text-stone-800">运势指引</div>
+            <div className="mt-4 border-t border-white/70 pt-4 md:mt-6 md:pt-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
+                <div className="text-base font-bold text-stone-800 md:text-lg">运势指引</div>
                 <div className="rounded-2xl bg-white/55 p-1">
                   {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
                     <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-sky-500 text-white' : 'text-stone-500'}`}>
@@ -705,7 +977,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
                   ))}
                 </div>
               </div>
-              <ol className="space-y-3">
+              <ol className="space-y-2 md:space-y-3">
                 {modeAdvice.map((item: string, index: number) => (
                   <li key={`${item}-${index}`} className="flex gap-3 text-sm leading-7 text-stone-700">
                     <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/70 text-xs font-bold text-stone-500">{index + 1}</span>
@@ -752,38 +1024,60 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
 };
 
 const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
-  const [dimension, setDimension] = useState<DimensionKey>('overall');
-  const points = useMemo(() => {
+  const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career', 'wealth']);
+  const series = useMemo(() => {
     const sample = calendar.filter((_: any, index: number) => index % 3 === 0 || index === calendar.length - 1);
-    return sample.map((item: any, index: number) => {
-      const value = item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level);
-      const x = sample.length === 1 ? 50 : (index / (sample.length - 1)) * 100;
-      const y = 100 - Math.max(12, Math.min(92, value));
-      return { x, y, label: `${item.day}`, value };
+    return activeDimensions.map((dimension) => ({
+      dimension,
+      points: sample.map((item: any, index: number) => {
+        const value = item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level);
+        const x = sample.length === 1 ? 50 : (index / (sample.length - 1)) * 100;
+        const y = 100 - Math.max(12, Math.min(92, value));
+        return { x, y, label: `${item.day}`, value };
+      }),
+    }));
+  }, [calendar, activeDimensions]);
+  if (!series.length) return null;
+  const primaryPoints = series[0]?.points || [];
+  const toggleDimension = (dimension: DimensionKey) => {
+    setActiveDimensions((current) => {
+      if (current.includes(dimension)) {
+        return current.length === 1 ? current : current.filter((item) => item !== dimension);
+      }
+      return [...current, dimension];
     });
-  }, [calendar, dimension]);
-  if (!points.length) return null;
-  const polyline = points.map((item) => `${item.x},${item.y}`).join(' ');
+  };
   return (
-    <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-lg font-bold text-stone-800">运势起伏</div>
-        <div className="flex flex-wrap gap-2">
+    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
+        <div className="text-base font-bold text-stone-800 md:text-lg">运势起伏</div>
+        <div className="flex flex-wrap gap-1.5 md:gap-2">
           {SCORE_ITEMS.map((item) => (
-            <button key={item.key} type="button" onClick={() => setDimension(item.key)} className={`rounded-full px-3 py-1.5 text-xs font-bold ${dimension === item.key ? 'bg-indigo-500 text-white' : 'bg-white/65 text-stone-500'}`}>
+            <button key={item.key} type="button" onClick={() => toggleDimension(item.key)} className={`rounded-full px-2.5 py-1 text-xs font-bold md:px-3 md:py-1.5 ${activeDimensions.includes(item.key) ? 'bg-indigo-500 text-white' : 'bg-white/65 text-stone-500'}`}>
               {item.label.replace('运势', '').replace('运', '')}
             </button>
           ))}
         </div>
       </div>
-      <svg viewBox="0 0 100 100" className="h-64 w-full overflow-visible rounded-[24px] border border-stone-100 bg-white/45">
+      <svg viewBox="0 0 100 100" className="h-44 w-full overflow-visible rounded-[18px] border border-stone-100 bg-white/45 md:h-64 md:rounded-[24px]">
         {[20, 40, 60, 80].map((line) => (
           <line key={line} x1="0" y1={100 - line} x2="100" y2={100 - line} stroke="#e7e5e4" strokeWidth="0.35" strokeDasharray="1.5 2" />
         ))}
-        <polyline points={polyline} fill="none" stroke="#6366f1" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point) => (
+        {series.map((item) => (
+          <path
+            key={item.dimension}
+            d={smoothPath(item.points)}
+            fill="none"
+            stroke={DIMENSION_COLOR[item.dimension]}
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={item.dimension === activeDimensions[0] ? 1 : 0.7}
+          />
+        ))}
+        {primaryPoints.map((point) => (
           <g key={point.label}>
-            <circle cx={point.x} cy={point.y} r="2.2" fill="#6366f1" stroke="#fff" strokeWidth="0.9" />
+            <circle cx={point.x} cy={point.y} r="2.2" fill={DIMENSION_COLOR[activeDimensions[0]]} stroke="#fff" strokeWidth="0.9" />
             <text x={point.x} y="108" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}日</text>
           </g>
         ))}
@@ -792,7 +1086,7 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
   );
 };
 
-const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
+const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
@@ -802,35 +1096,38 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
   const firstDay = new Date(year, month - 1, 1).getDay();
   const monthDate = new Date(year, month - 1, 1);
   const monthlyGuide = useMemo(() => {
-    const base = [
-      `综合为${fortune.overall || '平'}，本月宜先定节奏，再处理关键事项。`,
-      `事业为${fortune.career || '平'}，重要沟通尽量提前准备方案和边界。`,
-      `财运为${fortune.wealth || '平'}，支出与合作事项以可验证信息为准。`,
-      `感情为${fortune.love || '平'}，少用试探，多用明确表达。`,
+    const generated = getModeAdvice(fortune, mode);
+    if (generated.length) return generated;
+    return [
+      `${MODE_PREFIX[mode]}综合为${fortune.overall || '平'}，本月宜先定节奏，再处理关键事项。`,
+      `${MODE_PREFIX[mode]}事业为${fortune.career || '平'}，重要沟通尽量提前准备方案和边界。`,
+      `${MODE_PREFIX[mode]}财运为${fortune.wealth || '平'}，支出与合作事项以可验证信息为准。`,
+      `${MODE_PREFIX[mode]}感情为${fortune.love || '平'}，少用试探，多用明确表达。`,
     ];
-    return base.map((item) => `${MODE_PREFIX[mode]}${item}`);
-  }, [fortune.career, fortune.love, fortune.overall, fortune.wealth, mode]);
+  }, [fortune, mode]);
   return (
-    <div className="space-y-6">
-      <div className="glass-panel-soft overflow-hidden rounded-[28px] border border-white/60">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/70 p-5 md:p-6">
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, -1))} className="rounded-full border border-white/70 bg-white/60 px-3 py-2 text-stone-500 hover:bg-white">‹</button>
+    <div className="space-y-4 md:space-y-6">
+      <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[28px]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-3 md:gap-4 md:p-6">
+          <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
+            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, -1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">‹</button>
             <div className="text-center">
               <div className="text-2xl font-bold text-stone-900">{year}年 {month}月</div>
               <button type="button" onClick={() => onDateChange?.(new Date())} className="mt-1 text-xs text-stone-500 hover:text-stone-800">回到本月</button>
             </div>
-            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, 1))} className="rounded-full border border-white/70 bg-white/60 px-3 py-2 text-stone-500 hover:bg-white">›</button>
+            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, 1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">›</button>
           </div>
-          <div className="rounded-full border border-white/70 bg-white/60 px-4 py-2 text-sm text-stone-600">
-            命主：<span className="font-bold text-indigo-600">{String(data.base_info?.name || '当前命例')}</span>
+          <div className="w-full rounded-full border border-white/70 bg-white/60 px-3 py-2 text-center text-sm text-stone-600 sm:w-auto sm:text-left md:px-4">
+            <span className="mr-2">命主</span>
+            <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
+            {!caseOptions?.length && <span className="font-bold text-indigo-600">{String(data.base_info?.name || '当前命例')}</span>}
           </div>
         </div>
-        <div className="grid gap-6 p-5 md:grid-cols-[0.85fr_1.15fr] md:p-6">
-          <div className="border-b border-white/70 pb-5 md:border-b-0 md:border-r md:pb-0 md:pr-6">
+        <div className="grid gap-4 p-3 md:grid-cols-[0.85fr_1.15fr] md:gap-6 md:p-6">
+          <div className="border-b border-white/70 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-6">
             <div className="text-sm font-bold text-stone-500">本月能量</div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-stone-900">{fortune.monthStem}{fortune.monthBranch}</span>
+              <span className="text-3xl font-bold text-stone-900 md:text-4xl">{fortune.monthStem}{fortune.monthBranch}</span>
               <span className="text-sm text-stone-500">月</span>
             </div>
             <div className="mt-4 inline-flex rounded-2xl bg-white/65 px-4 py-2 text-sm text-stone-600">
@@ -847,14 +1144,14 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
             </div>
           </div>
           <div>
-            <div className="mb-3 text-lg font-bold text-stone-800">运势批语</div>
+            <div className="mb-2 text-base font-bold text-stone-800 md:mb-3 md:text-lg">运势批语</div>
             <p className="text-sm leading-8 text-stone-700">{fortune.summary || '本月宜稳中求进，结合每日运程安排节奏。'}</p>
-            <div className="mt-6">
+            <div className="mt-4 md:mt-6">
               <ScoreBars fortune={fortune} />
             </div>
-            <div className="mt-6 border-t border-white/70 pt-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-lg font-bold text-stone-800">本月指引</div>
+            <div className="mt-4 border-t border-white/70 pt-4 md:mt-6 md:pt-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
+                <div className="text-base font-bold text-stone-800 md:text-lg">本月指引</div>
                 <div className="rounded-2xl bg-white/55 p-1">
                   {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
                     <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-indigo-500 text-white' : 'text-stone-500'}`}>
@@ -863,7 +1160,7 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
                   ))}
                 </div>
               </div>
-              <ol className="space-y-3">
+              <ol className="space-y-2 md:space-y-3">
                 {monthlyGuide.map((item, index) => (
                   <li key={`${item}-${index}`} className="flex gap-3 text-sm leading-7 text-stone-700">
                     <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/70 text-xs font-bold text-stone-500">{index + 1}</span>
@@ -878,9 +1175,9 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
 
       <MonthlyTrend calendar={calendar} />
 
-      <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="text-lg font-bold text-stone-800">每日运程</div>
+      <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+        <div className="mb-3 flex items-center justify-between gap-3 md:mb-4">
+          <div className="text-base font-bold text-stone-800 md:text-lg">每日运程</div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-stone-500">
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />吉</span>
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-stone-400" />平</span>
@@ -890,7 +1187,7 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-2 sm:gap-3">
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-3">
           {['日', '一', '二', '三', '四', '五', '六'].map((item) => (
             <div key={item} className="py-2 text-center text-xs font-semibold text-stone-400">{item}</div>
           ))}
@@ -902,8 +1199,8 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
               <button
                 key={day.day}
                 type="button"
-                onClick={() => onDateChange?.(dayDate)}
-                className={`rounded-2xl border px-2 py-3 text-center transition hover:-translate-y-0.5 hover:bg-white ${
+                onClick={() => (onOpenDailyDate || onDateChange)?.(dayDate)}
+                className={`rounded-xl border px-1.5 py-2 text-center transition hover:-translate-y-0.5 hover:bg-white md:rounded-2xl md:px-2 md:py-3 ${
                   isToday ? 'border-indigo-200 bg-indigo-50/80 ring-1 ring-indigo-200' : 'border-white/60 bg-white/45'
                 }`}
               >
