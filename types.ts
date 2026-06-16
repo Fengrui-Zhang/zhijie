@@ -28,6 +28,20 @@ export interface BaseParams {
   born_year?: number;
   province?: string;
   city?: string;
+  district?: string;
+  birthPlace?: string;
+  longitude?: number;
+  latitude?: number;
+  useTrueSolar?: boolean;
+  timeInputMode?: 'exact' | 'quick';
+  calendarType?: 'solar' | 'lunar' | 'pillars';
+  isLeapMonth?: boolean;
+  pillars?: {
+    year: string;
+    month: string;
+    day: string;
+    hour: string;
+  };
   specialTags?: string[];
   
   // Liuyao Specifics
@@ -156,6 +170,7 @@ export interface BaziResponse {
     big_start_year: number[];
     big_end_year: number[];
     xu_sui: number[];
+    list?: any[];
     [key: string]: any;
   };
   detail_info: {
@@ -178,6 +193,11 @@ export interface BaziResponse {
     zhuxing?: {
       day: string;
       [key: string]: any;
+    };
+    fortuneContext?: {
+      dayStem: string;
+      dayBranch: string;
+      yearBranch: string;
     };
   };
 }
@@ -206,6 +226,8 @@ export interface ZiweiPalace {
 export interface ZiweiResponse {
   taibuText?: string;
   taibuJson?: unknown;
+  horoscopeJson?: Record<string, any>;
+  calcInput?: Record<string, any>;
   base_info: {
     sex: string;
     name: string;

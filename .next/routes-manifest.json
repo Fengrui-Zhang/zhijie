@@ -60,6 +60,22 @@
       "namedRegex": "^/api/auth/(?<nxtPnextauth>.+?)(?:/)?$"
     },
     {
+      "page": "/api/case-relations/[id]",
+      "regex": "^/api/case\\-relations/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/case\\-relations/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/cases/[id]",
+      "regex": "^/api/cases/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/cases/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
       "page": "/api/sessions/[id]",
       "regex": "^/api/sessions/([^/]+?)(?:/)?$",
       "routeKeys": {

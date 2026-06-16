@@ -9,6 +9,9 @@ import {
   type DayunOutput,
 } from 'taibu-core/bazi-dayun';
 import {
+  resolveBaziPillars,
+} from 'taibu-core/bazi-pillars-resolve';
+import {
   calculateQimen,
   toQimenJson,
   toQimenText,
@@ -16,10 +19,15 @@ import {
 } from 'taibu-core/qimen';
 import {
   calculateZiwei,
+  calculateZiweiDataWithAstrolabe,
+  calculateZiweiHoroscopeDataWithAstrolabe,
   toZiweiJson,
   toZiweiText,
   type ZiweiOutput,
 } from 'taibu-core/ziwei';
+import {
+  toZiweiHoroscopeJson,
+} from 'taibu-core/ziwei-horoscope';
 import {
   calculateMeihua,
   toMeihuaJson,
@@ -45,6 +53,8 @@ type ChartRequest = {
 const sexLabel = (sex: number | undefined) => (sex === 1 ? '女' : '男');
 const gender = (sex: number | undefined): 'male' | 'female' => (sex === 1 ? 'female' : 'male');
 const pad2 = (value: number) => String(value).padStart(2, '0');
+type BirthInput = ReturnType<typeof commonBirthInput>;
+
 const dateTimeString = (params: BaseParams) =>
   `${params.year}-${pad2(params.month)}-${pad2(params.day)}T${pad2(params.hours)}:${pad2(params.minute)}`;
 const pillar = (value?: { gan: string; zhi: string } | string) => {
@@ -69,6 +79,34 @@ function buildBirthPlace(params: BaseParams) {
   return [params.province, params.city].filter(Boolean).join(' ') || undefined;
 }
 
+async function normalizeBirthParams(params: BaseParams): Promise<BaseParams> {
+  if (params.calendarType !== 'pillars') return params;
+  const pillars = params.pillars;
+  if (!pillars?.year || !pillars.month || !pillars.day || !pillars.hour) {
+    throw new Error('四柱排盘需要填写完整的年柱、月柱、日柱、时柱');
+  }
+  const resolved = await resolveBaziPillars({
+    yearPillar: pillars.year,
+    monthPillar: pillars.month,
+    dayPillar: pillars.day,
+    hourPillar: pillars.hour,
+  });
+  const candidate = resolved.candidates[0];
+  if (!candidate) {
+    throw new Error('未能根据输入四柱反推出可用出生时间，请检查四柱是否正确');
+  }
+  return {
+    ...params,
+    year: candidate.birthYear,
+    month: candidate.birthMonth,
+    day: candidate.birthDay,
+    hours: candidate.birthHour,
+    minute: candidate.birthMinute,
+    calendarType: candidate.nextCall.arguments.calendarType,
+    isLeapMonth: candidate.isLeapMonth,
+  };
+}
+
 function commonBirthInput(params: BaseParams) {
   return {
     birthYear: params.year,
@@ -78,19 +116,37 @@ function commonBirthInput(params: BaseParams) {
     birthMinute: params.minute,
     gender: gender(params.sex),
     birthPlace: buildBirthPlace(params),
+    calendarType: params.calendarType === 'lunar' ? 'lunar' as const : 'solar' as const,
+    isLeapMonth: Boolean(params.isLeapMonth),
+    longitude: params.useTrueSolar && params.timeInputMode !== 'quick' && typeof params.longitude === 'number'
+      ? params.longitude
+      : undefined,
   };
 }
 
-function buildBaseInfo(params: BaseParams, dayun?: DayunOutput) {
+function buildTrueSolarInfo(params: BaseParams, chart: { trueSolarTimeInfo?: BaziOutput['trueSolarTimeInfo'] }) {
+  const info = chart.trueSolarTimeInfo;
+  if (!info) return undefined;
+  return {
+    province: params.province,
+    city: params.district || params.city || params.birthPlace || '',
+    jingdu: String(info.longitude),
+    weidu: typeof params.latitude === 'number' ? String(params.latitude) : undefined,
+    shicha: `${info.trueSolarTime}（校正${info.correctionMinutes}分钟）`,
+  };
+}
+
+function buildBaseInfo(params: BaseParams, dayun?: DayunOutput, chart?: BaziOutput) {
   const solar = `${params.year}-${pad2(params.month)}-${pad2(params.day)} ${pad2(params.hours)}:${pad2(params.minute)}`;
   return {
     sex: sexLabel(params.sex),
     name: params.name || '匿名',
     gongli: solar,
-    nongli: '',
+    nongli: params.calendarType === 'lunar' ? `农历${params.year}-${pad2(params.month)}-${pad2(params.day)}${params.isLeapMonth ? '（闰月）' : ''}` : '',
     qiyun: dayun ? `${dayun.startAge}岁（${dayun.startAgeDetail}）` : '',
     jiaoyun: '',
     zhengge: '',
+    zhen: chart ? buildTrueSolarInfo(params, chart) : undefined,
   };
 }
 
@@ -105,11 +161,16 @@ function adaptBazi(params: BaseParams, chart: BaziOutput, dayun: DayunOutput) {
   const hiddenGods = pillars.map((item) => item.hiddenStems.map((stem) => stem.tenGod).join(' '));
   const dayunList = dayun.list || [];
   const taibuText = toBaziText(chart, { name: params.name, dayun, detailLevel: 'full' });
+  const fortuneContext = {
+    dayStem: chart.fourPillars.day.stem,
+    dayBranch: chart.fourPillars.day.branch,
+    yearBranch: chart.fourPillars.year.branch,
+  };
 
   return {
     taibuText,
     taibuJson: toBaziJson(chart, { dayun }),
-    base_info: buildBaseInfo(params, dayun),
+    base_info: buildBaseInfo(params, dayun, chart),
     bazi_info: {
       kw: chart.kongWang?.kongZhi?.join('') || '',
       tg_cg_god: pillars.map((item, index) => index === 2 ? '日主' : item.tenGod || ''),
@@ -125,6 +186,7 @@ function adaptBazi(params: BaseParams, chart: BaziOutput, dayun: DayunOutput) {
       sx: '',
     },
     dayun_info: {
+      list: dayunList,
       big_god: dayunList.map((item) => item.tenGod || ''),
       big: dayunList.map((item) => item.ganZhi),
       big_cs: dayunList.map((item) => item.diShi || ''),
@@ -152,6 +214,7 @@ function adaptBazi(params: BaseParams, chart: BaziOutput, dayun: DayunOutput) {
         tgdz: item.ganZhi,
         shensha: item.shenSha.join(' '),
       })),
+      fortuneContext,
       zhuxing: { day: chart.dayMaster },
     },
   };
@@ -234,13 +297,15 @@ function adaptQimen(params: QimenParams, chart: QimenOutput) {
   };
 }
 
-function adaptZiwei(params: BaseParams, chart: ZiweiOutput) {
+function adaptZiwei(params: BaseParams, chart: ZiweiOutput, input: BirthInput, horoscopeJson?: Record<string, any>) {
   const taibuText = toZiweiText(chart, { detailLevel: 'full' });
   const soulPalace = chart.palaces.find((item) => item.name === '命宫' || item.earthlyBranch === chart.earthlyBranchOfSoulPalace);
   const bodyPalace = chart.palaces.find((item) => item.isBodyPalace || item.earthlyBranch === chart.earthlyBranchOfBodyPalace);
   return {
     taibuText,
     taibuJson: toZiweiJson(chart, { detailLevel: 'full' }),
+    horoscopeJson,
+    calcInput: input,
     base_info: {
       sex: sexLabel(params.sex),
       name: params.name || '匿名',
@@ -251,6 +316,10 @@ function adaptZiwei(params: BaseParams, chart: ZiweiOutput) {
       mingju: chart.fiveElement,
       mingzhu: chart.soul,
       shenzhu: chart.body,
+      zhen: chart.trueSolarTimeInfo ? {
+        city: params.district || params.city || '',
+        shicha: `${chart.trueSolarTimeInfo.trueSolarTime}（校正${chart.trueSolarTimeInfo.correctionMinutes}分钟）`,
+      } : undefined,
     },
     detail_info: {
       xiantian_info: {
@@ -496,7 +565,7 @@ export async function calculateTaibuChart({ modelType, params }: ChartRequest) {
       return adaptQimen(qimenParams, chart);
     }
     case ModelType.BAZI: {
-      const base = params as BaseParams;
+      const base = await normalizeBirthParams(params as BaseParams);
       const input = commonBirthInput(base);
       const [chart, dayun] = [
         calculateBazi(input),
@@ -505,9 +574,14 @@ export async function calculateTaibuChart({ modelType, params }: ChartRequest) {
       return adaptBazi(base, chart, dayun);
     }
     case ModelType.ZIWEI: {
-      const base = params as BaseParams;
-      const chart = calculateZiwei(commonBirthInput(base));
-      return adaptZiwei(base, chart);
+      const base = await normalizeBirthParams(params as BaseParams);
+      const input = commonBirthInput(base);
+      const { output, astrolabe } = calculateZiweiDataWithAstrolabe(input);
+      const horoscopeJson = toZiweiHoroscopeJson(
+        calculateZiweiHoroscopeDataWithAstrolabe(astrolabe, { targetDate: new Date() }),
+        { detailLevel: 'full' },
+      ) as Record<string, any>;
+      return adaptZiwei(base, output || calculateZiwei(input), input, horoscopeJson);
     }
     case ModelType.MEIHUA: {
       const base = params as BaseParams;

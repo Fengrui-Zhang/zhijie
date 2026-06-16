@@ -89,7 +89,9 @@ import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import LocationSelector from './components/LocationSelector';
+import LifeReadingForm from './components/LifeReadingForm';
 import NoteSidebar, { NoteIcon } from './components/NoteSidebar';
+import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 
 // --- Icons ---
 const Spinner = () => (
@@ -1108,6 +1110,17 @@ const App: React.FC = () => {
   const [gender, setGender] = useState<number>(0); // 0 Male, 1 Female
   const [timeMode, setTimeMode] = useState<'now' | 'custom'>('now');
   const [customDate, setCustomDate] = useState('');
+  const todayForLifeForm = new Date();
+  const [lifeCalendarType, setLifeCalendarType] = useState<'solar' | 'lunar' | 'pillars'>('solar');
+  const [lifeYear, setLifeYear] = useState(todayForLifeForm.getFullYear());
+  const [lifeMonth, setLifeMonth] = useState(todayForLifeForm.getMonth() + 1);
+  const [lifeDay, setLifeDay] = useState(todayForLifeForm.getDate());
+  const [lifeHour, setLifeHour] = useState(9);
+  const [lifeMinute, setLifeMinute] = useState(0);
+  const [lifeTimeInputMode, setLifeTimeInputMode] = useState<'exact' | 'quick'>('quick');
+  const [lifeUseTrueSolar, setLifeUseTrueSolar] = useState(false);
+  const [lifeIsLeapMonth, setLifeIsLeapMonth] = useState(false);
+  const [lifePillars, setLifePillars] = useState({ year: '甲子', month: '甲子', day: '甲子', hour: '甲子' });
   const [birthYear, setBirthYear] = useState('');
   const [qimenProEnabled, setQimenProEnabled] = useState(false);
   const [qimenJuModel, setQimenJuModel] = useState(0);
@@ -1125,6 +1138,7 @@ const App: React.FC = () => {
   // Location Inputs (for Bazi/Ziwei True Solar Time)
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
 
   // Data
   const [chartData, setChartData] = useState<any | null>(null);
@@ -4556,7 +4570,13 @@ const App: React.FC = () => {
       setError("请输入您的问题");
       return;
     }
-    if ((modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) && (!customDate && timeMode === 'custom')) {
+    if ((modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) && lifeCalendarType === 'pillars') {
+      if (!lifePillars.year || !lifePillars.month || !lifePillars.day || !lifePillars.hour) {
+        setError("请填写完整四柱");
+        return;
+      }
+    }
+    if ((modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) && lifeCalendarType !== 'pillars' && (!lifeYear || !lifeMonth || !lifeDay)) {
       setError("请选择出生日期");
       return;
     }
@@ -4607,21 +4627,34 @@ const App: React.FC = () => {
          date = new Date(customDate);
       } else if (isLiupanModeModel(modelType) && liuyaoMode === LiuyaoMode.AUTO) {
          date = new Date();
-      } else if ((timeMode === 'custom' || isLifeReading) && customDate) {
+      } else if (!isLifeReading && timeMode === 'custom' && customDate) {
          date = new Date(customDate);
       }
 
+      const lifePlaceText = buildBirthPlaceText(province, city, district);
+      const lifeCoord = findPlaceCoord(district, city, province);
+      const lifeUsesTrueSolar = isLifeReading && lifeTimeInputMode === 'exact' && lifeUseTrueSolar && Boolean(lifeCoord);
+
       const baseParams: any = {
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        day: date.getDate(),
-        hours: date.getHours(),
-        minute: date.getMinutes(),
+        year: isLifeReading ? lifeYear : date.getFullYear(),
+        month: isLifeReading ? lifeMonth : date.getMonth() + 1,
+        day: isLifeReading ? lifeDay : date.getDate(),
+        hours: isLifeReading ? lifeHour : date.getHours(),
+        minute: isLifeReading ? lifeMinute : date.getMinutes(),
         sex: gender,
         name: name || '某人',
         born_year: birthYear ? parseInt(birthYear) : undefined,
         province: province,
         city: city,
+        district,
+        birthPlace: lifePlaceText,
+        longitude: lifeUsesTrueSolar ? lifeCoord?.lng : undefined,
+        latitude: lifeUsesTrueSolar ? lifeCoord?.lat : undefined,
+        useTrueSolar: lifeUsesTrueSolar,
+        timeInputMode: isLifeReading ? lifeTimeInputMode : undefined,
+        calendarType: isLifeReading ? lifeCalendarType : undefined,
+        isLeapMonth: isLifeReading ? lifeIsLeapMonth : undefined,
+        pillars: isLifeReading && lifeCalendarType === 'pillars' ? lifePillars : undefined,
         pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
         question,
       };
@@ -6420,16 +6453,44 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Name (Life Reading Only) */}
               {isLifeReading && (
-                 <div>
-                   <label className="block text-stone-700 font-bold mb-2">姓名 (可选)</label>
-                   <input type="text" value={name} onChange={e => setName(e.target.value)} className="glass-input w-full rounded-2xl p-3" placeholder="张三"/>
-                 </div>
+                <LifeReadingForm
+                  modelLabel={modelType === ModelType.BAZI ? '八字' : '紫微'}
+                  name={name}
+                  setName={setName}
+                  gender={gender}
+                  setGender={setGender}
+                  calendarType={lifeCalendarType}
+                  setCalendarType={setLifeCalendarType}
+                  year={lifeYear}
+                  setYear={setLifeYear}
+                  month={lifeMonth}
+                  setMonth={setLifeMonth}
+                  day={lifeDay}
+                  setDay={setLifeDay}
+                  hour={lifeHour}
+                  setHour={setLifeHour}
+                  minute={lifeMinute}
+                  setMinute={setLifeMinute}
+                  timeInputMode={lifeTimeInputMode}
+                  setTimeInputMode={setLifeTimeInputMode}
+                  useTrueSolar={lifeUseTrueSolar}
+                  setUseTrueSolar={setLifeUseTrueSolar}
+                  isLeapMonth={lifeIsLeapMonth}
+                  setIsLeapMonth={setLifeIsLeapMonth}
+                  pillars={lifePillars}
+                  setPillars={setLifePillars}
+                  province={province}
+                  setProvince={setProvince}
+                  city={city}
+                  setCity={setCity}
+                  district={district}
+                  setDistrict={setDistrict}
+                />
               )}
 
               {/* Birth Year (Meihua & Liuyao) */}
-              {showBornYear && (
+              {!isLifeReading && showBornYear && (
                  <div>
                    <label className="block text-stone-700 font-bold mb-2">出生年份 (用于起卦依据)</label>
                    <input 
@@ -6442,7 +6503,7 @@ const App: React.FC = () => {
                  </div>
               )}
 
-              <div className="grid md:grid-cols-2 gap-6">
+              {!isLifeReading && <div className="grid md:grid-cols-2 gap-6">
                 {/* Gender */}
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">性别</label>
@@ -6482,7 +6543,7 @@ const App: React.FC = () => {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
 
               {modelType === ModelType.QIMEN && (
                 <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
@@ -6649,7 +6710,7 @@ const App: React.FC = () => {
               )}
 
               {/* Location for True Solar Time (Bazi & Ziwei) */}
-              {showLocation && (
+              {!isLifeReading && showLocation && (
                 <LocationSelector 
                   province={province} 
                   setProvince={setProvince} 
