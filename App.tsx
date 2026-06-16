@@ -5068,9 +5068,7 @@ const App: React.FC<AppProps> = ({
       }
 
       let resultData: any = null;
-      let prompt = "";
       let systemInstruction = "";
-      let knowledgeQuery = "";
 
       // --- API Calls & Prompt Gen ---
       switch (modelType) {
@@ -5085,65 +5083,46 @@ const App: React.FC<AppProps> = ({
             };
             resultData = await fetchQimen(qimenParams);
           }
-          prompt = formatQimenPrompt(resultData, question);
           systemInstruction = "你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。";
           break;
         case ModelType.BAZI:
           resultData = await fetchBazi(baseParams);
-          {
-            const analysisBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, resultData, question);
-            prompt = analysisBundle.prompt;
-            knowledgeQuery = analysisBundle.knowledgeQuery;
-            systemInstruction = analysisBundle.systemInstruction;
-          }
+          systemInstruction = buildLifeReadingAnalysisBundle(ModelType.BAZI, resultData, question).systemInstruction;
           break;
         case ModelType.ZIWEI:
           resultData = await fetchZiwei(baseParams);
-          {
-            const analysisBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, resultData, question);
-            prompt = analysisBundle.prompt;
-            knowledgeQuery = analysisBundle.knowledgeQuery;
-            systemInstruction = analysisBundle.systemInstruction;
-          }
+          systemInstruction = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, resultData, question).systemInstruction;
           break;
         case ModelType.MEIHUA:
           resultData = await fetchMeihua(baseParams);
-          prompt = formatMeihuaPrompt(resultData, question);
           systemInstruction = "你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。";
           break;
         case ModelType.LIUYAO:
           resultData = await fetchLiuyao(baseParams);
-          prompt = formatLiuyaoPrompt(resultData, question);
           systemInstruction = "你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。";
           break;
         case ModelType.DALIUREN:
           resultData = await fetchDaliuren(baseParams);
-          prompt = formatDaliurenPrompt(resultData, question);
           systemInstruction = "你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。";
           break;
         case ModelType.TAIYI:
           resultData = await fetchTaiyi(baseParams);
-          prompt = formatTaiyiPrompt(resultData, question);
           systemInstruction = "你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。";
           break;
         case ModelType.XIAOLIUREN:
           resultData = await fetchXiaoliuren(baseParams);
-          prompt = formatXiaoliurenPrompt(resultData, question);
           systemInstruction = "你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。";
           break;
         case ModelType.ALMANAC:
           resultData = await fetchAlmanac(baseParams);
-          prompt = formatAlmanacPrompt(resultData, question);
           systemInstruction = "你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。";
           break;
         case ModelType.DAILY_FORTUNE:
           resultData = await fetchDailyFortune(baseParams);
-          prompt = formatDailyFortunePrompt(resultData, question);
           systemInstruction = "你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。";
           break;
         case ModelType.MONTHLY_FORTUNE:
           resultData = await fetchMonthlyFortune(baseParams);
-          prompt = formatMonthlyFortunePrompt(resultData, question);
           systemInstruction = "你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。";
           break;
       }
@@ -5152,133 +5131,15 @@ const App: React.FC<AppProps> = ({
       setStep('chart');
       requestSectionScroll('report');
 
-      const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${question.trim().slice(0, 20) || baseParams.name || new Date().toLocaleDateString('zh-CN')}`;
       const sessionChartParams = { ...baseParams, question, timeMode, analysisModel } as Record<string, unknown>;
       setActiveSessionId(null);
       setActiveChartParams(sessionChartParams);
       setSessionAnalysisModel(analysisModel);
 
-      if (isFortuneReading) {
-        await startQimenChat(systemInstruction);
-        resetMessageVersions();
-        setChatHistory([]);
-        fetchSessions();
-        return;
-      }
-
-      if (isLoggedIn && userQuota !== null && userQuota <= 0) {
-        setError('排盘已完成。您的提问额度已用完，暂不能请求 AI 解读。');
-        return;
-      }
-
-      if (!isLoggedIn && guestFortuneCount >= GUEST_FORTUNE_LIMIT) {
-        setError('排盘已完成。访客 AI 解读次数已用完，请登录后继续分析。');
-        setShowAuth(true);
-        return;
-      }
-
-      // --- AI Chat Init ---
-      await startQimenChat(systemInstruction);
-
-      const userContent = buildInitialUserContent(
-        modelType,
-        baseParams as Record<string, unknown>,
-        question
-      );
-
+      // 排盘只生成盘面。首次点击解读、重新分析或追问时才请求模型并保存历史。
+      await startQimenChat(buildSystemInstruction(modelType, resultData, sessionChartParams) || systemInstruction);
       resetMessageVersions();
-      setChatHistory([{ id: 'init-u', role: 'user', content: userContent, timestamp: new Date() }]);
-      setIsTyping(true);
-
-      const modelId = 'init-m';
-      setChatHistory(prev => [
-        ...prev,
-        { id: modelId, role: 'model', content: '', timestamp: new Date() }
-      ]);
-      requestSectionScroll('chat');
-
-      const knowledgeQueryText = (() => {
-        if (knowledgeQuery) return knowledgeQuery;
-        if (modelType === ModelType.QIMEN) return question.trim();
-        return question.trim() ? question : prompt;
-      })();
-      const knowledge = useKnowledge && supportsKnowledge
-        ? {
-            enabled: true,
-            board: knowledgeBoardMap[modelType] || 'bazi',
-            query: knowledgeQueryText,
-          }
-        : undefined;
-
-      const finalState = await sendMessageToDeepseekStream(
-        prompt,
-        (state) => {
-          updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
-        },
-        knowledge,
-        analysisModel
-      );
-      if (finalState.knowledgeFailed) {
-        setKnowledgeHint(finalState.knowledgeFailed);
-      }
-      recordKnowledgeSources(modelId, finalState.knowledgeSources);
-      const finalAnswer = appendDisclaimer(finalState.content);
-      updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
-      if (modelType === ModelType.BAZI) {
-        setBaziInitialAnalysis(stripDisclaimer(finalState.content));
-        setKlineUnlocked(true);
-      }
-
-      // --- Save messages to DB ---
-      const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
-      if (isLoggedIn) {
-        const newSessionId = await saveSessionToDb(
-          modelType,
-          sessionTitle,
-          sessionChartParams,
-          resultData
-        );
-        if (newSessionId) {
-          setActiveSessionId(newSessionId);
-          await saveMessagesToDb(newSessionId, [
-            { role: 'user', content: userContent },
-            { role: 'model', content: finalContent },
-          ]);
-        }
-      } else if (activeCase) {
-        const guestSessionId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const now = new Date().toISOString();
-        const finalMessages: ChatMessage[] = [
-          { id: 'init-u', role: 'user', content: userContent, timestamp: new Date() },
-          { id: modelId, role: 'model', content: finalContent, timestamp: new Date() },
-        ];
-        saveGuestCaseSession({
-          id: guestSessionId,
-          caseId: activeCase.id,
-          modelType,
-          title: sessionTitle,
-          chartParams: sessionChartParams,
-          chartData: resultData,
-          messages: finalMessages.map((msg) => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp.toISOString(),
-          })),
-          guestFollowUpCount: 0,
-          createdAt: now,
-          updatedAt: now,
-        });
-        setActiveSessionId(guestSessionId);
-      }
-
-      if (!isLoggedIn) {
-        const newCount = guestFortuneCount + 1;
-        localStorage.setItem('guestFortuneCount', String(newCount));
-        setGuestFortuneCount(newCount);
-      } else {
-        fetchUserProfile();
-      }
+      setChatHistory([]);
 
     } catch (err: any) {
       console.error(err);
@@ -5431,8 +5292,23 @@ const App: React.FC<AppProps> = ({
       }
 
       if (isLoggedIn) {
-        await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
-        await updateSessionInDb(activeSessionId, { chartParams: nextChartParams });
+        if (activeSessionId) {
+          await replaceMessagesInDb(activeSessionId, toPersistedMessages(finalMessages));
+          await updateSessionInDb(activeSessionId, { chartParams: nextChartParams });
+        } else {
+          const sessionTitle = `${MODEL_LABELS[modelType] || modelType} - ${bundle.question || String(activeChartParams.name || new Date().toLocaleDateString('zh-CN'))}`;
+          const newSessionId = await saveSessionToDb(
+            modelType,
+            sessionTitle,
+            nextChartParams,
+            chartData,
+            activeCase?.id
+          );
+          if (newSessionId) {
+            setActiveSessionId(newSessionId);
+            await saveMessagesToDb(newSessionId, toPersistedMessages(finalMessages));
+          }
+        }
         fetchSessions();
         fetchUserProfile();
         if (activeCase) {
