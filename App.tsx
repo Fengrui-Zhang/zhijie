@@ -63,7 +63,13 @@ import {
   formatDaliurenPrompt, formatTaiyiPrompt, formatXiaoliurenPrompt, formatAlmanacPrompt,
   formatDailyFortunePrompt, formatMonthlyFortunePrompt,
 } from './services/apiService';
-import { startQimenChat, sendMessageToDeepseekStream, clearChatSession, restoreChatSession } from './services/deepseekService';
+import {
+  startQimenChat,
+  sendMessageToDeepseekStream,
+  clearChatSession,
+  restoreChatSession,
+  type KnowledgeSourceSummary,
+} from './services/deepseekService';
 
 // Auth & Session Components
 import AuthForm from './components/AuthForm';
@@ -784,6 +790,47 @@ const KnowledgeToggleCard = ({
   </div>
 );
 
+const KnowledgeSourceSummaryPanel = ({ sources }: { sources?: KnowledgeSourceSummary[] }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!sources?.length) return null;
+
+  const shownSources = expanded ? sources : sources.slice(0, 3);
+
+  return (
+    <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50/75 px-3 py-2 text-xs text-sky-950">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 text-left font-semibold"
+      >
+        <span>参考了 {sources.length} 条知识库资料</span>
+        <span className="shrink-0 text-sky-600">{expanded ? '收起' : '查看'}</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {shownSources.map((source, index) => (
+            <div key={`${source.id || source.source}-${index}`} className="rounded-xl border border-sky-100 bg-white/75 px-3 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate font-bold text-stone-800">
+                  {source.title || source.source || `参考资料 ${index + 1}`}
+                </span>
+                <span className="shrink-0 text-[10px] text-stone-400">
+                  {Math.round((source.score || 0) * 100)}%
+                </span>
+              </div>
+              {source.preview && (
+                <div className="mt-1 max-h-10 overflow-hidden leading-5 text-stone-500">
+                  {source.preview}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const buildBaziSystemInstruction = (data: BaziResponse) => {
   const panText = formatBaziPrompt(data);
   const now = new Date();
@@ -1275,6 +1322,8 @@ const App: React.FC<AppProps> = ({
   const [standaloneChatMessages, setStandaloneChatMessages] = useState<ChatMessage[]>([]);
   const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
   const [standaloneChatError, setStandaloneChatError] = useState('');
+  const [standaloneChatUseKnowledge, setStandaloneChatUseKnowledge] = useState(true);
+  const [standaloneChatKnowledgeBoard, setStandaloneChatKnowledgeBoard] = useState<'bazi' | 'qimen'>('bazi');
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -1309,6 +1358,7 @@ const App: React.FC<AppProps> = ({
   const [confirmCaseSessionDeleteId, setConfirmCaseSessionDeleteId] = useState<string | null>(null);
   const [initialAnalysisBusy, setInitialAnalysisBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
+  const [messageSourceMap, setMessageSourceMap] = useState<Record<string, KnowledgeSourceSummary[]>>({});
   const [baziInitialAnalysis, setBaziInitialAnalysis] = useState('');
   const [, setKlineUnlocked] = useState(false);
   const [klineModalOpen, setKlineModalOpen] = useState(false);
@@ -2482,6 +2532,14 @@ const App: React.FC<AppProps> = ({
     );
   };
 
+  const recordKnowledgeSources = (messageId: string, sources?: KnowledgeSourceSummary[]) => {
+    if (!sources?.length) return;
+    setMessageSourceMap((prev) => ({
+      ...prev,
+      [messageId]: sources,
+    }));
+  };
+
   const buildMessageVersionEntry = (messageId: string, content: string, timestamp?: Date): MessageVersionEntry => ({
     id: `${messageId}-${timestamp?.getTime() ?? Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     content,
@@ -3041,6 +3099,7 @@ const App: React.FC<AppProps> = ({
     setStep('input');
     setChartData(null);
     setChatHistory([]);
+    setMessageSourceMap({});
     resetMessageVersions();
     clearChatSession();
     setError('');
@@ -3184,6 +3243,14 @@ const App: React.FC<AppProps> = ({
           messages: apiMessages,
           model: analysisModel,
           temperature: 0.7,
+          knowledge: standaloneChatUseKnowledge
+            ? {
+                enabled: true,
+                board: standaloneChatKnowledgeBoard,
+                query: content,
+                topK: 5,
+              }
+            : undefined,
         }),
       });
       const data = await res.json();
@@ -3197,6 +3264,10 @@ const App: React.FC<AppProps> = ({
         timestamp: new Date(),
       };
       setStandaloneChatMessages((prev) => [...prev, modelMsg]);
+      recordKnowledgeSources(modelMsg.id, Array.isArray(data.knowledgeSources) ? data.knowledgeSources : undefined);
+      if (data.knowledgeFailed) {
+        setStandaloneChatError(`知识库检索失败，本次回答未使用参考资料：${data.knowledgeFailed}`);
+      }
       await fetchUserProfile();
     } catch (err) {
       setStandaloneChatError(err instanceof Error ? err.message : '发送失败，请稍后再试');
@@ -4572,6 +4643,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(modelId, finalState.knowledgeSources);
 
       const cleanContent = stripDisclaimer(finalState.content);
       const initialAnalysis = buildInitialAnalysisDataPayload(cleanContent);
@@ -4749,6 +4821,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(modelId, finalState.knowledgeSources);
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
@@ -5147,6 +5220,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(modelId, finalState.knowledgeSources);
       const finalAnswer = appendDisclaimer(finalState.content);
       updateChatMessage(modelId, buildModelContent(finalState.reasoning, finalAnswer));
       if (modelType === ModelType.BAZI) {
@@ -5331,6 +5405,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(modelId, finalState.knowledgeSources);
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
@@ -5478,6 +5553,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(messageId, finalState.knowledgeSources);
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
@@ -5632,6 +5708,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(replyId, finalState.knowledgeSources);
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
@@ -5754,6 +5831,7 @@ const App: React.FC<AppProps> = ({
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
       }
+      recordKnowledgeSources(modelId, finalState.knowledgeSources);
 
       const finalAnswer = appendDisclaimer(finalState.content);
       const finalContent = buildModelContent(finalState.reasoning, finalAnswer);
@@ -6658,7 +6736,30 @@ const App: React.FC<AppProps> = ({
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
           <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
         </div>
-        <div className="text-sm text-stone-500">手动提问后才会请求模型</div>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={standaloneChatUseKnowledge}
+            onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              standaloneChatUseKnowledge
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-stone-200 bg-white/60 text-stone-500'
+            }`}
+          >
+            参考古籍：{standaloneChatUseKnowledge ? '开' : '关'}
+          </button>
+          <select
+            value={standaloneChatKnowledgeBoard}
+            onChange={(event) => setStandaloneChatKnowledgeBoard(event.target.value as 'bazi' | 'qimen')}
+            disabled={!standaloneChatUseKnowledge}
+            className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
+          >
+            <option value="bazi">四柱八字</option>
+            <option value="qimen">奇门遁甲</option>
+          </select>
+        </div>
       </div>
 
       <div className="glass-panel-soft flex h-[62vh] min-h-[480px] flex-col overflow-hidden rounded-[30px] border border-white/60">
@@ -6678,6 +6779,9 @@ const App: React.FC<AppProps> = ({
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {msg.content}
                 </ReactMarkdown>
+                {msg.role === 'model' && (
+                  <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
+                )}
               </div>
             </div>
           ))}
@@ -8372,6 +8476,9 @@ const App: React.FC<AppProps> = ({
                               </ReactMarkdown>
                             )}
                           </div>
+                        )}
+                        {msg.role === 'model' && (
+                          <KnowledgeSourceSummaryPanel sources={messageSourceMap[msg.id]} />
                         )}
                         {msg.role === 'model' && (
                           <div className="mt-4 flex justify-end">

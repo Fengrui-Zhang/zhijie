@@ -4,7 +4,7 @@ import {
   resolveChatModel,
 } from '../../../lib/analysis-models';
 import { prisma } from '../../../lib/prisma';
-import { formatKnowledgeContext, retrieveKnowledge } from '../../../utils/knowledge';
+import { formatKnowledgeContext, retrieveKnowledge, type RetrievedChunk } from '../../../utils/knowledge';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -17,6 +17,28 @@ type KnowledgeRequest = {
   query?: string;
   topK?: number;
 };
+
+type KnowledgeSourceSummary = {
+  id: string;
+  title: string;
+  source: string;
+  score: number;
+  preview: string;
+};
+
+const summarizeKnowledgeSources = (chunks: RetrievedChunk[]): KnowledgeSourceSummary[] =>
+  chunks.slice(0, 6).map((chunk, index) => {
+    const title = chunk.title || chunk.source || `参考资料 ${index + 1}`;
+    return {
+      id: chunk.id || chunk.docId || `${chunk.source}-${index}`,
+      title,
+      source: chunk.source,
+      score: Number(chunk.score.toFixed(4)),
+      preview: chunk.text.replace(/\s+/g, ' ').trim().slice(0, 140),
+    };
+  });
+
+const encodeHeaderJson = (value: unknown) => encodeURIComponent(JSON.stringify(value));
 
 const extractErrorMessage = (input: unknown): string => {
   if (!input) return '';
@@ -74,6 +96,7 @@ export async function POST(request: Request) {
 
   let finalMessages = messages;
   let knowledgeFailed = '';
+  let knowledgeSources: KnowledgeSourceSummary[] = [];
   if (knowledge?.enabled) {
     const board = knowledge.board || 'bazi';
     const query =
@@ -88,6 +111,7 @@ export async function POST(request: Request) {
 
     try {
       const chunks = await retrieveKnowledge(board, query, knowledge.topK, false);
+      knowledgeSources = summarizeKnowledgeSources(chunks);
       const context = formatKnowledgeContext(chunks);
       if (context) {
         if (messages[0]?.role === 'system') {
@@ -168,6 +192,9 @@ export async function POST(request: Request) {
     if (knowledgeFailed) {
       headers['X-Knowledge-Failed'] = encodeURIComponent(knowledgeFailed);
     }
+    if (knowledgeSources.length > 0) {
+      headers['X-Knowledge-Sources'] = encodeHeaderJson(knowledgeSources);
+    }
     return new Response(response.body, {
       status: response.status,
       headers,
@@ -177,7 +204,8 @@ export async function POST(request: Request) {
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content ?? '';
 
-  const json: { content: string; knowledgeFailed?: string } = { content };
+  const json: { content: string; knowledgeFailed?: string; knowledgeSources?: KnowledgeSourceSummary[] } = { content };
   if (knowledgeFailed) json.knowledgeFailed = knowledgeFailed;
+  if (knowledgeSources.length > 0) json.knowledgeSources = knowledgeSources;
   return NextResponse.json(json);
 }

@@ -32,7 +32,7 @@ type CachedKnowledgeIndex = Omit<KnowledgeIndex, 'chunks'> & {
   chunks: CachedChunk[];
 };
 
-type RetrievedChunk = {
+export type RetrievedChunk = {
   text: string;
   source: string;
   score: number;

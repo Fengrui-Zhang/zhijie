@@ -12,6 +12,14 @@ type KnowledgeOptions = {
   topK?: number;
 };
 
+export type KnowledgeSourceSummary = {
+  id: string;
+  title: string;
+  source: string;
+  score: number;
+  preview: string;
+};
+
 const extractResponseError = (raw: string, fallback: string) => {
   if (!raw.trim()) return fallback;
 
@@ -34,6 +42,29 @@ const extractResponseError = (raw: string, fallback: string) => {
   }
 
   return fallback;
+};
+
+const parseKnowledgeSourcesHeader = (value: string | null): KnowledgeSourceSummary[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        return {
+          id: String(record.id || record.source || ''),
+          title: String(record.title || record.source || '参考资料'),
+          source: String(record.source || ''),
+          score: typeof record.score === 'number' ? record.score : 0,
+          preview: String(record.preview || ''),
+        };
+      })
+      .filter((item): item is KnowledgeSourceSummary => Boolean(item?.id || item?.source || item?.preview));
+  } catch {
+    return [];
+  }
 };
 
 let chatMessages: ChatMessage[] = [];
@@ -91,6 +122,7 @@ type StreamState = {
   reasoning: string;
   content: string;
   knowledgeFailed?: string;
+  knowledgeSources?: KnowledgeSourceSummary[];
 };
 
 export const sendMessageToDeepseekStream = async (
@@ -126,12 +158,18 @@ export const sendMessageToDeepseekStream = async (
   const knowledgeFailed = response.headers.get('X-Knowledge-Failed')
     ? decodeURIComponent(response.headers.get('X-Knowledge-Failed')!)
     : undefined;
+  const knowledgeSources = parseKnowledgeSourcesHeader(response.headers.get('X-Knowledge-Sources'));
 
   if (!response.body) {
     const data = await response.json();
     const content = data.content || '无法获取回复';
     chatMessages.push({ role: 'assistant', content });
-    return { reasoning: '', content, knowledgeFailed: data.knowledgeFailed ?? knowledgeFailed };
+    return {
+      reasoning: '',
+      content,
+      knowledgeFailed: data.knowledgeFailed ?? knowledgeFailed,
+      knowledgeSources: data.knowledgeSources ?? knowledgeSources,
+    };
   }
 
   const reader = response.body.getReader();
@@ -180,7 +218,7 @@ export const sendMessageToDeepseekStream = async (
   }
 
   chatMessages.push({ role: 'assistant', content: contentText });
-  return { reasoning: reasoningText, content: contentText, knowledgeFailed };
+  return { reasoning: reasoningText, content: contentText, knowledgeFailed, knowledgeSources };
 };
 
 export const clearChatSession = () => {
