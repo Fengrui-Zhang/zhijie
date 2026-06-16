@@ -404,6 +404,48 @@ const getCaseSexLabel = (chartParams: unknown) => {
   return '';
 };
 
+const getCaseModelDisplayLabel = (modelType: CaseModelType) =>
+  modelType === ModelType.BAZI ? '四柱八字' : '紫微斗数';
+
+const buildStandaloneCaseReferenceText = (items: CaseItem[]) => {
+  const blocks = items
+    .map((item, index) => {
+      const label = getCaseModelDisplayLabel(item.modelType);
+      const title = getCaseDisplayName(item);
+      let chartText = '';
+      try {
+        chartText = item.modelType === ModelType.BAZI
+          ? formatBaziPrompt(item.chartData as BaziResponse)
+          : formatZiweiPrompt(item.chartData as ZiweiResponse);
+      } catch {
+        chartText = JSON.stringify(item.chartData ?? {});
+      }
+
+      const initialAnalysis = item.initialAnalysisData?.content?.trim()
+        ? [
+            '',
+            '【命例基线分析】',
+            item.initialAnalysisData.content.trim().slice(0, 2800),
+          ].join('\n')
+        : '';
+
+      return [
+        `【引用命例 ${index + 1}：${title}｜${label}】`,
+        chartText,
+        initialAnalysis,
+      ].filter(Boolean).join('\n');
+    })
+    .filter(Boolean);
+
+  if (blocks.length === 0) return '';
+
+  return [
+    '用户已在本次聊天中选择以下命例作为资料源。若用户问题涉及命主、运势、性格、关系或择事，请优先结合这些命例；若问题与命例无关，可以简要说明后直接回答。',
+    '',
+    blocks.join('\n\n'),
+  ].join('\n');
+};
+
 const buildJointAnalysisPrompt = (jointData: JointChartData) => {
   const baziBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, jointData.baziChartData, '');
   const ziweiBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, jointData.ziweiChartData, '');
@@ -1362,6 +1404,9 @@ const App: React.FC<AppProps> = ({
   const [standaloneChatError, setStandaloneChatError] = useState('');
   const [standaloneChatUseKnowledge, setStandaloneChatUseKnowledge] = useState(true);
   const [standaloneChatKnowledgeBoard, setStandaloneChatKnowledgeBoard] = useState<'bazi' | 'qimen'>('bazi');
+  const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
+  const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
+  const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
   const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>('profile');
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -1731,6 +1776,36 @@ const App: React.FC<AppProps> = ({
     }
   }, [isLoggedIn, readGuestCases]);
 
+  const hydrateStandaloneCaseOptions = useCallback(async () => {
+    if (!isLoggedIn) {
+      const items = readGuestCases()
+        .filter((item) => item.modelType === ModelType.BAZI || item.modelType === ModelType.ZIWEI)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      setStandaloneCaseOptions(items);
+      setStandaloneSelectedCaseIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+      return;
+    }
+
+    try {
+      const [baziRes, ziweiRes] = await Promise.all([
+        fetch('/api/cases?modelType=bazi'),
+        fetch('/api/cases?modelType=ziwei'),
+      ]);
+      const [baziData, ziweiData] = await Promise.all([
+        baziRes.ok ? baziRes.json() : Promise.resolve([]),
+        ziweiRes.ok ? ziweiRes.json() : Promise.resolve([]),
+      ]);
+      const items = [
+        ...(Array.isArray(baziData) ? baziData : []),
+        ...(Array.isArray(ziweiData) ? ziweiData : []),
+      ].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      setStandaloneCaseOptions(items);
+      setStandaloneSelectedCaseIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+    } catch {
+      // silently ignore
+    }
+  }, [isLoggedIn, readGuestCases]);
+
   const loadCaseDetail = useCallback(async (caseId: string) => {
     if (!isCaseModel) return;
 
@@ -1939,6 +2014,11 @@ const App: React.FC<AppProps> = ({
     if (modelType !== ModelType.DAILY_FORTUNE && modelType !== ModelType.MONTHLY_FORTUNE) return;
     hydrateFortuneCaseOptions();
   }, [hydrateFortuneCaseOptions, modelType]);
+
+  useEffect(() => {
+    if (workspaceView !== 'chat') return;
+    hydrateStandaloneCaseOptions();
+  }, [hydrateStandaloneCaseOptions, workspaceView]);
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') {
@@ -3265,6 +3345,20 @@ const App: React.FC<AppProps> = ({
     clearViewState();
   };
 
+  const handleAddStandaloneCaseReference = () => {
+    const nextId = standaloneCaseSelectValue;
+    if (!nextId) return;
+    setStandaloneSelectedCaseIds((current) => {
+      if (current.includes(nextId)) return current;
+      return [...current, nextId].slice(-4);
+    });
+    setStandaloneCaseSelectValue('');
+  };
+
+  const handleRemoveStandaloneCaseReference = (caseId: string) => {
+    setStandaloneSelectedCaseIds((current) => current.filter((id) => id !== caseId));
+  };
+
   const handleStandaloneChatSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
     const content = standaloneChatInput.trim();
@@ -3282,10 +3376,17 @@ const App: React.FC<AppProps> = ({
     setStandaloneChatMessages(nextMessages);
     setStandaloneChatLoading(true);
     try {
+      const selectedCases = standaloneSelectedCaseIds
+        .map((id) => standaloneCaseOptions.find((item) => item.id === id))
+        .filter((item): item is CaseItem => Boolean(item));
+      const caseReferenceText = buildStandaloneCaseReferenceText(selectedCases);
       const apiMessages = [
         {
           role: 'system',
-          content: '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
+          content: [
+            '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
+            caseReferenceText,
+          ].filter(Boolean).join('\n\n'),
         },
         ...nextMessages.map((msg) => ({
           role: msg.role === 'model' ? 'assistant' : 'user',
@@ -6898,6 +6999,11 @@ const App: React.FC<AppProps> = ({
     </div>
   );
 
+  const standaloneSelectedCases = standaloneSelectedCaseIds
+    .map((id) => standaloneCaseOptions.find((item) => item.id === id))
+    .filter((item): item is CaseItem => Boolean(item));
+  const standaloneAvailableCaseOptions = standaloneCaseOptions.filter((item) => !standaloneSelectedCaseIds.includes(item.id));
+
   const renderChatWorkspace = () => (
     <div className="glass-panel flex h-[calc(100vh-128px)] min-h-[620px] flex-col overflow-hidden rounded-[32px]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
@@ -6905,7 +7011,31 @@ const App: React.FC<AppProps> = ({
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
           <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
+            <span className="pl-1 text-xs font-semibold text-stone-500">引用命例</span>
+            <select
+              value={standaloneCaseSelectValue}
+              onChange={(event) => setStandaloneCaseSelectValue(event.target.value)}
+              className="max-w-[180px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
+              disabled={standaloneAvailableCaseOptions.length === 0}
+            >
+              <option value="">{standaloneAvailableCaseOptions.length ? '选择命例' : '暂无命例'}</option>
+              {standaloneAvailableCaseOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {getCaseModelDisplayLabel(item.modelType)} · {getCaseDisplayName(item)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAddStandaloneCaseReference}
+              disabled={!standaloneCaseSelectValue}
+              className="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-semibold text-amber-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
+            >
+              添加
+            </button>
+          </div>
           <button
             type="button"
             role="switch"
@@ -6930,6 +7060,28 @@ const App: React.FC<AppProps> = ({
           </select>
         </div>
       </div>
+      {standaloneSelectedCases.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-stone-100/80 bg-white/42 px-6 py-3 md:px-8">
+          <span className="text-xs font-semibold text-stone-400">已引用</span>
+          {standaloneSelectedCases.map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center gap-2 rounded-full border border-amber-100 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-stone-700"
+            >
+              <span className="text-amber-700">{getCaseModelDisplayLabel(item.modelType)}</span>
+              <span>{getCaseDisplayName(item)}</span>
+              <button
+                type="button"
+                onClick={() => handleRemoveStandaloneCaseReference(item.id)}
+                className="text-stone-400 transition hover:text-stone-700"
+                aria-label={`移除${getCaseDisplayName(item)}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-8">
         {standaloneChatMessages.length === 0 ? (
