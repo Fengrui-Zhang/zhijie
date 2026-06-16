@@ -916,7 +916,7 @@ const AskPanel = ({
         <div className="text-base font-bold text-stone-800 md:text-lg">{title}</div>
       </div>
       <div className="mt-3 rounded-2xl border border-stone-100 bg-stone-50/50 p-3 md:mt-5 md:p-4">
-        <div className="text-sm font-bold text-stone-700">选中日期</div>
+        <div className="text-sm font-bold text-stone-700">当前日期</div>
         <div className="mt-1 text-lg font-bold text-stone-900 md:mt-2 md:text-xl">{dateText}</div>
       </div>
       <div className="mt-3 flex gap-2 md:mt-5 md:gap-3">
@@ -926,7 +926,7 @@ const AskPanel = ({
           onKeyDown={(event) => {
             if (event.key === 'Enter') submit();
           }}
-          placeholder={`询问关于${dateText}的问题...`}
+          placeholder={`输入关于${dateText}的问题`}
           className="glass-input min-w-0 flex-1 rounded-2xl px-3 py-2.5 text-sm outline-none md:px-4 md:py-3"
         />
         <button
@@ -935,11 +935,11 @@ const AskPanel = ({
           disabled={!draft.trim() || !onAsk || isAsking}
           className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-300 disabled:opacity-50 md:px-5 md:py-3"
         >
-          提问
+          问 AI
         </button>
       </div>
       <div className="mt-4 md:mt-5">
-        <div className="mb-2 text-sm font-bold text-stone-600 md:mb-3">建议问题：</div>
+        <div className="mb-2 text-sm font-bold text-stone-600 md:mb-3">常用问题</div>
         <div className="grid gap-2 md:grid-cols-2 md:gap-3">
           {suggestions.map((item) => (
             <button
@@ -1132,7 +1132,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
       </div>
 
       <AskPanel
-        title="日历智能问答"
+        title="问 AI"
         dateText={formatDateZh(currentDate)}
         onAsk={onAsk}
         isAsking={isAsking}
@@ -1400,7 +1400,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
       </div>
 
       <AskPanel
-        title="月运智能问答"
+        title="问 AI"
         dateText={`${monthDate.getFullYear()}年${monthDate.getMonth() + 1}月`}
         onAsk={onAsk}
         isAsking={isAsking}

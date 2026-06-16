@@ -6115,11 +6115,16 @@ const App: React.FC<AppProps> = ({
           }
         }
         updateChatMessage(modelId, finalContent);
-        await saveMessagesToDb(sessionId, [
-          { role: 'user', content: outgoingMessage },
-          { role: 'model', content: finalContent, knowledgeSources: finalState.knowledgeSources },
-        ]);
-        fetchUserProfile();
+        if (sessionId) {
+          await saveMessagesToDb(sessionId, [
+            { role: 'user', content: outgoingMessage },
+            { role: 'model', content: finalContent, knowledgeSources: finalState.knowledgeSources },
+          ]);
+          fetchSessions();
+          fetchUserProfile();
+        } else {
+          setError('对话已生成，但历史保存失败，请稍后重试');
+        }
       } else {
         const nextGuestFollowUpCount = effectiveGuestFollowUpCount + 1;
         localStorage.setItem('guestFollowUpCount', String(nextGuestFollowUpCount));
