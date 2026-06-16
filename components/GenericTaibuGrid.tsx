@@ -15,6 +15,25 @@ const formatValue = (value: unknown): string => {
   return String(value);
 };
 
+const objectEntries = (value: unknown) => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined && item !== '')
+    : []
+);
+
+const SectionCard = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <div className="glass-panel-soft rounded-[26px] border border-white/60 p-4 md:p-5">
+    <div className="mb-3 text-sm font-bold text-stone-700">{title}</div>
+    {children}
+  </div>
+);
+
 const EntryList = ({ entries }: { entries: Array<[string, unknown]> }) => (
   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
     {entries.map(([key, value]) => (
@@ -55,6 +74,20 @@ const FortuneBlock = ({ fortune }: { fortune: any }) => {
           {notes.join(' ')}
         </div>
       )}
+    </div>
+  );
+};
+
+const CompactEntryList = ({ entries }: { entries: Array<[string, unknown]> }) => {
+  if (!entries.length) return <div className="text-sm text-stone-400">暂无</div>;
+  return (
+    <div className="space-y-2 text-sm leading-6 text-stone-600">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex justify-between gap-3 rounded-xl bg-white/55 px-3 py-2">
+          <span className="shrink-0 font-semibold text-stone-500">{key}</span>
+          <span className="min-w-0 break-words text-right">{formatValue(value)}</span>
+        </div>
+      ))}
     </div>
   );
 };
@@ -107,11 +140,104 @@ const DaliurenBlock = ({ data }: { data: any }) => {
   );
 };
 
+const TaiyiBlock = ({ data }: { data: any }) => {
+  if (!data) return null;
+  const metaEntries = objectEntries(data.boardMeta);
+  const timeEntries = objectEntries(data.datetimeContext);
+  const coreEntries = objectEntries(data).filter(([key]) => !['boardMeta', 'datetimeContext'].includes(key)).slice(0, 9);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <SectionCard title="局式信息">
+        <CompactEntryList entries={metaEntries.length ? metaEntries : coreEntries.slice(0, 4)} />
+      </SectionCard>
+      <SectionCard title="时间干支">
+        <CompactEntryList entries={timeEntries} />
+      </SectionCard>
+      <SectionCard title="关键结构">
+        <CompactEntryList entries={coreEntries} />
+      </SectionCard>
+    </div>
+  );
+};
+
+const XiaoliurenBlock = ({ data }: { data: any }) => {
+  if (!data) return null;
+  const inputEntries = objectEntries(data.input);
+  const resultEntries = objectEntries(data.result);
+  const extraEntries = objectEntries(data).filter(([key]) => !['input', 'result'].includes(key)).slice(0, 8);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <SectionCard title="起课信息">
+        <CompactEntryList entries={inputEntries} />
+      </SectionCard>
+      <SectionCard title="落宫结果">
+        <CompactEntryList entries={resultEntries} />
+      </SectionCard>
+      <SectionCard title="辅助判断">
+        <CompactEntryList entries={extraEntries} />
+      </SectionCard>
+    </div>
+  );
+};
+
+const AlmanacBlock = ({ data }: { data: any }) => {
+  if (!data) return null;
+  const almanac = data.almanac || data;
+  const dayEntries = objectEntries(data.dayInfo || almanac.dayInfo || {}).slice(0, 8);
+  const directionEntries = objectEntries(almanac.directions || data.directions || {});
+  const yi = Array.isArray(almanac.yi) ? almanac.yi : Array.isArray(almanac.suitable) ? almanac.suitable : [];
+  const ji = Array.isArray(almanac.ji) ? almanac.ji : Array.isArray(almanac.avoid) ? almanac.avoid : [];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <SectionCard title="日课信息">
+          <CompactEntryList entries={dayEntries} />
+        </SectionCard>
+        <SectionCard title="方位">
+          <CompactEntryList entries={directionEntries} />
+        </SectionCard>
+        <SectionCard title="神煞">
+          <CompactEntryList
+            entries={[
+              ['吉神', almanac.jishen],
+              ['凶煞', almanac.xiongsha],
+              ['冲煞', almanac.chongSha],
+              ['胎神', almanac.taiShen],
+            ]}
+          />
+        </SectionCard>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <SectionCard title="宜">
+          <div className="flex flex-wrap gap-2">
+            {(yi.length ? yi : ['暂无']).map((item: string) => (
+              <span key={item} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{item}</span>
+            ))}
+          </div>
+        </SectionCard>
+        <SectionCard title="忌">
+          <div className="flex flex-wrap gap-2">
+            {(ji.length ? ji : ['暂无']).map((item: string) => (
+              <span key={item} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600">{item}</span>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+};
+
 const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => {
   const baseEntries = Object.entries(data.base_info || {}).filter(([, value]) => value !== undefined && value !== '');
   const detail = data.detail_info || {};
   const fortune = (detail as any).fortune;
   const daliuren = (detail as any).daliuren;
+  const taiyi = (detail as any).taiyi;
+  const xiaoliuren = (detail as any).xiaoliuren;
+  const almanac = (detail as any).almanac;
 
   return (
     <div className="space-y-4">
@@ -126,6 +252,9 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
       </div>
 
       <DaliurenBlock data={daliuren} />
+      <TaiyiBlock data={taiyi} />
+      <XiaoliurenBlock data={xiaoliuren} />
+      <AlmanacBlock data={almanac} />
       <FortuneBlock fortune={fortune} />
 
       <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
