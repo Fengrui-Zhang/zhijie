@@ -6920,6 +6920,35 @@ const App: React.FC<AppProps> = ({
     recordFilterOptions.find((option) => option.key === getRecordCategory(item))?.label || '记录'
   );
   const getRecordMessageCount = (item: SessionItem) => item._count?.messages ?? 0;
+  const handleExportRecords = (records: SessionItem[], filenamePrefix: string) => {
+    if (!records.length || typeof window === 'undefined') return;
+    const payload = {
+      app: '元分 · 智解',
+      type: 'divination_sessions',
+      exportedAt: new Date().toISOString(),
+      count: records.length,
+      records: records.map((item) => ({
+        id: item.id,
+        title: item.title,
+        modelType: item.modelType,
+        category: getRecordCategoryLabel(item),
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        isPinned: Boolean(item.isPinned),
+        isArchived: Boolean(item.isArchived),
+        messageCount: getRecordMessageCount(item),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
 
   const formatSessionDate = (value: string) => {
     const date = new Date(value);
@@ -6956,13 +6985,31 @@ const App: React.FC<AppProps> = ({
           <div className="mt-1 text-2xl font-bold text-stone-800">命理记录</div>
           <div className="mt-2 text-sm text-stone-500">只保存发生过 AI 对话的记录，排盘浏览不会进入这里。</div>
         </div>
-        <button
-          type="button"
-          onClick={() => handleModelChange(ModelType.BAZI)}
-          className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
-        >
-          新建排盘
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => handleExportRecords(filteredRecords, 'zhijie-records-filtered')}
+            disabled={filteredRecords.length === 0}
+            className="rounded-2xl border border-white/70 bg-white/58 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            导出筛选
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportRecords(savedSessions, 'zhijie-records-all')}
+            disabled={savedSessions.length === 0}
+            className="rounded-2xl border border-white/70 bg-white/58 px-4 py-2.5 text-sm font-semibold text-stone-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            导出全部
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModelChange(ModelType.BAZI)}
+            className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
+          >
+            新建排盘
+          </button>
+        </div>
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2 rounded-[22px] border border-white/65 bg-white/48 p-2">
