@@ -28,6 +28,12 @@ const MODE_LABELS: Record<InterpretationMode, string> = {
   technical: '术语',
 };
 
+const MODE_PREFIX: Record<InterpretationMode, string> = {
+  colloquial: '',
+  professional: '从日主与流运关系看，',
+  technical: '以十神、五行与日课结构参断，',
+};
+
 const LEVEL_VALUE: Record<string, number> = {
   大吉: 92,
   吉: 78,
@@ -104,6 +110,53 @@ const ChipList = ({ items, tone = 'neutral', limit }: { items: string[]; tone?: 
       {typeof limit === 'number' && items.length > limit && (
         <span className="rounded-lg border border-stone-200 bg-white/50 px-2.5 py-1 text-xs text-stone-400">+{items.length - limit}</span>
       )}
+    </div>
+  );
+};
+
+const ShareDialog = ({
+  open,
+  title,
+  lines,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  lines: string[];
+  onClose: () => void;
+}) => {
+  const [copied, setCopied] = useState(false);
+  if (!open) return null;
+  const text = [title, ...lines].filter(Boolean).join('\n');
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard?.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/30 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_90px_rgba(28,25,23,0.22)]">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="text-lg font-bold text-stone-800">分享摘要</div>
+          <button type="button" onClick={onClose} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-stone-500 hover:bg-stone-50">
+            关闭
+          </button>
+        </div>
+        <div className="rounded-2xl border border-stone-100 bg-stone-50/80 p-4 text-sm leading-7 text-stone-700">
+          <div className="mb-2 text-base font-bold text-stone-900">{title}</div>
+          {lines.map((line) => (
+            <div key={line}>{line}</div>
+          ))}
+        </div>
+        <button type="button" onClick={handleCopy} className="mt-4 w-full rounded-2xl bg-stone-900 px-4 py-3 text-sm font-bold text-amber-200 transition hover:bg-stone-800">
+          {copied ? '已复制' : '复制摘要'}
+        </button>
+      </div>
     </div>
   );
 };
@@ -289,6 +342,7 @@ const DirectionGrid = ({ directions }: { directions?: Record<string, string> }) 
 const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [showHours, setShowHours] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
   const almanacPayload = fortune.almanac || {};
   const almanac = almanacPayload.almanac || {};
@@ -403,7 +457,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
                 <div className="text-lg font-bold text-stone-800">运势分析</div>
                 <div className="mt-1 text-sm text-stone-400">日干支：{fortune.dayStem}{fortune.dayBranch}</div>
               </div>
-              <button type="button" className="rounded-2xl border border-white/70 bg-white/60 px-4 py-2 text-sm font-bold text-stone-600">分享</button>
+              <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-white/70 bg-white/60 px-4 py-2 text-sm font-bold text-stone-600">分享</button>
             </div>
             <ScoreBars fortune={fortune} />
             <div className="mt-6 grid gap-4 border-t border-white/70 pt-5 sm:grid-cols-2">
@@ -454,6 +508,17 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
           '这一天的财运如何？',
         ]}
       />
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={`${formatDateZh(currentDate)} 运势`}
+        lines={[
+          `综合：${fortune.overall || '平'}，主神：${fortune.tenGod || '—'}`,
+          `事业：${fortune.career || '平'}，感情：${fortune.love || '平'}，财运：${fortune.wealth || '平'}`,
+          `幸运色：${fortune.luckyColor || '—'}，吉方位：${fortune.luckyDirection || '—'}`,
+          `建议：${advice.slice(0, 3).join(' ') || '稳中求进，顺势而为。'}`,
+        ]}
+      />
     </div>
   );
 };
@@ -500,12 +565,23 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
 };
 
 const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
+  const [mode, setMode] = useState<InterpretationMode>('colloquial');
+  const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
   const calendar = Array.isArray(fortune.calendar) ? fortune.calendar : [];
   const year = Number(fortune.year || new Date().getFullYear());
   const month = Number(fortune.month || new Date().getMonth() + 1);
   const firstDay = new Date(year, month - 1, 1).getDay();
   const monthDate = new Date(year, month - 1, 1);
+  const monthlyGuide = useMemo(() => {
+    const base = [
+      `综合为${fortune.overall || '平'}，本月宜先定节奏，再处理关键事项。`,
+      `事业为${fortune.career || '平'}，重要沟通尽量提前准备方案和边界。`,
+      `财运为${fortune.wealth || '平'}，支出与合作事项以可验证信息为准。`,
+      `感情为${fortune.love || '平'}，少用试探，多用明确表达。`,
+    ];
+    return base.map((item) => `${MODE_PREFIX[mode]}${item}`);
+  }, [fortune.career, fortune.love, fortune.overall, fortune.wealth, mode]);
   return (
     <div className="space-y-6">
       <div className="glass-panel-soft overflow-hidden rounded-[28px] border border-white/60">
@@ -548,6 +624,26 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
             <div className="mt-6">
               <ScoreBars fortune={fortune} />
             </div>
+            <div className="mt-6 border-t border-white/70 pt-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-lg font-bold text-stone-800">本月指引</div>
+                <div className="rounded-2xl bg-white/55 p-1">
+                  {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
+                    <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-indigo-500 text-white' : 'text-stone-500'}`}>
+                      {MODE_LABELS[item]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ol className="space-y-3">
+                {monthlyGuide.map((item, index) => (
+                  <li key={`${item}-${index}`} className="flex gap-3 text-sm leading-7 text-stone-700">
+                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/70 text-xs font-bold text-stone-500">{index + 1}</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </div>
       </div>
@@ -555,12 +651,15 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
       <MonthlyTrend calendar={calendar} />
 
       <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div className="text-lg font-bold text-stone-800">每日运程</div>
-          <div className="flex items-center gap-3 text-xs text-stone-500">
+          <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-stone-500">
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />吉</span>
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-stone-400" />平</span>
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-red-500" />凶</span>
+            <button type="button" onClick={() => setShareOpen(true)} className="rounded-full border border-white/70 bg-white/60 px-3 py-1.5 font-bold text-stone-600">
+              分享
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-7 gap-2 sm:gap-3">
@@ -601,6 +700,17 @@ const MonthlyView = ({ data, onDateChange, onAsk, isAsking }: Props) => {
           '这个月感情运如何？',
           '这个月哪几天更适合行动？',
           '这个月有什么需要避开的风险？',
+        ]}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={`${year}年${month}月运势`}
+        lines={[
+          `流月：${fortune.monthStem || ''}${fortune.monthBranch || ''}，主运十神：${fortune.tenGod || '—'}`,
+          `综合：${fortune.overall || '平'}，事业：${fortune.career || '平'}，财运：${fortune.wealth || '平'}`,
+          `感情：${fortune.love || '平'}，健康：${fortune.health || '平'}，人际：${fortune.social || '平'}`,
+          `总结：${fortune.summary || '本月宜稳中求进，结合每日运程安排节奏。'}`,
         ]}
       />
     </div>
