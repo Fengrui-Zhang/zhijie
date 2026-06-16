@@ -8593,20 +8593,11 @@ const App: React.FC<AppProps> = ({
 
         {/* Input Phase */}
         {step === 'input' && (
-          <div className="glass-panel p-6 md:p-8 rounded-[32px]">
+          <div className="glass-panel rounded-[24px] p-5 md:p-7">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">{currentWorkspaceLabel}</div>
                 <div className="mt-1 text-2xl font-bold text-stone-800">{currentModuleLabel}</div>
-              </div>
-              <div className="text-sm text-stone-500">
-                {professionalSelectedProject
-                  ? '选择命例或新建资料后开始进阶分析'
-                  : isCaseModel
-                    ? '管理命例、排盘并进入 AI 分析'
-                    : isFortuneReading
-                      ? '选择命例与日期，生成专属运势面板'
-                    : '先完成排盘，再基于盘面发起解读'}
               </div>
             </div>
 
@@ -8618,38 +8609,15 @@ const App: React.FC<AppProps> = ({
             )}
 
             {professionalSelectedProject ? renderProfessionalWorkspace() : hasSelectedModel && (isFortuneReading ? (
-              <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
-                <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <div className="text-lg font-bold text-stone-700">
-                        {modelType === ModelType.MONTHLY_FORTUNE ? '每月运势' : '每日运势'}
-                      </div>
-                      <div className="mt-1 text-xs text-stone-500">
-                        运势会根据所选八字命例和日期自动刷新；只有点击智能问答才会请求 AI。
-                      </div>
-                    </div>
-                    {fortuneCaseOptions.length > 0 && (
-                      <select
-                        value={fortuneCaseId}
-                        onChange={(event) => handleFortuneCaseChange(event.target.value)}
-                        className="glass-input glass-select min-w-[220px] rounded-2xl px-4 py-3 text-sm font-semibold outline-none"
-                      >
-                        {fortuneCaseOptions.map((item) => (
-                          <option key={item.id} value={item.id}>{item.title}</option>
-                        ))}
-                      </select>
-                    )}
+              <div className="space-y-5 animate-fade-in">
+                {fortuneCaseOptions.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-sm leading-6 text-stone-500">
+                    暂无八字命例。请先进入“四柱八字”新增命例，再查看每日或每月运势。
                   </div>
-                  {fortuneCaseOptions.length === 0 && (
-                    <div className="mt-4 rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
-                      暂无八字命例。请先进入“四柱八字”新增命例，再查看每日或每月运势。
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {loading && (
-                  <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-12 text-center text-sm text-stone-500">
+                  <div className="rounded-2xl border border-stone-100 bg-white/70 px-5 py-12 text-center text-sm text-stone-500">
                     <div className="mx-auto mb-3 flex justify-center text-stone-500"><Spinner /></div>
                     正在生成运势面板...
                   </div>

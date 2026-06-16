@@ -283,6 +283,23 @@ const DIMENSION_COLOR: Record<DimensionKey, string> = {
   social: '#8b5cf6',
 };
 
+type TrendPoint = {
+  x: number;
+  y: number;
+  value: number;
+  label: string;
+  fullDate?: string;
+  dimension?: DimensionKey;
+};
+
+const chartX = (index: number, total: number) => (total <= 1 ? 50 : 8 + (index / (total - 1)) * 84);
+const chartY = (value: number) => {
+  const safe = Math.max(25, Math.min(100, Number(value) || 52));
+  return 12 + ((100 - safe) / 75) * 76;
+};
+
+const dimensionShortLabel = (label: string) => label.replace('运势', '').replace('运', '');
+
 const parseDate = (value?: string) => {
   if (!value) return new Date();
   const [year, month, day] = value.split('-').map(Number);
@@ -489,8 +506,20 @@ const downloadShareImage = async (baseFilename: string, svg: string) => {
   }
 };
 
-const ChipList = ({ items, tone = 'neutral', limit }: { items: string[]; tone?: 'good' | 'bad' | 'neutral'; limit?: number }) => {
-  const shown = typeof limit === 'number' ? items.slice(0, limit) : items;
+const ChipList = ({
+  items,
+  tone = 'neutral',
+  limit,
+  collapsible = false,
+}: {
+  items: string[];
+  tone?: 'good' | 'bad' | 'neutral';
+  limit?: number;
+  collapsible?: boolean;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const effectiveLimit = collapsible ? (limit ?? 6) : limit;
+  const shown = typeof effectiveLimit === 'number' && !expanded ? items.slice(0, effectiveLimit) : items;
   if (!shown.length) return <span className="text-sm text-stone-400">暂无</span>;
   const cls = tone === 'good'
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -502,8 +531,14 @@ const ChipList = ({ items, tone = 'neutral', limit }: { items: string[]; tone?: 
       {shown.map((item) => (
         <span key={item} className={`rounded-lg border px-2.5 py-1 text-xs font-semibold ${cls}`}>{item}</span>
       ))}
-      {typeof limit === 'number' && items.length > limit && (
-        <span className="rounded-lg border border-stone-200 bg-white/50 px-2.5 py-1 text-xs text-stone-400">+{items.length - limit}</span>
+      {typeof effectiveLimit === 'number' && items.length > effectiveLimit && (
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="rounded-lg border border-stone-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-stone-500 transition hover:bg-white hover:text-stone-700"
+        >
+          {expanded ? '收起' : `展开 ${items.length - effectiveLimit}`}
+        </button>
       )}
     </div>
   );
@@ -666,15 +701,16 @@ const FortuneTrendChart = ({
   selectedDate?: string;
 }) => {
   const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall']);
+  const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
   const series = useMemo(() => {
     if (!trend?.length) return [];
     return activeDimensions.map((dimension) => ({
       dimension,
       points: trend.map((item, index) => {
         const value = item.scores?.[dimension] ?? item.scores?.overall ?? 52;
-        const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
-        const y = 100 - Math.max(12, Math.min(92, value));
-        return { x, y, value, label: item.date, fullDate: item.fullDate };
+        const x = chartX(index, trend.length);
+        const y = chartY(value);
+        return { x, y, value, label: item.date, fullDate: item.fullDate, dimension };
       }),
     }));
   }, [trend, activeDimensions]);
@@ -692,7 +728,7 @@ const FortuneTrendChart = ({
   };
 
   return (
-    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[26px] md:p-6">
+    <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
         <div className="flex items-center gap-3">
           <div className="text-base font-bold text-stone-800 md:text-lg">7日运势趋势</div>
@@ -710,37 +746,66 @@ const FortuneTrendChart = ({
                 activeDimensions.includes(item.key) ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/65 text-stone-500 hover:bg-white'
               }`}
             >
-              {item.label.replace('运势', '').replace('运', '')}
+              {dimensionShortLabel(item.label)}
             </button>
           ))}
         </div>
       </div>
-      <svg viewBox="0 0 100 100" className="h-44 w-full overflow-visible rounded-[18px] border border-stone-100 bg-white/45 px-2 md:h-64 md:rounded-[24px]">
-        {[20, 40, 60, 80].map((line) => (
-          <line key={line} x1="0" y1={100 - line} x2="100" y2={100 - line} stroke="#e7e5e4" strokeWidth="0.35" strokeDasharray="1.5 2" />
-        ))}
-        {series.map((item) => (
-          <path
-            key={item.dimension}
-            d={smoothPath(item.points)}
-            fill="none"
-            stroke={DIMENSION_COLOR[item.dimension]}
-            strokeWidth="2.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
-          />
-        ))}
-        {primaryPoints.map((point) => {
-          const active = selectedDate && point.fullDate === selectedDate;
-          return (
-            <g key={point.fullDate}>
-              <circle cx={point.x} cy={point.y} r={active ? '4.2' : '2.2'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke={active ? '#fff7ed' : '#ffffff'} strokeWidth={active ? '2.2' : '0.8'} />
-              <text x={point.x} y="108" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}</text>
-            </g>
-          );
-        })}
-      </svg>
+      <div className="relative h-56 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72">
+        <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
+          {[25, 50, 75, 100].map((line) => (
+            <line key={line} x1="8" y1={chartY(line)} x2="92" y2={chartY(line)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
+          ))}
+          {series.map((item) => (
+            <path
+              key={item.dimension}
+              d={smoothPath(item.points)}
+              fill="none"
+              stroke={DIMENSION_COLOR[item.dimension]}
+              strokeWidth={item.dimension === activeDimensions[0] ? '3.2' : '2.7'}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
+            />
+          ))}
+          {primaryPoints.map((point) => {
+            const active = selectedDate && point.fullDate === selectedDate;
+            const tooltipPoint = { ...point, dimension: activeDimensions[0] };
+            return (
+              <g
+                key={point.fullDate || point.label}
+                tabIndex={0}
+                role="button"
+                onMouseEnter={() => setHoveredPoint(tooltipPoint)}
+                onMouseLeave={() => setHoveredPoint(null)}
+                onFocus={() => setHoveredPoint(tooltipPoint)}
+                onBlur={() => setHoveredPoint(null)}
+                onClick={() => setHoveredPoint(tooltipPoint)}
+                className="cursor-pointer outline-none"
+              >
+                <circle cx={point.x} cy={point.y} r={active ? '4.2' : '2.4'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke={active ? '#fff7ed' : '#ffffff'} strokeWidth={active ? '2.4' : '1'} />
+                <text x={point.x} y="97" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}</text>
+              </g>
+            );
+          })}
+        </svg>
+        {hoveredPoint && (
+          <div
+            className="pointer-events-none absolute z-10 min-w-[132px] rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-lg"
+            style={{
+              left: `${hoveredPoint.x}%`,
+              top: `${hoveredPoint.y}%`,
+              transform: 'translate(-50%, -112%)',
+            }}
+          >
+            <div className="font-bold text-stone-800">{hoveredPoint.fullDate || hoveredPoint.label}</div>
+            <div className="mt-1 flex items-center gap-2 text-stone-600">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DIMENSION_COLOR[hoveredPoint.dimension || activeDimensions[0]] }} />
+              <span>{dimensionShortLabel(SCORE_ITEMS.find((item) => item.key === (hoveredPoint.dimension || activeDimensions[0]))?.label || '综合')}：<b className="text-stone-900">{Math.round(hoveredPoint.value)}</b></span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -767,12 +832,12 @@ const AskPanel = ({
   };
 
   return (
-    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
-      <div className="border-b border-white/70 pb-3 md:pb-4">
+    <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
+      <div className="border-b border-stone-100 pb-3 md:pb-4">
         <div className="text-base font-bold text-stone-800 md:text-lg">{title}</div>
         <div className="mt-1 text-xs text-stone-500 md:text-sm">针对选中日期提出问题，确认后才会请求 AI 解答。</div>
       </div>
-      <div className="mt-3 rounded-2xl border border-stone-200/80 bg-white/55 p-3 md:mt-5 md:p-4">
+      <div className="mt-3 rounded-2xl border border-stone-100 bg-stone-50/50 p-3 md:mt-5 md:p-4">
         <div className="text-sm font-bold text-stone-700">选中日期</div>
         <div className="mt-1 text-lg font-bold text-stone-900 md:mt-2 md:text-xl">{dateText}</div>
       </div>
@@ -804,7 +869,7 @@ const AskPanel = ({
               type="button"
               onClick={() => submit(item)}
               disabled={!onAsk || isAsking}
-              className="rounded-2xl border border-white/70 bg-white/55 px-3 py-2.5 text-left text-sm font-semibold text-stone-700 transition hover:bg-white disabled:opacity-50 md:px-4 md:py-3"
+              className="rounded-2xl border border-stone-100 bg-white px-3 py-2.5 text-left text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50 md:px-4 md:py-3"
             >
               {item}
             </button>
@@ -826,7 +891,7 @@ const DirectionGrid = ({ directions }: { directions?: Record<string, string> }) 
   return (
     <div className="grid grid-cols-2 gap-2 md:gap-3">
       {items.map(([key, label]) => (
-        <div key={key} className="rounded-2xl border border-white/60 bg-white/50 px-3 py-2.5 md:px-4 md:py-3">
+        <div key={key} className="rounded-2xl border border-stone-100 bg-stone-50/40 px-3 py-2.5 md:px-4 md:py-3">
           <div className="text-xs text-stone-400">{label}</div>
           <div className="mt-1 text-sm font-bold text-stone-700">{directions?.[key] || '—'}</div>
         </div>
@@ -856,21 +921,21 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] xl:gap-6">
-        <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[28px]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-3 md:gap-4 md:p-6">
+        <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white/75 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-3 md:gap-4 md:p-6">
             <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">‹</button>
+              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">‹</button>
               <div>
                 <div className="text-center text-2xl font-bold text-stone-900 sm:text-left">{formatDateZh(currentDate)}</div>
                 <div className="mt-1 text-sm text-stone-500">农历 {almanac.lunarDate || '—'}</div>
               </div>
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">›</button>
+              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">›</button>
             </div>
             <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end md:gap-4">
               <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
               <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
               <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
-              <div className={`rounded-full bg-white/70 px-3 py-1 font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
+              <div className={`rounded-full bg-stone-50 px-3 py-1 font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
             </div>
           </div>
 
@@ -878,22 +943,22 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
             <div className="grid grid-cols-2 gap-3 md:gap-4">
               <div>
                 <div className="mb-2 text-sm font-bold text-emerald-700">宜</div>
-                <ChipList items={yi} tone="good" />
+                <ChipList items={yi} tone="good" limit={6} collapsible />
               </div>
               <div>
                 <div className="mb-2 text-sm font-bold text-red-600">忌</div>
-                <ChipList items={ji} tone="bad" />
+                <ChipList items={ji} tone="bad" limit={6} collapsible />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 md:p-4">
+              <div className="rounded-2xl border border-stone-100 bg-stone-50/40 p-3 md:p-4">
                 <div className="mb-3 text-sm font-bold text-stone-700">吉神</div>
-                <ChipList items={asList(almanac.jishen)} tone="good" limit={8} />
+                <ChipList items={asList(almanac.jishen)} tone="good" limit={6} collapsible />
               </div>
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 md:p-4">
+              <div className="rounded-2xl border border-stone-100 bg-stone-50/40 p-3 md:p-4">
                 <div className="mb-3 text-sm font-bold text-stone-700">凶煞</div>
-                <ChipList items={asList(almanac.xiongsha)} tone="bad" limit={8} />
+                <ChipList items={asList(almanac.xiongsha)} tone="bad" limit={6} collapsible />
               </div>
             </div>
 
@@ -906,7 +971,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
                 ['二十八宿', `${almanac.lunarMansion || '—'}${almanac.lunarMansionLuck ? `（${almanac.lunarMansionLuck}）` : ''}`],
                 ['纳音', almanac.nayin],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl border border-white/60 bg-white/50 px-3 py-2.5 md:px-4 md:py-3">
+                <div key={label} className="rounded-2xl border border-stone-100 bg-stone-50/40 px-3 py-2.5 md:px-4 md:py-3">
                   <div className="text-xs text-stone-400">{label}</div>
                   <div className="mt-1 text-sm font-bold text-stone-700">{value || '—'}</div>
                 </div>
@@ -916,7 +981,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
             <DirectionGrid directions={almanac.directions} />
 
             {almanac.lunarMansionSong && (
-              <div className="rounded-2xl border border-white/60 bg-white/50 p-3 text-sm leading-7 text-stone-600 md:p-4">
+              <div className="rounded-2xl border border-stone-100 bg-stone-50/40 p-3 text-sm leading-7 text-stone-600 md:p-4">
                 <span className="font-bold text-stone-700">宿曜歌诀：</span>{almanac.lunarMansionSong}
               </div>
             )}
@@ -930,7 +995,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
                 {showHours && (
                   <div className="mt-3 grid gap-2 md:mt-4 md:grid-cols-2 md:gap-3">
                     {hourly.slice(0, 12).map((item: any) => (
-                      <div key={item.ganZhi} className="rounded-2xl border border-white/60 bg-white/50 px-4 py-3 text-sm">
+                      <div key={item.ganZhi} className="rounded-2xl border border-stone-100 bg-stone-50/40 px-4 py-3 text-sm">
                         <div className="flex justify-between gap-3">
                           <span className="font-bold text-stone-800">{item.ganZhi}</span>
                           <span className={item.tianShenLuck === '吉' ? 'text-emerald-600' : 'text-red-500'}>{item.tianShen} · {item.tianShenLuck}</span>
@@ -947,13 +1012,13 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
 
         <div className="space-y-4 md:space-y-6">
           <FortuneTrendChart trend={fortune.trend || []} selectedDate={fortune.date} />
-          <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+          <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 md:mb-6">
               <div>
                 <div className="text-base font-bold text-stone-800 md:text-lg">运势分析</div>
                 <div className="mt-1 text-sm text-stone-400">日干支：{fortune.dayStem}{fortune.dayBranch}</div>
               </div>
-              <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-white/70 bg-white/60 px-3 py-1.5 text-sm font-bold text-stone-600 md:px-4 md:py-2">分享</button>
+              <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-stone-200 bg-white px-3 py-1.5 text-sm font-bold text-stone-600 md:px-4 md:py-2">分享</button>
             </div>
             <ScoreBars fortune={fortune} />
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/70 pt-4 md:mt-6 md:gap-4 md:pt-5">
@@ -969,7 +1034,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
             <div className="mt-4 border-t border-white/70 pt-4 md:mt-6 md:pt-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
                 <div className="text-base font-bold text-stone-800 md:text-lg">运势指引</div>
-                <div className="rounded-2xl bg-white/55 p-1">
+                <div className="rounded-2xl bg-stone-100 p-1">
                   {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
                     <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-sky-500 text-white' : 'text-stone-500'}`}>
                       {MODE_LABELS[item]}
@@ -1025,20 +1090,28 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
 
 const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
   const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career', 'wealth']);
+  const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
   const series = useMemo(() => {
-    const sample = calendar.filter((_: any, index: number) => index % 3 === 0 || index === calendar.length - 1);
     return activeDimensions.map((dimension) => ({
       dimension,
-      points: sample.map((item: any, index: number) => {
+      points: calendar.map((item: any, index: number) => {
         const value = item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level);
-        const x = sample.length === 1 ? 50 : (index / (sample.length - 1)) * 100;
-        const y = 100 - Math.max(12, Math.min(92, value));
-        return { x, y, label: `${item.day}`, value };
+        const x = chartX(index, calendar.length);
+        const y = chartY(value);
+        return { x, y, label: `${item.day}`, value, fullDate: item.date, dimension };
       }),
     }));
   }, [calendar, activeDimensions]);
   if (!series.length) return null;
   const primaryPoints = series[0]?.points || [];
+  const tickLabels = new Set(
+    primaryPoints
+      .filter((point, index) => {
+        const day = Number(point.label);
+        return index === 0 || index === primaryPoints.length - 1 || [7, 14, 21, 28].includes(day);
+      })
+      .map((point) => point.label)
+  );
   const toggleDimension = (dimension: DimensionKey) => {
     setActiveDimensions((current) => {
       if (current.includes(dimension)) {
@@ -1048,40 +1121,74 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
     });
   };
   return (
-    <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+    <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
         <div className="text-base font-bold text-stone-800 md:text-lg">运势起伏</div>
         <div className="flex flex-wrap gap-1.5 md:gap-2">
           {SCORE_ITEMS.map((item) => (
-            <button key={item.key} type="button" onClick={() => toggleDimension(item.key)} className={`rounded-full px-2.5 py-1 text-xs font-bold md:px-3 md:py-1.5 ${activeDimensions.includes(item.key) ? 'bg-indigo-500 text-white' : 'bg-white/65 text-stone-500'}`}>
-              {item.label.replace('运势', '').replace('运', '')}
+            <button key={item.key} type="button" onClick={() => toggleDimension(item.key)} className={`rounded-full px-2.5 py-1 text-xs font-bold transition md:px-3 md:py-1.5 ${activeDimensions.includes(item.key) ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-stone-50 text-stone-500 hover:bg-white'}`}>
+              {dimensionShortLabel(item.label)}
             </button>
           ))}
         </div>
       </div>
-      <svg viewBox="0 0 100 100" className="h-44 w-full overflow-visible rounded-[18px] border border-stone-100 bg-white/45 md:h-64 md:rounded-[24px]">
-        {[20, 40, 60, 80].map((line) => (
-          <line key={line} x1="0" y1={100 - line} x2="100" y2={100 - line} stroke="#e7e5e4" strokeWidth="0.35" strokeDasharray="1.5 2" />
-        ))}
-        {series.map((item) => (
-          <path
-            key={item.dimension}
-            d={smoothPath(item.points)}
-            fill="none"
-            stroke={DIMENSION_COLOR[item.dimension]}
-            strokeWidth="2.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={item.dimension === activeDimensions[0] ? 1 : 0.7}
-          />
-        ))}
-        {primaryPoints.map((point) => (
-          <g key={point.label}>
-            <circle cx={point.x} cy={point.y} r="2.2" fill={DIMENSION_COLOR[activeDimensions[0]]} stroke="#fff" strokeWidth="0.9" />
-            <text x={point.x} y="108" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}日</text>
-          </g>
-        ))}
-      </svg>
+      <div className="relative h-60 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-80">
+        <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
+          {[25, 50, 75, 100].map((line) => (
+            <line key={line} x1="8" y1={chartY(line)} x2="92" y2={chartY(line)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
+          ))}
+          {series.map((item) => (
+            <path
+              key={item.dimension}
+              d={smoothPath(item.points)}
+              fill="none"
+              stroke={DIMENSION_COLOR[item.dimension]}
+              strokeWidth={item.dimension === activeDimensions[0] ? '3.2' : '2.8'}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
+            />
+          ))}
+          {primaryPoints.map((point, index) => {
+            const tooltipPoint = { ...point, dimension: activeDimensions[0] };
+            const showDot = index === 0 || index === primaryPoints.length - 1 || index % 3 === 0;
+            return (
+              <g
+                key={point.fullDate || point.label}
+                tabIndex={0}
+                role="button"
+                onMouseEnter={() => setHoveredPoint(tooltipPoint)}
+                onMouseLeave={() => setHoveredPoint(null)}
+                onFocus={() => setHoveredPoint(tooltipPoint)}
+                onBlur={() => setHoveredPoint(null)}
+                onClick={() => setHoveredPoint(tooltipPoint)}
+                className="cursor-pointer outline-none"
+              >
+                <circle cx={point.x} cy={point.y} r={showDot ? '2.25' : '1.25'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke="#fff" strokeWidth={showDot ? '1' : '0'} opacity={showDot ? 1 : 0.25} />
+                {tickLabels.has(point.label) && (
+                  <text x={point.x} y="97" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}日</text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+        {hoveredPoint && (
+          <div
+            className="pointer-events-none absolute z-10 min-w-[128px] rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-lg"
+            style={{
+              left: `${hoveredPoint.x}%`,
+              top: `${hoveredPoint.y}%`,
+              transform: 'translate(-50%, -112%)',
+            }}
+          >
+            <div className="font-bold text-stone-800">{hoveredPoint.fullDate || `${hoveredPoint.label}日`}</div>
+            <div className="mt-1 flex items-center gap-2 text-stone-600">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DIMENSION_COLOR[hoveredPoint.dimension || activeDimensions[0]] }} />
+              <span>{dimensionShortLabel(SCORE_ITEMS.find((item) => item.key === (hoveredPoint.dimension || activeDimensions[0]))?.label || '综合')}：<b className="text-stone-900">{Math.round(hoveredPoint.value)}</b></span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1107,30 +1214,30 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
   }, [fortune, mode]);
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[28px]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/70 p-3 md:gap-4 md:p-6">
+      <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white/75 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-3 md:gap-4 md:p-6">
           <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
-            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, -1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">‹</button>
+            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, -1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">‹</button>
             <div className="text-center">
               <div className="text-2xl font-bold text-stone-900">{year}年 {month}月</div>
               <button type="button" onClick={() => onDateChange?.(new Date())} className="mt-1 text-xs text-stone-500 hover:text-stone-800">回到本月</button>
             </div>
-            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, 1))} className="rounded-full border border-white/70 bg-white/60 px-2.5 py-1.5 text-stone-500 hover:bg-white md:px-3 md:py-2">›</button>
+            <button type="button" onClick={() => onDateChange?.(shiftMonth(year, month, 1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">›</button>
           </div>
-          <div className="w-full rounded-full border border-white/70 bg-white/60 px-3 py-2 text-center text-sm text-stone-600 sm:w-auto sm:text-left md:px-4">
+          <div className="w-full rounded-full border border-stone-100 bg-stone-50/70 px-3 py-2 text-center text-sm text-stone-600 sm:w-auto sm:text-left md:px-4">
             <span className="mr-2">命主</span>
             <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
             {!caseOptions?.length && <span className="font-bold text-indigo-600">{String(data.base_info?.name || '当前命例')}</span>}
           </div>
         </div>
         <div className="grid gap-4 p-3 md:grid-cols-[0.85fr_1.15fr] md:gap-6 md:p-6">
-          <div className="border-b border-white/70 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-6">
+          <div className="border-b border-stone-100 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-6">
             <div className="text-sm font-bold text-stone-500">本月能量</div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-3xl font-bold text-stone-900 md:text-4xl">{fortune.monthStem}{fortune.monthBranch}</span>
               <span className="text-sm text-stone-500">月</span>
             </div>
-            <div className="mt-4 inline-flex rounded-2xl bg-white/65 px-4 py-2 text-sm text-stone-600">
+            <div className="mt-4 inline-flex rounded-2xl bg-stone-50 px-4 py-2 text-sm text-stone-600">
               主运十神：<span className="ml-1 font-bold text-stone-800">{fortune.tenGod || '—'}</span>
             </div>
             <div className="mt-5">
@@ -1138,7 +1245,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
                 <span>综合运势</span>
                 <span className={levelTone(fortune.overall || '平')}>{fortune.overall || '平'}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/70">
+              <div className="h-2 overflow-hidden rounded-full bg-stone-100">
                 <div className={`h-full ${levelBar(fortune.overall || '平')}`} style={{ width: `${fortune._chart?.overall || 52}%` }} />
               </div>
             </div>
@@ -1149,10 +1256,10 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
             <div className="mt-4 md:mt-6">
               <ScoreBars fortune={fortune} />
             </div>
-            <div className="mt-4 border-t border-white/70 pt-4 md:mt-6 md:pt-5">
+            <div className="mt-4 border-t border-stone-100 pt-4 md:mt-6 md:pt-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
                 <div className="text-base font-bold text-stone-800 md:text-lg">本月指引</div>
-                <div className="rounded-2xl bg-white/55 p-1">
+                <div className="rounded-2xl bg-stone-100 p-1">
                   {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => (
                     <button key={item} type="button" onClick={() => setMode(item)} className={`rounded-xl px-3 py-1.5 text-xs font-bold ${mode === item ? 'bg-indigo-500 text-white' : 'text-stone-500'}`}>
                       {MODE_LABELS[item]}
@@ -1163,7 +1270,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
               <ol className="space-y-2 md:space-y-3">
                 {monthlyGuide.map((item, index) => (
                   <li key={`${item}-${index}`} className="flex gap-3 text-sm leading-7 text-stone-700">
-                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/70 text-xs font-bold text-stone-500">{index + 1}</span>
+                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-xs font-bold text-stone-500">{index + 1}</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -1175,14 +1282,14 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
 
       <MonthlyTrend calendar={calendar} />
 
-      <div className="glass-panel-soft rounded-[20px] border border-white/60 p-3 md:rounded-[28px] md:p-6">
+      <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
         <div className="mb-3 flex items-center justify-between gap-3 md:mb-4">
           <div className="text-base font-bold text-stone-800 md:text-lg">每日运程</div>
           <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-stone-500">
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />吉</span>
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-stone-400" />平</span>
             <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-red-500" />凶</span>
-            <button type="button" onClick={() => setShareOpen(true)} className="rounded-full border border-white/70 bg-white/60 px-3 py-1.5 font-bold text-stone-600">
+            <button type="button" onClick={() => setShareOpen(true)} className="rounded-full border border-stone-200 bg-white px-3 py-1.5 font-bold text-stone-600">
               分享
             </button>
           </div>
@@ -1201,10 +1308,10 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
                 type="button"
                 onClick={() => (onOpenDailyDate || onDateChange)?.(dayDate)}
                 className={`rounded-xl border px-1.5 py-2 text-center transition hover:-translate-y-0.5 hover:bg-white md:rounded-2xl md:px-2 md:py-3 ${
-                  isToday ? 'border-indigo-200 bg-indigo-50/80 ring-1 ring-indigo-200' : 'border-white/60 bg-white/45'
+                  isToday ? 'border-orange-200 bg-orange-50/80 ring-1 ring-orange-200' : 'border-stone-100 bg-stone-50/45'
                 }`}
               >
-                <div className={`text-sm font-semibold ${isToday ? 'text-indigo-600' : 'text-stone-600'}`}>{day.day}</div>
+                <div className={`text-sm font-semibold ${isToday ? 'text-orange-600' : 'text-stone-600'}`}>{day.day}</div>
                 <div className={`mx-auto mt-2 h-2 w-2 rounded-full ${levelDot(day.level)}`} />
                 <div className={`mt-1 text-[11px] font-semibold ${levelTone(day.level)}`}>{day.level}</div>
               </button>
