@@ -83,6 +83,7 @@ import {
 import { HEXAGRAMS } from 'taibu-core/data/hexagrams';
 import { Solar } from 'lunar-javascript';
 import { ModelType, LiuyaoMode, type BaseParams, type QimenParams } from '../types';
+import { normalizeZhijieShenSha, type BaziShenShaContext } from '../utils/baziShensha';
 
 type ChartRequest = {
   modelType: ModelType;
@@ -208,6 +209,52 @@ function buildBaseInfo(params: BaseParams, dayun?: DayunOutput, chart?: BaziOutp
 }
 
 function adaptBazi(params: BaseParams, chart: BaziOutput, dayun: DayunOutput) {
+  const shenShaContext: BaziShenShaContext = {
+    yearStem: chart.fourPillars.year.stem,
+    yearBranch: chart.fourPillars.year.branch,
+    monthStem: chart.fourPillars.month.stem,
+    monthBranch: chart.fourPillars.month.branch,
+    dayStem: chart.fourPillars.day.stem,
+    dayBranch: chart.fourPillars.day.branch,
+    hourStem: chart.fourPillars.hour.stem,
+    hourBranch: chart.fourPillars.hour.branch,
+    sex: params.sex,
+    kongZhi: chart.kongWang?.kongZhi || [],
+  };
+  chart.fourPillars.year.shenSha = normalizeZhijieShenSha(chart.fourPillars.year.shenSha, shenShaContext, {
+    stem: chart.fourPillars.year.stem,
+    branch: chart.fourPillars.year.branch,
+    position: 'year',
+  });
+  chart.fourPillars.month.shenSha = normalizeZhijieShenSha(chart.fourPillars.month.shenSha, shenShaContext, {
+    stem: chart.fourPillars.month.stem,
+    branch: chart.fourPillars.month.branch,
+    position: 'month',
+  });
+  chart.fourPillars.day.shenSha = normalizeZhijieShenSha(chart.fourPillars.day.shenSha, shenShaContext, {
+    stem: chart.fourPillars.day.stem,
+    branch: chart.fourPillars.day.branch,
+    position: 'day',
+  });
+  chart.fourPillars.hour.shenSha = normalizeZhijieShenSha(chart.fourPillars.hour.shenSha, shenShaContext, {
+    stem: chart.fourPillars.hour.stem,
+    branch: chart.fourPillars.hour.branch,
+    position: 'hour',
+  });
+  for (const item of dayun.list || []) {
+    const stem = item.ganZhi?.slice(0, 1) || item.stem || '';
+    const branch = item.ganZhi?.slice(1, 2) || item.branch || '';
+    item.shenSha = normalizeZhijieShenSha(item.shenSha, shenShaContext, { stem, branch, position: 'fortune' });
+    for (const liunian of item.liunianList || []) {
+      const yearStem = liunian.gan || liunian.ganZhi?.slice(0, 1) || '';
+      const yearBranch = liunian.zhi || liunian.ganZhi?.slice(1, 2) || '';
+      liunian.shenSha = normalizeZhijieShenSha(liunian.shenSha, shenShaContext, {
+        stem: yearStem,
+        branch: yearBranch,
+        position: 'fortune',
+      });
+    }
+  }
   const pillars = [
     chart.fourPillars.year,
     chart.fourPillars.month,
@@ -221,7 +268,14 @@ function adaptBazi(params: BaseParams, chart: BaziOutput, dayun: DayunOutput) {
   const fortuneContext = {
     dayStem: chart.fourPillars.day.stem,
     dayBranch: chart.fourPillars.day.branch,
+    yearStem: chart.fourPillars.year.stem,
     yearBranch: chart.fourPillars.year.branch,
+    monthStem: chart.fourPillars.month.stem,
+    monthBranch: chart.fourPillars.month.branch,
+    hourStem: chart.fourPillars.hour.stem,
+    hourBranch: chart.fourPillars.hour.branch,
+    sex: params.sex,
+    kongZhi: chart.kongWang?.kongZhi || [],
   };
 
   return {

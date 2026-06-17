@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Solar } from 'lunar-javascript';
 import { calculateBaziLiuRiData, calculateBaziLiuYueData } from 'taibu-core/bazi';
 import { BaziResponse } from '../types';
+import { normalizeZhijieShenSha, type BaziShenShaContext } from '../utils/baziShensha';
 import { getWuxingColor } from '../utils/wuxing';
 import MarkdownContent from './MarkdownContent';
 
@@ -634,15 +635,59 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     return selectedDayun.liunianList?.find((item: any) => item.year === selectedYear) || null;
   }, [selectedDayun, selectedYear]);
   const fortuneContext = (detail_info as any).fortuneContext;
+  const shenShaContext = useMemo<BaziShenShaContext | null>(() => {
+    const sizhu = (detail_info as any).sizhu || {};
+    const dayPillar = pillars[2];
+    const yearPillar = pillars[0];
+    const monthPillar = pillars[1];
+    const hourPillar = pillars[3];
+    const yearStem = fortuneContext?.yearStem || yearPillar?.gan || sizhu.year?.tg || '';
+    const yearBranch = fortuneContext?.yearBranch || yearPillar?.zhi || sizhu.year?.dz || '';
+    const monthStem = fortuneContext?.monthStem || monthPillar?.gan || sizhu.month?.tg || '';
+    const monthBranch = fortuneContext?.monthBranch || monthPillar?.zhi || sizhu.month?.dz || '';
+    const dayStem = fortuneContext?.dayStem || dayPillar?.gan || sizhu.day?.tg || '';
+    const dayBranch = fortuneContext?.dayBranch || dayPillar?.zhi || sizhu.day?.dz || '';
+    if (!yearStem || !yearBranch || !monthStem || !monthBranch || !dayStem || !dayBranch) return null;
+    return {
+      yearStem,
+      yearBranch,
+      monthStem,
+      monthBranch,
+      dayStem,
+      dayBranch,
+      hourStem: fortuneContext?.hourStem || hourPillar?.gan || sizhu.hour?.tg || '',
+      hourBranch: fortuneContext?.hourBranch || hourPillar?.zhi || sizhu.hour?.dz || '',
+      sex: fortuneContext?.sex,
+      kongZhi: fortuneContext?.kongZhi || [],
+    };
+  }, [detail_info, fortuneContext, pillars]);
   const liuyueList = useMemo(() => {
     if (!selectedYear || !fortuneContext) return [];
-    return calculateBaziLiuYueData(selectedYear, fortuneContext);
-  }, [fortuneContext, selectedYear]);
+    const list = calculateBaziLiuYueData(selectedYear, fortuneContext);
+    if (!shenShaContext) return list;
+    return list.map((item: any) => ({
+      ...item,
+      shenSha: normalizeZhijieShenSha(item.shenSha, shenShaContext, {
+        stem: item.gan || item.ganZhi?.slice(0, 1) || '',
+        branch: item.zhi || item.ganZhi?.slice(1, 2) || '',
+        position: 'fortune',
+      }),
+    }));
+  }, [fortuneContext, selectedYear, shenShaContext]);
   const selectedMonthItem = selectedMonth ? liuyueList.find((item: any) => item.month === selectedMonth) : null;
   const liuriList = useMemo(() => {
     if (!selectedMonthItem || !fortuneContext) return [];
-    return calculateBaziLiuRiData(selectedMonthItem.startDate, selectedMonthItem.endDate, fortuneContext);
-  }, [fortuneContext, selectedMonthItem]);
+    const list = calculateBaziLiuRiData(selectedMonthItem.startDate, selectedMonthItem.endDate, fortuneContext);
+    if (!shenShaContext) return list;
+    return list.map((item: any) => ({
+      ...item,
+      shenSha: normalizeZhijieShenSha(item.shenSha, shenShaContext, {
+        stem: item.gan || item.ganZhi?.slice(0, 1) || '',
+        branch: item.zhi || item.ganZhi?.slice(1, 2) || '',
+        position: 'day',
+      }),
+    }));
+  }, [fortuneContext, selectedMonthItem, shenShaContext]);
   const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.date === selectedDay) : null;
   const visibleDayunList = dayunList.slice(0, 10);
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
