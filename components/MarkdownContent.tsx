@@ -64,6 +64,16 @@ const toText = (value: unknown, fallback = '') => {
 
 const clampScore = (value: unknown) => Math.max(0, Math.min(100, toNumber(value, 0)));
 
+const normalizeCompactScoreEntries = (entries: ScoreEntry[]) => {
+  const positiveScores = entries.map((entry) => entry.score).filter((score) => score > 0);
+  const shouldScaleFromTen = positiveScores.length > 0 && Math.max(...positiveScores) <= 10;
+  if (!shouldScaleFromTen) return entries;
+  return entries.map((entry) => ({
+    ...entry,
+    score: Math.max(0, Math.min(100, Math.round(entry.score * 10))),
+  }));
+};
+
 const FORTUNE_SCORE_LABELS: FallbackScoreLabel[] = [
   { key: 'career', label: '事业/学业' },
   { key: 'wealth', label: '财富' },
@@ -129,7 +139,7 @@ const scoreColor = (score: number) => {
 
 const getScoreEntries = (value: unknown, fallbackLabels?: FallbackScoreLabel[]): ScoreEntry[] => {
   if (Array.isArray(value)) {
-    return value
+    const entries = value
       .map((item, index) => {
         const fallback = getFallbackScoreLabel(fallbackLabels, index);
         const record = toRecord(item);
@@ -145,12 +155,13 @@ const getScoreEntries = (value: unknown, fallbackLabels?: FallbackScoreLabel[]):
         };
       })
       .filter((item): item is ScoreEntry => Boolean(item));
+    return normalizeCompactScoreEntries(entries);
   }
 
   const record = toRecord(value);
   if (!record) return [];
 
-  return Object.entries(record).map(([key, raw], index) => {
+  const entries = Object.entries(record).map(([key, raw], index) => {
     const fallback = getFallbackScoreLabel(fallbackLabels, index);
     const item = toRecord(raw);
     const rawLabel = item ? toText(item.label || item.name || key, key) : key;
@@ -161,9 +172,19 @@ const getScoreEntries = (value: unknown, fallbackLabels?: FallbackScoreLabel[]):
       score: item ? clampScore(item.score || item.value) : clampScore(raw),
     };
   });
+  return normalizeCompactScoreEntries(entries);
 };
 
 const WUXING_LABELS = ['木', '火', '土', '金', '水'];
+
+const wuxingColor = (label: string) => {
+  if (label.includes('水')) return 'bg-stone-950';
+  if (label.includes('金')) return 'bg-yellow-300';
+  if (label.includes('土')) return 'bg-amber-700';
+  if (label.includes('木')) return 'bg-emerald-600';
+  if (label.includes('火')) return 'bg-red-500';
+  return 'bg-stone-500';
+};
 
 const inferWuxingScore = (record: UnknownRecord) => {
   const direct = record.score ?? record.value ?? record.energy ?? record.percent ?? record.percentage ?? record.power;
@@ -255,7 +276,8 @@ const ScoreBars = ({ entries }: { entries: ScoreEntry[] }) => (
 
 const FortuneRadarBlock = ({ chart }: { chart: ChartPayload }) => {
   const scores = getScoreEntries(chart.data.scores || chart.data.dimensions || chart.data.items, FORTUNE_SCORE_LABELS);
-  const overallScore = clampScore(chart.data.overallScore || chart.data.score);
+  const rawOverallScore = clampScore(chart.data.overallScore || chart.data.score);
+  const overallScore = rawOverallScore > 0 && rawOverallScore <= 10 ? Math.round(rawOverallScore * 10) : rawOverallScore;
 
   if (!scores.length && !overallScore) return null;
 
@@ -352,7 +374,7 @@ const WuxingEnergyBlock = ({ chart }: { chart: ChartPayload }) => {
           <div key={entry.key} className="grid grid-cols-[64px_1fr_42px] items-center gap-3 text-sm">
             <div className="font-semibold text-stone-700">{entry.label}</div>
             <div className="h-3 overflow-hidden rounded-full bg-stone-200">
-              <div className={`h-full rounded-full ${scoreColor(entry.score)}`} style={{ width: `${entry.score}%` }} />
+              <div className={`h-full rounded-full ${wuxingColor(entry.label)}`} style={{ width: `${entry.score}%` }} />
             </div>
             <div className="text-right text-xs font-bold text-stone-500">{entry.score}</div>
           </div>

@@ -61,8 +61,8 @@ const PERSONALITY_PROMPT = `你是一位专业的命理分析师，擅长通过�
 
 const CHART_PROMPT_HINTS: Record<SupportedAnalysisChartType, string> = {
   life_fortune_trend: '适合展示大运/流年趋势，data 需包含 currentAge、currentYear、periods、lifeHighlight。',
-  fortune_radar: '适合展示当前多维评分，data 需包含 period、scores、overallScore、overallLabel、topAdvice；scores 请使用 career、wealth、love、health、family、social 等 key，每项必须包含 score 与中文 label，不能使用“项目1”这类占位名称。',
-  wuxing_energy: '适合展示五行能量分布，data 需包含 elements、favorableElement、unfavorableElement、advice、interactions。',
+  fortune_radar: '适合展示当前多维评分，data 需包含 period、scores、overallScore、overallLabel、topAdvice；所有 score、overallScore 必须使用百分制 0-100，不允许使用 0-10 小数制；scores 请使用 career、wealth、love、health、family、social 等 key，每项必须包含 score 与中文 label，不能使用“项目1”这类占位名称。',
+  wuxing_energy: '适合展示五行能量分布，data 需包含 elements、favorableElement、unfavorableElement、advice、interactions；elements 的 value/score 必须使用百分制 0-100。',
   life_timeline: '适合展示人生关键节点，data 需包含 currentAge、milestones。',
   personality_petal: '适合展示人格特质花瓣图，data 需包含 traits、topTraits、summary；traits 每项必须包含 key、中文 label、score、description，不能使用“项目1”这类占位名称。',
   fortune_calendar: '适合展示月度/年度运势日历热力图，data 需包含 year、month、days（每日 overallScore + level）、monthSummary。',
