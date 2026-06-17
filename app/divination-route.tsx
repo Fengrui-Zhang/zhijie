@@ -4,7 +4,7 @@ import { ModelType } from '../types';
 type DivinationRouteProps = {
   modelType?: ModelType;
   workspace?: 'divination' | 'records' | 'chat' | 'settings';
-  settingsTab?: 'profile' | 'general' | 'charts' | 'knowledge' | 'help' | 'security';
+  settingsTab?: 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
 };
 
 export default function DivinationRoute({

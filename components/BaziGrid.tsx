@@ -8,6 +8,7 @@ interface Props {
   data: BaziResponse;
   caseId?: string | null;
   initialAnalysisData?: unknown;
+  personalizationPrompt?: string;
   onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }
 
@@ -19,7 +20,7 @@ const splitList = (value?: string | string[]) => {
 
 const labelForPillar = ['年柱', '月柱', '日柱', '时柱'];
 const rowLabels = ['主星', '天干', '地支', '藏干', '纳音', '神煞'];
-type BaziTab = 'basic' | 'professional' | 'notes';
+type BaziTab = 'basic' | 'professional' | 'ai' | 'notes';
 type AnalysisType = 'wuxing' | 'personality';
 
 const elementLabel = (stem: string) => {
@@ -216,6 +217,7 @@ const AnalysisCard = ({
   chartText,
   caseId,
   savedContent,
+  personalizationPrompt,
   onSaved,
 }: {
   type: AnalysisType;
@@ -224,6 +226,7 @@ const AnalysisCard = ({
   chartText: string;
   caseId?: string | null;
   savedContent?: string;
+  personalizationPrompt?: string;
   onSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }) => {
   const [content, setContent] = useState(savedContent || '');
@@ -242,7 +245,7 @@ const AnalysisCard = ({
       const response = await fetch('/api/bazi/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, chartText, caseId, force }),
+        body: JSON.stringify({ type, chartText, caseId, force, personalizationPrompt }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -392,7 +395,7 @@ const ChipButton = ({
   </button>
 );
 
-const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalysisSaved }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
   const dayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -445,6 +448,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
   const tabItems: Array<{ key: BaziTab; label: string }> = [
     { key: 'basic', label: '基本信息' },
     { key: 'professional', label: '专业排盘' },
+    { key: 'ai', label: 'AI解读' },
     { key: 'notes', label: '断事笔记' },
   ];
   const tableColumns = useMemo(() => {
@@ -573,7 +577,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 md:gap-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
         {tabItems.map((item) => (
           <button
             key={item.key}
@@ -621,6 +625,18 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
             </div>
           </section>
 
+          <TenGodKnowledge highlighted={highlightedTenGods} />
+        </div>
+      )}
+
+      {activeTab === 'ai' && (
+        <div className="space-y-5">
+          <section className="rounded-[28px] border border-white/60 bg-white/55 p-5 shadow-sm backdrop-blur-xl">
+            <div className="text-base font-bold text-stone-800">AI解读</div>
+            <div className="mt-1 text-sm leading-6 text-stone-500">
+              选择需要的专项解读后再发起分析。
+            </div>
+          </section>
           <AnalysisCard
             type="wuxing"
             title="AI专业五行分析"
@@ -628,6 +644,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
             chartText={data.taibuText || JSON.stringify(data.taibuJson || data, null, 2)}
             caseId={caseId}
             savedContent={savedWuxingAnalysis}
+            personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
           />
           <AnalysisCard
@@ -637,9 +654,9 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
             chartText={data.taibuText || JSON.stringify(data.taibuJson || data, null, 2)}
             caseId={caseId}
             savedContent={savedPersonalityAnalysis}
+            personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
           />
-          <TenGodKnowledge highlighted={highlightedTenGods} />
         </div>
       )}
 

@@ -702,7 +702,134 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
 );
 
 type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
-type SettingsWorkspaceTab = 'profile' | 'general' | 'charts' | 'knowledge' | 'help' | 'security';
+type SettingsWorkspaceTab = 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
+type ExpressionStyle = 'direct' | 'gentle';
+type ChartPromptDetailLevel = 'default' | 'more' | 'full';
+type FortuneDimensionKey =
+  | 'career'
+  | 'wealth'
+  | 'love'
+  | 'health'
+  | 'family'
+  | 'social'
+  | 'windfall'
+  | 'travel'
+  | 'creativity'
+  | 'children'
+  | 'legal'
+  | 'spiritual';
+type VisualizationChartStyle = 'modern' | 'classic-chinese' | 'dark';
+
+type PersonalizationSettings = {
+  identity: string;
+  expressionStyle: ExpressionStyle;
+  chartPromptDetailLevel: ChartPromptDetailLevel;
+  customInstructions: string;
+  selectedDimensions: FortuneDimensionKey[];
+  dayunPeriods: number;
+  chartStyle: VisualizationChartStyle;
+};
+
+const PERSONALIZATION_STORAGE_KEY = 'zhijie:personalization-settings:v1';
+
+const FORTUNE_DIMENSIONS: Array<{ key: FortuneDimensionKey; label: string; icon: string }> = [
+  { key: 'career', label: '事业/学业', icon: '💼' },
+  { key: 'wealth', label: '财富', icon: '💰' },
+  { key: 'love', label: '感情/婚姻', icon: '❤️' },
+  { key: 'health', label: '健康', icon: '🏥' },
+  { key: 'family', label: '家庭/长辈', icon: '👨‍👩‍👧‍👦' },
+  { key: 'social', label: '人际/贵人', icon: '🤝' },
+  { key: 'windfall', label: '偏财/投资', icon: '🎰' },
+  { key: 'travel', label: '出行/迁移', icon: '✈️' },
+  { key: 'creativity', label: '创意/灵感', icon: '🎨' },
+  { key: 'children', label: '子女', icon: '👶' },
+  { key: 'legal', label: '官非/法律', icon: '⚖️' },
+  { key: 'spiritual', label: '精神/心灵', icon: '🧘' },
+];
+
+const DEFAULT_PERSONALIZATION_SETTINGS: PersonalizationSettings = {
+  identity: '',
+  expressionStyle: 'direct',
+  chartPromptDetailLevel: 'default',
+  customInstructions: '',
+  selectedDimensions: FORTUNE_DIMENSIONS.slice(0, 6).map((item) => item.key),
+  dayunPeriods: 5,
+  chartStyle: 'classic-chinese',
+};
+
+const EXPRESSION_STYLE_OPTIONS: Array<{ value: ExpressionStyle; label: string; prompt: string }> = [
+  { value: 'direct', label: '直接干练', prompt: '表达风格：直接干练，先给结论，再说明依据，避免空话和重复术语。' },
+  { value: 'gentle', label: '温和委婉', prompt: '表达风格：温和委婉，在指出风险时给出可执行的缓冲建议，避免制造焦虑。' },
+];
+
+const CHART_DETAIL_OPTIONS: Array<{ value: ChartPromptDetailLevel; label: string; prompt: string }> = [
+  { value: 'default', label: '默认', prompt: '命盘注入详细级别：默认。优先保留关键盘面和结论依据，避免上下文噪音。' },
+  { value: 'more', label: '扩展', prompt: '命盘注入详细级别：扩展。解读时可展开更多宫位、运限、神煞和五行细节。' },
+  { value: 'full', label: '完整', prompt: '命盘注入详细级别：完整。尽量完整参考命盘结构，但仍需控制回答层次和可读性。' },
+];
+
+const CHART_STYLE_OPTIONS: Array<{ value: VisualizationChartStyle; label: string; promptLabel: string }> = [
+  { value: 'modern', label: '简约现代', promptLabel: '现代信息图表风格' },
+  { value: 'classic-chinese', label: '经典中式', promptLabel: '古典中文图表风格' },
+  { value: 'dark', label: '暗色高对比', promptLabel: '深色高对比图表风格' },
+];
+
+const isFortuneDimensionKey = (value: unknown): value is FortuneDimensionKey =>
+  typeof value === 'string' && FORTUNE_DIMENSIONS.some((item) => item.key === value);
+
+const clampDayunPeriods = (value: unknown) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_PERSONALIZATION_SETTINGS.dayunPeriods;
+  return Math.min(10, Math.max(3, Math.round(parsed)));
+};
+
+const normalizePersonalizationSettings = (value: unknown): PersonalizationSettings => {
+  const source = value && typeof value === 'object' ? value as Partial<PersonalizationSettings> : {};
+  const selectedDimensions = Array.isArray(source.selectedDimensions)
+    ? source.selectedDimensions.filter(isFortuneDimensionKey)
+    : DEFAULT_PERSONALIZATION_SETTINGS.selectedDimensions;
+  const dimensionFallback = selectedDimensions.length >= 3
+    ? selectedDimensions.slice(0, 12)
+    : DEFAULT_PERSONALIZATION_SETTINGS.selectedDimensions;
+  return {
+    identity: typeof source.identity === 'string' ? source.identity.slice(0, 120) : '',
+    expressionStyle: source.expressionStyle === 'gentle' ? 'gentle' : 'direct',
+    chartPromptDetailLevel: source.chartPromptDetailLevel === 'more' || source.chartPromptDetailLevel === 'full'
+      ? source.chartPromptDetailLevel
+      : 'default',
+    customInstructions: typeof source.customInstructions === 'string' ? source.customInstructions.slice(0, 4000) : '',
+    selectedDimensions: dimensionFallback,
+    dayunPeriods: clampDayunPeriods(source.dayunPeriods),
+    chartStyle: source.chartStyle === 'modern' || source.chartStyle === 'dark' ? source.chartStyle : 'classic-chinese',
+  };
+};
+
+const getDimensionLabels = (keys: FortuneDimensionKey[]) =>
+  keys
+    .map((key) => FORTUNE_DIMENSIONS.find((item) => item.key === key)?.label)
+    .filter(Boolean)
+    .join('、');
+
+const buildPersonalizationPrompt = (settings: PersonalizationSettings) => {
+  const lines: string[] = [];
+  const identity = settings.identity.trim();
+  const customInstructions = settings.customInstructions.trim();
+  if (identity) lines.push(`用户身份：${identity}。`);
+  const expressionPrompt = EXPRESSION_STYLE_OPTIONS.find((item) => item.value === settings.expressionStyle)?.prompt;
+  if (expressionPrompt) lines.push(expressionPrompt);
+  const detailPrompt = CHART_DETAIL_OPTIONS.find((item) => item.value === settings.chartPromptDetailLevel)?.prompt;
+  if (detailPrompt) lines.push(detailPrompt);
+  if (settings.selectedDimensions.length) {
+    lines.push(`在进行运势分析时，请重点关注以下维度并提供评分：${getDimensionLabels(settings.selectedDimensions)}。`);
+  }
+  lines.push(`涉及大运分析时，仅展开最关键的 ${settings.dayunPeriods} 个大运周期，不要默认铺开更多周期。`);
+  const chartStyle = CHART_STYLE_OPTIONS.find((item) => item.value === settings.chartStyle);
+  if (chartStyle) {
+    lines.push(`如果需要输出图表说明、可视化建议或结构化呈现，请优先采用${chartStyle.promptLabel}。`);
+  }
+  if (customInstructions) lines.push(`自定义指令：${customInstructions}`);
+  return lines.length ? `【个性化偏好】\n${lines.join('\n')}` : '';
+};
 
 const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
   records: '/records',
@@ -713,6 +840,7 @@ const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
 const SETTINGS_TAB_ROUTES: Record<SettingsWorkspaceTab, string> = {
   profile: '/settings/profile',
   general: '/settings/general',
+  personalization: '/settings/personalization',
   charts: '/settings/charts',
   knowledge: '/settings/knowledge',
   help: '/settings/help',
@@ -744,6 +872,7 @@ const SETTINGS_WORKSPACE_TABS: Array<{
 }> = [
   { id: 'profile', label: '我的', group: '账户', icon: '人', description: '账户与额度' },
   { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与记录' },
+  { id: 'personalization', label: '个性化', group: '账户', icon: '∞', description: '回答与图表偏好' },
   { id: 'charts', label: '命盘', group: '资料', icon: '盘', description: '八字与紫微信息' },
   { id: 'knowledge', label: '知识参考', group: '资料', icon: '书', description: '问答引用设置' },
   { id: 'help', label: '帮助', group: '支持', icon: '？', description: '常见问题' },
@@ -1471,6 +1600,9 @@ const App: React.FC<AppProps> = ({
   const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
   const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(initialSettingsTab);
+  const [personalizationSettings, setPersonalizationSettings] = useState<PersonalizationSettings>(DEFAULT_PERSONALIZATION_SETTINGS);
+  const [personalizationDraft, setPersonalizationDraft] = useState<PersonalizationSettings>(DEFAULT_PERSONALIZATION_SETTINGS);
+  const [personalizationSavedAt, setPersonalizationSavedAt] = useState('');
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -1494,6 +1626,61 @@ const App: React.FC<AppProps> = ({
     activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const isCaseModel = isCaseModelType(modelType) && !activeProfessionalFeature;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(PERSONALIZATION_STORAGE_KEY);
+      if (!raw) return;
+      const normalized = normalizePersonalizationSettings(JSON.parse(raw));
+      setPersonalizationSettings(normalized);
+      setPersonalizationDraft(normalized);
+    } catch {
+      setPersonalizationSettings(DEFAULT_PERSONALIZATION_SETTINGS);
+      setPersonalizationDraft(DEFAULT_PERSONALIZATION_SETTINGS);
+    }
+  }, []);
+
+  const applyPersonalizationToSystemInstruction = useCallback((systemInstruction: string) => {
+    const prompt = buildPersonalizationPrompt(personalizationSettings);
+    return prompt ? [systemInstruction, prompt].filter(Boolean).join('\n\n') : systemInstruction;
+  }, [personalizationSettings]);
+
+  const handleSavePersonalization = () => {
+    const normalized = normalizePersonalizationSettings(personalizationDraft);
+    setPersonalizationSettings(normalized);
+    setPersonalizationDraft(normalized);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PERSONALIZATION_STORAGE_KEY, JSON.stringify(normalized));
+    }
+    setPersonalizationSavedAt('已保存');
+    window.setTimeout(() => setPersonalizationSavedAt(''), 1800);
+  };
+
+  const handleResetPersonalization = () => {
+    setPersonalizationSettings(DEFAULT_PERSONALIZATION_SETTINGS);
+    setPersonalizationDraft(DEFAULT_PERSONALIZATION_SETTINGS);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(PERSONALIZATION_STORAGE_KEY);
+    }
+    setPersonalizationSavedAt('已恢复默认');
+    window.setTimeout(() => setPersonalizationSavedAt(''), 1800);
+  };
+
+  const togglePersonalizationDimension = (key: FortuneDimensionKey) => {
+    setPersonalizationDraft((current) => {
+      const selected = current.selectedDimensions.includes(key);
+      if (selected && current.selectedDimensions.length <= 3) return current;
+      if (!selected && current.selectedDimensions.length >= 12) return current;
+      return {
+        ...current,
+        selectedDimensions: selected
+          ? current.selectedDimensions.filter((item) => item !== key)
+          : [...current.selectedDimensions, key],
+      };
+    });
+  };
+
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null);
   const [editingUserMessageDraft, setEditingUserMessageDraft] = useState('');
@@ -2661,7 +2848,7 @@ const App: React.FC<AppProps> = ({
           (data.chartParams || {}) as Record<string, unknown>
         );
         restoreChatSession(
-          systemInstruction,
+          applyPersonalizationToSystemInstruction(systemInstruction),
           msgs.map(m => ({ role: m.role, content: m.content }))
         );
       }
@@ -2787,7 +2974,7 @@ const App: React.FC<AppProps> = ({
         storedSession.chartParams || {}
       );
       restoreChatSession(
-        systemInstruction,
+        applyPersonalizationToSystemInstruction(systemInstruction),
         msgs.map((msg) => ({ role: msg.role, content: msg.content }))
       );
     }
@@ -3586,13 +3773,14 @@ const App: React.FC<AppProps> = ({
         .map((id) => standaloneCaseOptions.find((item) => item.id === id))
         .filter((item): item is CaseItem => Boolean(item));
       const caseReferenceText = buildStandaloneCaseReferenceText(selectedCases);
+      const standaloneSystemInstruction = applyPersonalizationToSystemInstruction([
+        '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
+        caseReferenceText,
+      ].filter(Boolean).join('\n\n'));
       const apiMessages = [
         {
           role: 'system',
-          content: [
-            '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
-            caseReferenceText,
-          ].filter(Boolean).join('\n\n'),
+          content: standaloneSystemInstruction,
         },
         ...nextMessages.map((msg) => ({
           role: msg.role === 'model' ? 'assistant' : 'user',
@@ -4043,7 +4231,7 @@ const App: React.FC<AppProps> = ({
         setActiveSessionId(currentSessionId);
       }
 
-      await startQimenChat(systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
 
       const userMsg: ChatMessage = {
         id: 'joint-init-u',
@@ -4296,7 +4484,7 @@ const App: React.FC<AppProps> = ({
         setActiveSessionId(currentSessionId);
       }
 
-      await startQimenChat(systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
 
       const userMsg: ChatMessage = {
         id: 'compat-init-u',
@@ -4896,7 +5084,7 @@ const App: React.FC<AppProps> = ({
       targetCase.chartData,
       sessionChartParams
     );
-    restoreChatSession(systemInstruction, [
+    restoreChatSession(applyPersonalizationToSystemInstruction(systemInstruction), [
       { role: userMsg.role, content: userMsg.content },
       { role: modelMsg.role, content: modelMsg.content },
     ]);
@@ -4994,7 +5182,7 @@ const App: React.FC<AppProps> = ({
     }
 
     try {
-      await startQimenChat(systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
 
       const userMsg: ChatMessage = {
         id: 'init-u',
@@ -5177,7 +5365,7 @@ const App: React.FC<AppProps> = ({
       setActiveChartParams(sessionChartParams);
       setSessionAnalysisModel(analysisModel);
 
-      await startQimenChat(systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
 
       const userMsg: ChatMessage = {
         id: 'init-u',
@@ -5527,7 +5715,7 @@ const App: React.FC<AppProps> = ({
       setSessionAnalysisModel(analysisModel);
 
       // 排盘只生成盘面。首次点击解读、重新分析或追问时才请求模型并保存历史。
-      await startQimenChat(buildSystemInstruction(modelType, resultData, sessionChartParams) || systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, resultData, sessionChartParams) || systemInstruction));
       resetMessageVersions();
       setChatHistory([]);
 
@@ -5627,7 +5815,7 @@ const App: React.FC<AppProps> = ({
     clearChatSession();
 
     try {
-      await startQimenChat(bundle.systemInstruction);
+      await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
 
       const userMsg: ChatMessage = {
         id: 'rerun-u',
@@ -5775,7 +5963,7 @@ const App: React.FC<AppProps> = ({
           chatHistory
         );
         clearChatSession();
-        await startQimenChat(bundle.systemInstruction);
+        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
         prompt = bundle.prompt;
         knowledgeQuery = bundle.knowledgeQuery || bundle.question;
         nextMessagesBase = [
@@ -5789,7 +5977,7 @@ const App: React.FC<AppProps> = ({
       } else {
         const prefixHistory = chatHistory.slice(0, userIndex);
         restoreChatSession(
-          buildSystemInstruction(modelType, chartData, activeChartParams),
+          applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, chartData, activeChartParams)),
           prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
         );
         prompt = chatHistory[userIndex].content;
@@ -5934,7 +6122,7 @@ const App: React.FC<AppProps> = ({
           analysisModel: lockedModel,
         };
         clearChatSession();
-        await startQimenChat(bundle.systemInstruction);
+        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
         prompt = bundle.prompt;
         knowledgeQuery = bundle.knowledgeQuery || bundle.question || editedContent;
         nextMessagesBase = [editedUserMessage];
@@ -5943,7 +6131,7 @@ const App: React.FC<AppProps> = ({
       } else {
         const prefixHistory = chatHistory.slice(0, userIndex);
         restoreChatSession(
-          buildSystemInstruction(modelType, chartData, activeChartParams),
+          applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, chartData, activeChartParams)),
           prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
         );
         prompt = editedContent;
@@ -6599,7 +6787,7 @@ const App: React.FC<AppProps> = ({
       setBaziInitialAnalysis(initializationAnalysis);
 
       const prompt = buildKlinePrompt(chartData as BaziResponse, initializationAnalysis);
-      await startQimenChat(buildKlineSystemInstruction());
+      await startQimenChat(applyPersonalizationToSystemInstruction(buildKlineSystemInstruction()));
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
@@ -7587,6 +7775,171 @@ const App: React.FC<AppProps> = ({
                     <div className="mt-1 text-xs text-stone-400">支持在八字、奇门等问答中参考古籍资料。</div>
                   </div>
                   <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">手动控制</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {settingsWorkspaceTab === 'personalization' && (
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-bold text-stone-600">身份</span>
+                  <input
+                    type="text"
+                    value={personalizationDraft.identity}
+                    maxLength={120}
+                    onChange={(event) => setPersonalizationDraft((current) => ({
+                      ...current,
+                      identity: event.target.value.slice(0, 120),
+                    }))}
+                    placeholder="例如：创业者"
+                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-bold text-stone-600">表达风格</span>
+                  <select
+                    value={personalizationDraft.expressionStyle}
+                    onChange={(event) => setPersonalizationDraft((current) => ({
+                      ...current,
+                      expressionStyle: event.target.value as ExpressionStyle,
+                    }))}
+                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                  >
+                    {EXPRESSION_STYLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div>
+                <div className="text-sm font-bold text-stone-600">命盘注入详细级别</div>
+                <div className="mt-2 grid overflow-hidden rounded-2xl border border-stone-200 bg-white/70 p-1 md:grid-cols-3">
+                  {CHART_DETAIL_OPTIONS.map((option) => {
+                    const selected = personalizationDraft.chartPromptDetailLevel === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPersonalizationDraft((current) => ({
+                          ...current,
+                          chartPromptDetailLevel: option.value,
+                        }))}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                          selected ? 'bg-sky-500 text-white shadow-sm' : 'text-stone-500 hover:bg-white'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 text-sm leading-6 text-stone-500">
+                  用于聊天命盘注入与结果页 AI 解读提示词。默认经过微调能降低噪音。
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="flex items-center justify-between gap-3 text-sm font-bold text-stone-600">
+                  <span>自定义指令</span>
+                  <span className="font-medium text-stone-400">{personalizationDraft.customInstructions.length}/4000</span>
+                </span>
+                <textarea
+                  value={personalizationDraft.customInstructions}
+                  maxLength={4000}
+                  onChange={(event) => setPersonalizationDraft((current) => ({
+                    ...current,
+                    customInstructions: event.target.value.slice(0, 4000),
+                  }))}
+                  placeholder="例如：先给结论，再给依据；避免空话和术语堆叠。"
+                  className="glass-input mt-2 min-h-36 w-full resize-y rounded-2xl px-4 py-3 text-sm leading-7 outline-none"
+                />
+              </label>
+
+              <div className="space-y-4">
+                <div>
+                  <div className="text-lg font-bold text-stone-800">运势可视化偏好</div>
+                  <div className="mt-1 text-sm text-stone-500">控制 AI 输出时默认关注的维度、图表风格和大运展示数量。</div>
+                </div>
+                <div>
+                  <div className="mb-2 text-sm font-bold text-stone-600">
+                    维度选择（至少 3 个，最多 12 个）
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                    {FORTUNE_DIMENSIONS.map((dimension) => {
+                      const selected = personalizationDraft.selectedDimensions.includes(dimension.key);
+                      return (
+                        <button
+                          key={dimension.key}
+                          type="button"
+                          onClick={() => togglePersonalizationDimension(dimension.key)}
+                          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                            selected
+                              ? 'border-sky-200 bg-sky-50 text-sky-700'
+                              : 'border-stone-200 bg-white/65 text-stone-500 hover:bg-white'
+                          }`}
+                        >
+                          <span className="text-lg leading-none">{dimension.icon}</span>
+                          <span>{dimension.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-bold text-stone-600">默认展示大运期数</span>
+                  <select
+                    value={personalizationDraft.dayunPeriods}
+                    onChange={(event) => setPersonalizationDraft((current) => ({
+                      ...current,
+                      dayunPeriods: clampDayunPeriods(event.target.value),
+                    }))}
+                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                  >
+                    {Array.from({ length: 8 }, (_, index) => index + 3).map((value) => (
+                      <option key={value} value={value}>{value} 期</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-bold text-stone-600">图表风格</span>
+                  <select
+                    value={personalizationDraft.chartStyle}
+                    onChange={(event) => setPersonalizationDraft((current) => ({
+                      ...current,
+                      chartStyle: event.target.value as VisualizationChartStyle,
+                    }))}
+                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                  >
+                    {CHART_STYLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-5">
+                <div className="text-sm font-semibold text-emerald-700">{personalizationSavedAt}</div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetPersonalization}
+                    className="glass-chip rounded-2xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:text-stone-900"
+                  >
+                    恢复默认
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePersonalization}
+                    className="glass-cta rounded-2xl px-5 py-2.5 text-sm font-semibold text-amber-300"
+                  >
+                    保存设置
+                  </button>
                 </div>
               </div>
             </div>
@@ -9098,6 +9451,7 @@ const App: React.FC<AppProps> = ({
                       data={chartData}
                       caseId={activeCase?.modelType === ModelType.BAZI ? activeCase.id : null}
                       initialAnalysisData={activeCase?.modelType === ModelType.BAZI ? activeCase.initialAnalysisData : null}
+                      personalizationPrompt={buildPersonalizationPrompt(personalizationSettings)}
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
                     />
                   )}

@@ -83,6 +83,7 @@ export async function POST(request: Request) {
     chartText?: string;
     caseId?: string;
     force?: boolean;
+    personalizationPrompt?: string;
   };
   if (body.type !== 'wuxing' && body.type !== 'personality') {
     return NextResponse.json({ error: '分析类型无效' }, { status: 400 });
@@ -136,9 +137,13 @@ export async function POST(request: Request) {
   }
 
   const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
+  const personalizationPrompt = typeof body.personalizationPrompt === 'string'
+    ? body.personalizationPrompt.trim().slice(0, 5000)
+    : '';
   const systemPrompt = [
     body.type === 'wuxing' ? WUXING_PROMPT : PERSONALITY_PROMPT,
     VISUAL_RESPONSE_INSTRUCTION,
+    personalizationPrompt,
   ].join('\n\n');
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
