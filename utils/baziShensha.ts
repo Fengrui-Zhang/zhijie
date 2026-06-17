@@ -378,6 +378,8 @@ const YIN_CHA_YANG_CUO = ['丙子', '丁丑', '戊寅', '辛卯', '壬辰', '癸
 const SHI_E_DA_BAI = ['甲辰', '乙巳', '丙申', '丁亥', '戊戌', '己丑', '庚辰', '辛巳', '壬申', '癸亥'];
 const GU_LUAN = ['乙巳', '丁巳', '辛亥', '戊申', '壬寅', '戊午', '壬子', '丙午'];
 const SHUI_NI_DAY = ['丙子', '癸未', '癸丑'];
+const SHI_LING_DAY = ['甲辰', '乙亥', '丙辰', '丁酉', '戊午', '庚寅', '庚戌', '辛亥', '壬寅', '癸未'];
+const LIU_XIU_DAY = ['丙午', '丁未', '戊子', '戊午', '己丑', '己未'];
 
 const RECOMPUTED_LABELS = new Set([
   '天乙贵人',
@@ -436,6 +438,8 @@ const RECOMPUTED_LABELS = new Set([
   '六厄',
   '自缢煞',
   '水溺煞',
+  '十灵日',
+  '六秀日',
 ]);
 
 const AUSPICIOUS_SHENSHA = new Set([
@@ -464,6 +468,8 @@ const AUSPICIOUS_SHENSHA = new Set([
   '月德贵人',
   '天德合',
   '月德合',
+  '十灵日',
+  '六秀日',
 ]);
 
 const INAUSPICIOUS_SHENSHA = new Set([
@@ -601,6 +607,8 @@ export function calculateZhijieShenSha(
     if (TIAN_SHE_DAY[season] === ganZhi) addUnique(names, '天赦');
     if (KUI_GANG.includes(ganZhi)) addUnique(names, '魁罡');
     if (SHI_E_DA_BAI.includes(ganZhi)) addUnique(names, '十恶大败');
+    if (SHI_LING_DAY.includes(ganZhi)) addUnique(names, '十灵日');
+    if (LIU_XIU_DAY.includes(ganZhi)) addUnique(names, '六秀日');
     if (YIN_CHA_YANG_CUO.includes(ganZhi)) addUnique(names, '阴差阳错');
     if (SHUI_NI_DAY.includes(ganZhi) && allChars.some((value) => ['壬', '癸', '亥', '子'].includes(value))) addUnique(names, '水溺煞');
   }
