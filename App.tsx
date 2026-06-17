@@ -8089,60 +8089,54 @@ const App: React.FC<AppProps> = ({
             +
           </button>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
-            <span className="pl-1 text-xs font-semibold text-stone-500">命例</span>
-            <select
-              value={standaloneCaseSelectValue}
-              onChange={(event) => handleSelectStandaloneCaseReference(event.target.value)}
-              className="max-w-[150px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
-              disabled={standaloneAvailableCaseOptions.length === 0}
-            >
-              <option value="">{standaloneAvailableCaseOptions.length ? '选择' : '暂无'}</option>
-              {standaloneAvailableCaseOptions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {getCaseModelDisplayLabel(item.modelType)} · {getCaseDisplayName(item)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
-            <span className="pl-1 text-xs font-semibold text-stone-500">会话</span>
-            <select
-              value={standaloneSessionSelectValue}
-              onChange={(event) => handleSelectStandaloneSessionReference(event.target.value)}
-              className="max-w-[150px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
-              disabled={standaloneAvailableSessionOptions.length === 0}
-            >
-              <option value="">{standaloneAvailableSessionOptions.length ? '选择' : '暂无'}</option>
-              {standaloneAvailableSessionOptions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {MODEL_LABELS[item.modelType] || item.modelType} · {item.title}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="grid w-full grid-cols-4 items-center gap-1.5 sm:w-auto sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
+          <select
+            value={standaloneCaseSelectValue}
+            onChange={(event) => handleSelectStandaloneCaseReference(event.target.value)}
+            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45 sm:min-w-[96px] sm:px-3 sm:text-xs"
+            disabled={standaloneAvailableCaseOptions.length === 0}
+          >
+            <option value="">{standaloneAvailableCaseOptions.length ? '引用命例' : '暂无命例'}</option>
+            {standaloneAvailableCaseOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {getCaseModelDisplayLabel(item.modelType)} · {getCaseDisplayName(item)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={standaloneSessionSelectValue}
+            onChange={(event) => handleSelectStandaloneSessionReference(event.target.value)}
+            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45 sm:min-w-[96px] sm:px-3 sm:text-xs"
+            disabled={standaloneAvailableSessionOptions.length === 0}
+          >
+            <option value="">{standaloneAvailableSessionOptions.length ? '引用会话' : '暂无会话'}</option>
+            {standaloneAvailableSessionOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {MODEL_LABELS[item.modelType] || item.modelType} · {item.title}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             role="switch"
             aria-checked={standaloneChatUseKnowledge}
             onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+            className={`min-w-0 rounded-full border px-2 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
               standaloneChatUseKnowledge
                 ? 'border-amber-200 bg-amber-50 text-amber-700'
                 : 'border-stone-200 bg-white/60 text-stone-500'
             }`}
           >
-            参考古籍：{standaloneChatUseKnowledge ? '开' : '关'}
+            古籍{standaloneChatUseKnowledge ? '开' : '关'}
           </button>
           <select
             value={standaloneChatKnowledgeBoard}
             onChange={(event) => setStandaloneChatKnowledgeBoard(event.target.value as 'bazi' | 'qimen')}
             disabled={!standaloneChatUseKnowledge}
-            className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
+            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none disabled:opacity-45 sm:px-3 sm:text-xs"
           >
-            <option value="bazi">四柱八字</option>
-            <option value="qimen">奇门遁甲</option>
+            <option value="bazi">四柱</option>
+            <option value="qimen">奇门</option>
           </select>
         </div>
       </div>
