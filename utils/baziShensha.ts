@@ -535,14 +535,14 @@ export function calculateZhijieShenSha(
   if (hasBranch(TIAN_YI_CURRENT, context.dayStem, branch) || hasBranch(TIAN_YI_CURRENT, context.yearStem, branch)) addUnique(names, '天乙贵人');
   if (hasBranch(TAI_JI, context.dayStem, branch) || hasBranch(TAI_JI, context.yearStem, branch)) addUnique(names, '太极贵人');
   if (hasBranch(WEN_CHANG, context.dayStem, branch)) addUnique(names, '文昌');
-  if (hasBranch(GUO_YIN, context.dayStem, branch)) addUnique(names, '国印贵人');
+  if (hasBranch(GUO_YIN, context.dayStem, branch) || hasBranch(GUO_YIN, context.yearStem, branch)) addUnique(names, '国印贵人');
   if (hasBranch(XUE_TANG, context.dayStem, branch)) addUnique(names, '学堂');
   if (hasBranch(CI_GUAN, context.dayStem, branch)) addUnique(names, '词馆');
   if (hasBranch(JIN_YU, context.dayStem, branch)) addUnique(names, '金舆');
   if (hasBranch(TIAN_YI_MEDICAL, context.monthBranch, branch)) addUnique(names, '天医');
   if (hasBranch(LU_SHEN, context.dayStem, branch)) addUnique(names, '禄神');
   if (hasBranch(YANG_REN, context.dayStem, branch)) addUnique(names, '羊刃');
-  if (hasBranch(FU_XING, context.dayStem, branch)) addUnique(names, '福星贵人');
+  if (hasBranch(FU_XING, context.dayStem, branch) || hasBranch(FU_XING, context.yearStem, branch)) addUnique(names, '福星贵人');
   if (hasBranch(HONG_YAN, context.dayStem, branch)) addUnique(names, '红艳煞');
 
   if (matchSanHeRule(context.yearBranch, branch, SAN_HE_BRANCH_RULES.jiangXing) || matchSanHeRule(context.dayBranch, branch, SAN_HE_BRANCH_RULES.jiangXing)) addUnique(names, '将星');
