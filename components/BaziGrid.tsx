@@ -350,28 +350,19 @@ const HiddenStemStack = ({ value }: { value?: string }) => {
   );
 };
 
-const ShenShaList = ({ value }: { value?: string }) => {
-  const [expanded, setExpanded] = useState(false);
+const ShenShaList = ({ value, expanded }: { value?: string; expanded: boolean }) => {
   const items = splitList(value);
   if (!items.length) return <span className="text-stone-400">—</span>;
   const visible = expanded ? items : items.slice(0, 3);
   return (
-    <button
-      type="button"
-      onClick={() => items.length > 3 && setExpanded((next) => !next)}
-      className="mx-auto flex max-w-full flex-col items-center gap-1 text-center"
-    >
+    <div className="mx-auto flex max-w-full flex-col items-center gap-1 text-center">
       {visible.map((item, index) => (
         <span key={`${item}-${index}`} className="max-w-full truncate text-[10px] font-medium leading-4 text-stone-600 md:text-xs">
           {item}
         </span>
       ))}
-      {items.length > 3 && (
-        <span className="text-[10px] font-semibold text-amber-700">
-          {expanded ? '收起' : `展开 ${items.length - 3}`}
-        </span>
-      )}
-    </button>
+      {!expanded && items.length > 3 && <span className="text-[10px] font-semibold text-stone-400">+{items.length - 3}</span>}
+    </div>
   );
 };
 
@@ -615,6 +606,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [shenShaExpanded, setShenShaExpanded] = useState(false);
 
   React.useEffect(() => {
     onTabChange?.(activeTab);
@@ -903,14 +895,25 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
           <tbody>
             {rowLabels.map((row) => (
               <tr key={row}>
-                <th className="border-b border-white/60 bg-white/30 p-1.5 text-[10px] font-semibold text-stone-500 md:p-3 md:text-xs">{row}</th>
+                <th className="border-b border-white/60 bg-white/30 p-1.5 text-[10px] font-semibold text-stone-500 md:p-3 md:text-xs">
+                  {row === '神煞' ? (
+                    <button
+                      type="button"
+                      onClick={() => setShenShaExpanded((next) => !next)}
+                      className="inline-flex flex-col items-center gap-0.5 text-stone-500 transition hover:text-amber-700"
+                    >
+                      <span>{row}</span>
+                      <span className="text-[9px] font-medium text-amber-700">{shenShaExpanded ? '收起' : '展开'}</span>
+                    </button>
+                  ) : row}
+                </th>
                 {tableColumns.map((column) => {
                   const content = column.values[row as keyof typeof column.values] || '—';
                   const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
                   const cellContent = row === '藏干'
                     ? <HiddenStemStack value={String(content)} />
                     : row === '神煞'
-                      ? <ShenShaList value={String(content)} />
+                      ? <ShenShaList value={String(content)} expanded={shenShaExpanded} />
                       : content;
                   return (
                     <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-1 align-middle md:p-3">
