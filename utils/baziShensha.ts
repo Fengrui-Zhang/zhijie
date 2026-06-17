@@ -400,6 +400,7 @@ const RECOMPUTED_LABELS = new Set([
   '德秀贵人',
   '华盖',
   '羊刃',
+  '阳刃',
   '劫煞',
   '灾煞',
   '亡神',
@@ -467,6 +468,7 @@ const AUSPICIOUS_SHENSHA = new Set([
 
 const INAUSPICIOUS_SHENSHA = new Set([
   '羊刃',
+  '阳刃',
   '劫煞',
   '灾煞',
   '亡神',
