@@ -170,7 +170,7 @@ const ChartShell = ({
   chart: ChartPayload;
   children: React.ReactNode;
 }) => (
-  <div className="my-4 rounded-[22px] border border-white/70 bg-white/78 p-4 shadow-sm shadow-stone-200/50">
+  <div className="my-4 min-w-0 max-w-full overflow-hidden rounded-[22px] border border-white/70 bg-white/78 p-4 shadow-sm shadow-stone-200/50">
     {(chart.title || chart.subtitle) && (
       <div className="mb-4">
         {chart.title && <div className="text-sm font-bold text-stone-800">{chart.title}</div>}
@@ -377,13 +377,17 @@ const PersonalityPetalBlock = ({ chart }: { chart: ChartPayload }) => {
 
   return (
     <ChartShell chart={chart}>
-      {summary && <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-stone-700">{summary}</div>}
+      {summary && (
+        <div className="mb-4 min-w-0 max-w-full whitespace-normal break-words rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-stone-700 [overflow-wrap:anywhere]">
+          {summary}
+        </div>
+      )}
       {traits.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
           {traits.slice(0, 10).map((trait) => (
-            <div key={trait.key} className="rounded-2xl border border-stone-100 bg-white/72 px-3 py-3">
+            <div key={trait.key} className="min-w-0 rounded-2xl border border-stone-100 bg-white/72 px-3 py-3">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-semibold text-stone-800">{trait.label}</span>
+                <span className="min-w-0 whitespace-normal break-words font-semibold text-stone-800 [overflow-wrap:anywhere]">{trait.label}</span>
                 <span className="font-bold text-amber-700">{trait.score}</span>
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
