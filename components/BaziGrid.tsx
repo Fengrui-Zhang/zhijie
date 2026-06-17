@@ -280,12 +280,12 @@ const FlowStemBranch = ({
 }) => (
   <div className="mt-1 flex flex-col items-center gap-0.5">
     <div className="flex items-baseline justify-center gap-1 leading-none">
-      <span className={`text-base font-bold sm:text-lg md:text-xl ${getWuxingColor(gan)}`}>{gan || '—'}</span>
-      {stemTenGod && <span className="text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-[11px]">{shortTenGod(stemTenGod)}</span>}
+      <span className={`text-sm font-bold sm:text-base md:text-lg ${getWuxingColor(gan)}`}>{gan || '—'}</span>
+      {stemTenGod && <span className="text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{shortTenGod(stemTenGod)}</span>}
     </div>
     <div className="flex items-baseline justify-center gap-1 leading-none">
-      <span className={`text-base font-bold sm:text-lg md:text-xl ${getWuxingColor(zhi)}`}>{zhi || '—'}</span>
-      {branchTenGod && <span className="text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-[11px]">{shortTenGod(branchTenGod)}</span>}
+      <span className={`text-sm font-bold sm:text-base md:text-lg ${getWuxingColor(zhi)}`}>{zhi || '—'}</span>
+      {branchTenGod && <span className="text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{shortTenGod(branchTenGod)}</span>}
     </div>
   </div>
 );
@@ -304,8 +304,8 @@ const FlowItemButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`min-h-[80px] shrink-0 whitespace-nowrap border-r border-stone-100 px-1.5 py-1.5 text-center transition last:border-r-0 sm:min-h-[88px] sm:px-2 sm:py-2 md:min-h-[96px] ${
-      wide ? 'w-[70px] sm:w-[78px] md:w-[84px]' : 'w-[66px] sm:w-[72px] md:w-[78px]'
+    className={`min-h-[72px] shrink-0 whitespace-nowrap border-r border-stone-100 px-1 py-1 text-center transition last:border-r-0 sm:min-h-[80px] sm:px-1.5 sm:py-1.5 md:min-h-[86px] ${
+      wide ? 'w-[62px] sm:w-[68px] md:w-[74px]' : 'w-[58px] sm:w-[64px] md:w-[70px]'
     } ${
       active
         ? 'bg-amber-100/70 text-stone-950 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.18)]'
@@ -317,13 +317,13 @@ const FlowItemButton = ({
 );
 
 const FlowRail = ({ title, meta, children }: { title: string; meta?: string; children: React.ReactNode }) => (
-  <section className="border-t border-stone-100/80 py-3 first:border-t-0 first:pt-0">
-    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 px-1">
-      <div className="text-base font-bold text-stone-900">{title}</div>
-      {meta && <div className="text-xs font-medium text-stone-500">{meta}</div>}
+  <section className="border-t border-stone-100/80 py-1.5 first:border-t-0 first:pt-0">
+    <div className="mb-1 flex flex-wrap items-baseline justify-between gap-1 px-1">
+      <div className="text-xs font-bold text-stone-900 sm:text-sm md:text-base">{title}</div>
+      {meta && <div className="text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{meta}</div>}
     </div>
-    <div className="-mx-2 overflow-x-auto px-2 pb-1">
-      <div className="flex min-w-max overflow-hidden rounded-2xl border border-stone-100 bg-white/45">
+    <div className="-mx-2 overflow-x-auto px-2">
+      <div className="flex min-w-max overflow-hidden rounded-xl border border-stone-100 bg-white/45">
         {children}
       </div>
     </div>
@@ -930,14 +930,14 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
         </table>
       </div>
 
-      <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
+      <div className="mt-3 space-y-1 border-t border-stone-100/80 pt-2">
         <FlowRail title="大运" meta={base_info.qiyun ? `${base_info.qiyun} 起运` : undefined}>
           {visibleDayunList.map((item: any, index: number) => {
             const { gan, zhi } = getGanZhiParts(item);
             return (
               <FlowItemButton key={`${item.ganZhi}-${index}`} active={selectedDayunIndex === index} onClick={() => selectDayun(index)}>
-                <div className="text-[11px] font-semibold text-stone-600 sm:text-xs">{item.startAge ? `${item.startAge}岁` : '—'}</div>
-                <div className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">{item.startYear || '—'}</div>
+                <div className="text-[9px] font-semibold text-stone-600 sm:text-[10px] md:text-xs">{item.startAge ? `${item.startAge}岁` : '—'}</div>
+                <div className="mt-0.5 text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{item.startYear || '—'}</div>
                 <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
               </FlowItemButton>
             );
@@ -950,8 +950,8 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
               const { gan, zhi } = getGanZhiParts(item);
               return (
                 <FlowItemButton key={item.year} active={selectedYear === item.year} onClick={() => selectYear(item.year)}>
-                  <div className="text-[11px] font-semibold text-stone-600 sm:text-xs">{item.age ? `${item.age}岁` : '—'}</div>
-                  <div className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">{item.year || '—'}</div>
+                  <div className="text-[9px] font-semibold text-stone-600 sm:text-[10px] md:text-xs">{item.age ? `${item.age}岁` : '—'}</div>
+                  <div className="mt-0.5 text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{item.year || '—'}</div>
                   <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
                 </FlowItemButton>
               );
@@ -965,8 +965,8 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
               const { gan, zhi } = getGanZhiParts(item);
               return (
                 <FlowItemButton key={item.month} active={selectedMonth === item.month} onClick={() => selectMonth(item.month)} wide>
-                  <div className="text-[11px] font-semibold text-stone-600 sm:text-xs">{formatSolarDateShort(item.startDate) || `${item.month}月`}</div>
-                  <div className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">{item.jieQi || '—'}</div>
+                  <div className="text-[9px] font-semibold text-stone-600 sm:text-[10px] md:text-xs">{formatSolarDateShort(item.startDate) || `${item.month}月`}</div>
+                  <div className="mt-0.5 text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{item.jieQi || '—'}</div>
                   <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
                 </FlowItemButton>
               );
@@ -980,8 +980,8 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
               const { gan, zhi } = getGanZhiParts(item);
               return (
                 <FlowItemButton key={item.date} active={selectedDay === item.date} onClick={() => setSelectedDay((current) => current === item.date ? null : item.date)} wide>
-                  <div className="text-[11px] font-semibold text-stone-600 sm:text-xs">{formatFlowSolarDay(item.date, item.day)}日</div>
-                  <div className="mt-0.5 text-[11px] font-medium text-stone-500 sm:mt-1 sm:text-xs">{formatFlowLunarDay(item.date)}</div>
+                  <div className="text-[9px] font-semibold text-stone-600 sm:text-[10px] md:text-xs">{formatFlowSolarDay(item.date, item.day)}日</div>
+                  <div className="mt-0.5 text-[9px] font-medium text-stone-500 sm:text-[10px] md:text-xs">{formatFlowLunarDay(item.date)}</div>
                   <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
                 </FlowItemButton>
               );
