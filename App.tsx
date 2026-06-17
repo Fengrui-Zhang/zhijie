@@ -54,6 +54,10 @@ import {
   DEFAULT_SITE_SETTINGS,
   type PublicSiteSettings,
 } from './lib/site-settings-defaults';
+import {
+  buildZiweiAnalysisPrompt,
+  buildZiweiSystemPrompt,
+} from './lib/ziwei-prompt';
 
 // Services
 import { 
@@ -528,7 +532,7 @@ const buildJointAnalysisSystemInstruction = (jointData: JointChartData) => {
     buildBaziSystemInstruction(jointData.baziChartData),
     '',
     '【紫微斗数命盘系统上下文】',
-    `${buildZiweiSystemInstruction(jointData.ziweiChartData)}\n\n${formatZiweiPrompt(jointData.ziweiChartData)}`,
+    buildZiweiSystemInstruction(jointData.ziweiChartData),
   ].join('\n');
 };
 
@@ -1232,8 +1236,13 @@ const buildBaziSystemInstruction = (data: BaziResponse) => {
   ].join('\n');
 };
 
+const buildCurrentTimeText = () => {
+  const now = new Date();
+  return `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
+};
+
 const buildZiweiSystemInstruction = (data: ZiweiResponse) =>
-  "你是紫微斗数专家。请基于十二宫位星曜，分析命主天赋与人生轨迹。";
+  buildZiweiSystemPrompt(data, buildCurrentTimeText());
 
 const buildLifeReadingAnalysisBundle = (
   mType: CaseModelType,
@@ -1241,8 +1250,7 @@ const buildLifeReadingAnalysisBundle = (
   question: string
 ) => {
   const trimmedQuestion = question.trim();
-  const now = new Date();
-  const currentTimeText = `当前时间: ${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日${now.getHours()}时${now.getMinutes()}分`;
+  const currentTimeText = buildCurrentTimeText();
 
   if (mType === ModelType.BAZI) {
     const defaultBaziQuestion = "请分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。";
@@ -1257,7 +1265,7 @@ const buildLifeReadingAnalysisBundle = (
   }
 
   return {
-    prompt: `${formatZiweiPrompt(cData as ZiweiResponse)}\n${currentTimeText}`,
+    prompt: buildZiweiAnalysisPrompt(cData as ZiweiResponse, trimmedQuestion, currentTimeText),
     systemInstruction: buildZiweiSystemInstruction(cData as ZiweiResponse),
     knowledgeQuery: trimmedQuestion,
   };

@@ -27,6 +27,7 @@ import {
 } from 'taibu-core/ziwei';
 import {
   toZiweiHoroscopeJson,
+  type ZiweiHoroscopeOutput,
 } from 'taibu-core/ziwei-horoscope';
 import {
   calculateMeihua,
@@ -408,8 +409,45 @@ function adaptQimen(params: QimenParams, chart: QimenOutput) {
   };
 }
 
-function adaptZiwei(params: BaseParams, chart: ZiweiOutput, input: BirthInput, horoscopeJson?: Record<string, any>) {
-  const taibuText = toZiweiText(chart, { detailLevel: 'full' });
+function formatZiweiHoroscopeRange(period?: { startAge?: number; endAge?: number }) {
+  if (typeof period?.startAge === 'number' && typeof period?.endAge === 'number') {
+    return `${period.startAge}~${period.endAge}岁`;
+  }
+  return '-';
+}
+
+function formatZiweiHoroscopePeriod(period?: { heavenlyStem?: string; earthlyBranch?: string }) {
+  return `${period?.heavenlyStem || ''}${period?.earthlyBranch || ''}` || '-';
+}
+
+function adaptZiwei(
+  params: BaseParams,
+  chart: ZiweiOutput,
+  input: BirthInput,
+  horoscope?: ZiweiHoroscopeOutput,
+  horoscopeJson?: Record<string, any>,
+) {
+  const taibuText = toZiweiText(chart, {
+    detailLevel: 'full',
+    horoscope: horoscope ? {
+      decadal: {
+        palaceName: horoscope.decadal.palaceNames[0] || '-',
+        ageRange: formatZiweiHoroscopeRange(horoscope.decadal),
+      },
+      yearly: {
+        palaceName: horoscope.yearly.palaceNames[0] || '-',
+        period: formatZiweiHoroscopePeriod(horoscope.yearly),
+      },
+      monthly: {
+        palaceName: horoscope.monthly.palaceNames[0] || '-',
+        period: formatZiweiHoroscopePeriod(horoscope.monthly),
+      },
+      daily: {
+        palaceName: horoscope.daily.palaceNames[0] || '-',
+        period: formatZiweiHoroscopePeriod(horoscope.daily),
+      },
+    } : undefined,
+  });
   const soulPalace = chart.palaces.find((item) => item.name === '命宫' || item.earthlyBranch === chart.earthlyBranchOfSoulPalace);
   const bodyPalace = chart.palaces.find((item) => item.isBodyPalace || item.earthlyBranch === chart.earthlyBranchOfBodyPalace);
   return {
@@ -1827,11 +1865,9 @@ export async function calculateTaibuChart({ modelType, params }: ChartRequest) {
       const base = await normalizeBirthParams(params as BaseParams);
       const input = commonBirthInput(base);
       const { output, astrolabe } = calculateZiweiDataWithAstrolabe(input);
-      const horoscopeJson = toZiweiHoroscopeJson(
-        calculateZiweiHoroscopeDataWithAstrolabe(astrolabe, { targetDate: new Date() }),
-        { detailLevel: 'full' },
-      ) as Record<string, any>;
-      return adaptZiwei(base, output || calculateZiwei(input), input, horoscopeJson);
+      const horoscope = calculateZiweiHoroscopeDataWithAstrolabe(astrolabe, { targetDate: new Date() });
+      const horoscopeJson = toZiweiHoroscopeJson(horoscope, { detailLevel: 'full' }) as Record<string, any>;
+      return adaptZiwei(base, output || calculateZiwei(input), input, horoscope, horoscopeJson);
     }
     case ModelType.MEIHUA: {
       const base = params as BaseParams;

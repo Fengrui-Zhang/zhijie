@@ -6,6 +6,7 @@ import {
   GenericTaibuResponse,
   ModelType, LiuyaoMode 
 } from '../types';
+import { buildZiweiAnalysisPrompt } from '../lib/ziwei-prompt';
 
 async function fetchChart<T>(modelType: ModelType, params: Record<string, unknown>): Promise<T> {
   try {
@@ -292,38 +293,7 @@ ${data.taibuText}
 };
 
 export const formatZiweiPrompt = (data: ZiweiResponse) => {
-  if (data.taibuText) {
-    return `【紫微斗数排盘】
-${data.taibuText}
-
-请以紫微斗数大师身份，综合分析命身宫及三方四正，论述其天赋、格局高低及人生重点课题。`;
-  }
-  const { base_info, detail_info } = data;
-  const ming = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '命宫');
-  const shen = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '身宫');
-  const caibo = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '财帛宫');
-  const guanlu = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '官禄宫');
-  const qianyi = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '迁移宫');
-  const fuqi = detail_info.xiantian_info.gong_pan.find(p => p.minggong === '夫妻宫');
-
-  const fmtPalace = (p: any) => p ? `[${p.minggong}] 主星:${p.ziweixing}(${p.ziweixing_xingyao}), ${p.tianfuxing}(${p.tianfuxing_xingyao})` : '';
-
-  return `
-  【紫微斗数排盘】
-  命主: ${base_info.name}, 局: ${base_info.mingju}
-  命宫: ${base_info.minggong}, 身宫: ${base_info.shengong}
-  真太阳时调整: ${base_info.zhen?.shicha || '无'}
-  
-  重点宫位:
-  ${fmtPalace(ming)}
-  ${fmtPalace(shen)}
-  ${fmtPalace(caibo)}
-  ${fmtPalace(guanlu)}
-  ${fmtPalace(qianyi)}
-  ${fmtPalace(fuqi)}
-
-  请以紫微斗数大师身份，综合分析命身宫及三方四正，论述其天赋、格局高低及人生重点课题。
-  `;
+  return buildZiweiAnalysisPrompt(data);
 };
 
 export const formatMeihuaPrompt = (data: MeihuaResponse, question: string) => {
