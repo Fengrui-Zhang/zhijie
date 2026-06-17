@@ -137,48 +137,50 @@ const LiuyaoGrid: React.FC<Props> = ({ data }) => {
          </div>
       </div>
 
-      <div className="flex justify-between items-end px-8 mb-4">
-         <div className="text-center w-[200px]">
-            <div className="text-xs text-stone-400 font-bold uppercase mb-1">本卦</div>
-            <div className="font-bold text-2xl text-stone-800 border-b-2 border-stone-800 pb-1">{ben.gua_name}</div>
-            <div className="text-xs text-stone-500 mt-1">{ben.gua_gong}</div>
-         </div>
-         {bian && (
-            <div className="text-center w-[200px]">
-              <div className="text-xs text-stone-400 font-bold uppercase mb-1">变卦</div>
-              <div className="font-bold text-2xl text-stone-600 border-b-2 border-stone-400 pb-1">{bian.gua_name}</div>
-              <div className="text-xs text-stone-400 mt-1">{bian.gua_gong}</div>
-            </div>
-         )}
-      </div>
+      <div className="mx-auto w-fit min-w-[600px]">
+        <div className="mb-4 grid grid-cols-[48px_80px_112px_80px_40px_48px_80px_112px] items-end px-2">
+           <div className="col-start-3 col-span-2 text-center">
+              <div className="text-xs text-stone-400 font-bold uppercase mb-1">本卦</div>
+              <div className="font-bold text-2xl text-stone-800 border-b-2 border-stone-800 pb-1">{ben.gua_name}</div>
+              <div className="text-xs text-stone-500 mt-1">{ben.gua_gong}</div>
+           </div>
+           {bian && (
+              <div className="col-start-7 col-span-2 text-center">
+                <div className="text-xs text-stone-400 font-bold uppercase mb-1">变卦</div>
+                <div className="font-bold text-2xl text-stone-600 border-b-2 border-stone-400 pb-1">{bian.gua_name}</div>
+                <div className="text-xs text-stone-400 mt-1">{bian.gua_gong}</div>
+              </div>
+           )}
+        </div>
 
-      {/* Hexagram Lines Container */}
-      <div className="glass-panel-soft border border-white/60 rounded-[24px] overflow-hidden mb-6 min-w-[600px]">
-         <div className="bg-white/45 flex text-[10px] font-bold text-stone-400 py-1 px-2 border-b border-white/60">
-            <div className="w-12 text-center">六神</div>
-            <div className="w-20 text-right pr-2">伏神</div>
-            <div className="w-28 text-center">本卦爻象</div>
-            <div className="w-20 text-center">卦画</div>
-            <div className="w-10 text-center">世应</div>
-            <div className="w-12 text-center">动</div>
-            <div className="w-20 text-center">变画</div>
-            <div className="w-28 text-center">变卦爻象</div>
-         </div>
-         {lines.map(line => (
-           <YaoLine 
-             key={line.index}
-             index={line.index}
-             isYang={line.isYang}
-             liuqin={line.liuqin}
-             liushen={line.liushen}
-             isShi={line.isShi}
-             isYing={line.isYing}
-             fushen={line.fushen}
-             isBian={line.isYangBian}
-             bianLiuqin={line.liuqinBian}
-             bianIsYang={line.isYangBian}
-           />
-         ))}
+        {/* Hexagram Lines Container */}
+        <div className="glass-panel-soft border border-white/60 rounded-[24px] overflow-hidden mb-6">
+           <div className="bg-white/45 flex text-[10px] font-bold text-stone-400 py-1 px-2 border-b border-white/60">
+              <div className="w-12 shrink-0 text-center">六神</div>
+              <div className="w-20 shrink-0 text-right pr-2">伏神</div>
+              <div className="w-28 shrink-0 text-center">本卦爻象</div>
+              <div className="w-20 shrink-0 text-center">卦画</div>
+              <div className="w-10 shrink-0 text-center">世应</div>
+              <div className="w-12 shrink-0 text-center">动</div>
+              <div className="w-20 shrink-0 text-center">变画</div>
+              <div className="w-28 shrink-0 text-center">变卦爻象</div>
+            </div>
+           {lines.map(line => (
+             <YaoLine
+               key={line.index}
+               index={line.index}
+               isYang={line.isYang}
+               liuqin={line.liuqin}
+               liushen={line.liushen}
+               isShi={line.isShi}
+               isYing={line.isYing}
+               fushen={line.fushen}
+               isBian={line.isYangBian}
+               bianLiuqin={line.liuqinBian}
+               bianIsYang={line.isYangBian}
+             />
+           ))}
+        </div>
       </div>
 
       <div className="glass-panel-soft mt-4 text-sm text-stone-600 bg-amber-50/65 p-4 rounded-[24px] border border-amber-100/80">
