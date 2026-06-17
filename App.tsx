@@ -9722,7 +9722,7 @@ const App: React.FC<AppProps> = ({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-bold text-stone-800">进阶功能</div>
-                  <div className="mt-1 text-sm text-stone-500">更新、更专业的 VIP 功能强先体验</div>
+                  <div className="mt-1 text-sm text-stone-500">选择进阶分析功能</div>
                 </div>
                 <button
                   type="button"
@@ -9759,9 +9759,6 @@ const App: React.FC<AppProps> = ({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-base font-bold text-stone-700">八字合盘分析</div>
-                      <span className="rounded-full border border-white/70 bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
-                        Beta
-                      </span>
                     </div>
                     <div className="mt-3 text-sm leading-7 text-stone-600">
                       读取两人的八字命盘，结合关系标签做合盘分析，适合观察匹配度、冲突点与相处建议。
