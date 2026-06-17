@@ -607,7 +607,7 @@ const CaseNotes = ({ storageKey }: { storageKey: string }) => {
 
 const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info } = data;
-  const dayunList = dayun_info.list || [];
+  const rawDayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
   const [selectedDayunIndex, setSelectedDayunIndex] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -619,7 +619,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     onTabChange?.(activeTab);
   }, [activeTab, onTabChange]);
 
-  const pillars = labelForPillar.map((label, index) => {
+  const rawPillars = labelForPillar.map((label, index) => {
     const value = bazi_info.bazi[index] || '';
     const key = ['year', 'month', 'day', 'hour'][index] as keyof BaziResponse['detail_info']['shensha'];
     const pillarShenSha = detail_info.shensha?.[key];
@@ -634,19 +634,13 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       shensha: Array.isArray(pillarShenSha) ? pillarShenSha.join(' ') : pillarShenSha || '',
     };
   });
-
-  const selectedDayun = selectedDayunIndex !== null ? dayunList[selectedDayunIndex] : null;
-  const selectedYearItem = useMemo(() => {
-    if (!selectedDayun || selectedYear === null) return null;
-    return selectedDayun.liunianList?.find((item: any) => item.year === selectedYear) || null;
-  }, [selectedDayun, selectedYear]);
   const fortuneContext = (detail_info as any).fortuneContext;
   const shenShaContext = useMemo<BaziShenShaContext | null>(() => {
     const sizhu = (detail_info as any).sizhu || {};
-    const dayPillar = pillars[2];
-    const yearPillar = pillars[0];
-    const monthPillar = pillars[1];
-    const hourPillar = pillars[3];
+    const dayPillar = rawPillars[2];
+    const yearPillar = rawPillars[0];
+    const monthPillar = rawPillars[1];
+    const hourPillar = rawPillars[3];
     const yearStem = fortuneContext?.yearStem || yearPillar?.gan || sizhu.year?.tg || '';
     const yearBranch = fortuneContext?.yearBranch || yearPillar?.zhi || sizhu.year?.dz || '';
     const monthStem = fortuneContext?.monthStem || monthPillar?.gan || sizhu.month?.tg || '';
@@ -666,7 +660,47 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       sex: fortuneContext?.sex,
       kongZhi: fortuneContext?.kongZhi || [],
     };
-  }, [detail_info, fortuneContext, pillars]);
+  }, [detail_info, fortuneContext, rawPillars]);
+  const pillars = useMemo(() => {
+    if (!shenShaContext) return rawPillars;
+    return rawPillars.map((pillar, index) => ({
+      ...pillar,
+      shensha: normalizeZhijieShenSha(pillar.shensha, shenShaContext, {
+        stem: pillar.gan,
+        branch: pillar.zhi,
+        position: ['year', 'month', 'day', 'hour'][index] as 'year' | 'month' | 'day' | 'hour',
+      }).join(' '),
+    }));
+  }, [rawPillars, shenShaContext]);
+  const dayunList = useMemo(() => {
+    if (!shenShaContext) return rawDayunList;
+    return rawDayunList.map((item: any) => {
+      const stem = item.ganZhi?.slice(0, 1) || item.stem || '';
+      const branch = item.ganZhi?.slice(1, 2) || item.branch || '';
+      return {
+        ...item,
+        shenSha: normalizeZhijieShenSha(item.shenSha, shenShaContext, { stem, branch, position: 'fortune' }),
+        liunianList: (item.liunianList || []).map((yearItem: any) => {
+          const yearStem = yearItem.gan || yearItem.ganZhi?.slice(0, 1) || '';
+          const yearBranch = yearItem.zhi || yearItem.ganZhi?.slice(1, 2) || '';
+          return {
+            ...yearItem,
+            shenSha: normalizeZhijieShenSha(yearItem.shenSha, shenShaContext, {
+              stem: yearStem,
+              branch: yearBranch,
+              position: 'fortune',
+            }),
+          };
+        }),
+      };
+    });
+  }, [rawDayunList, shenShaContext]);
+
+  const selectedDayun = selectedDayunIndex !== null ? dayunList[selectedDayunIndex] : null;
+  const selectedYearItem = useMemo(() => {
+    if (!selectedDayun || selectedYear === null) return null;
+    return selectedDayun.liunianList?.find((item: any) => item.year === selectedYear) || null;
+  }, [selectedDayun, selectedYear]);
   const liuyueList = useMemo(() => {
     if (!selectedYear || !fortuneContext) return [];
     const list = calculateBaziLiuYueData(selectedYear, fortuneContext);

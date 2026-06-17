@@ -157,17 +157,17 @@ const GUO_YIN: Record<string, string> = {
   癸: '申',
 };
 
-const FU_XING: Record<string, string> = {
-  甲: '寅',
-  乙: '丑',
-  丙: '子',
+const FU_XING: Record<string, string | string[]> = {
+  甲: ['寅', '子'],
+  丙: ['寅', '子'],
   丁: '亥',
   戊: '申',
   己: '未',
+  乙: ['丑', '卯'],
+  癸: ['丑', '卯'],
   庚: '午',
   辛: '巳',
   壬: '辰',
-  癸: '卯',
 };
 
 const HONG_YAN: Record<string, string> = {
