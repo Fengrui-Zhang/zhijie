@@ -8244,7 +8244,6 @@ const App: React.FC<AppProps> = ({
                 <div className="px-5 py-4">
                   <div>
                     <div className="text-sm font-bold text-stone-700">移动端底部菜单</div>
-                    <div className="mt-1 text-xs text-stone-400">选择 4 个常驻入口，按从左到右的顺序显示；“更多”会固定保留。</div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
                     {appPreferences.mobileBottomNav.map((navId, index) => (
