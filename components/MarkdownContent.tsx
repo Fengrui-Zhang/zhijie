@@ -198,11 +198,12 @@ const getWuxingEntries = (value: unknown): ScoreEntry[] => {
       record.element || record.name || record.label || record.key || fallbackKey || WUXING_LABELS[index],
       WUXING_LABELS[index] || `五行 ${index + 1}`
     );
+    const normalizedLabel = isGenericScoreLabel(label) ? (WUXING_LABELS[index] || label) : label;
     const score = inferWuxingScore(record);
     if (score == null) return null;
     return {
-      key: toText(record.key || record.element || record.name || label, label),
-      label,
+      key: toText(record.key || record.element || record.name || normalizedLabel, normalizedLabel),
+      label: normalizedLabel,
       score,
     };
   };
