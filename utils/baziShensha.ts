@@ -439,6 +439,9 @@ const RECOMPUTED_LABELS = new Set([
 
 const AUSPICIOUS_SHENSHA = new Set([
   '天乙贵人',
+  '天三奇',
+  '地三奇',
+  '人三奇',
   '太极贵人',
   '文昌',
   '文昌贵人',
