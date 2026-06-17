@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useSession, signOut } from 'next-auth/react';
 import {
   DEFAULT_ANALYSIS_MODEL,
@@ -97,11 +98,19 @@ import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import GenericTaibuGrid from './components/GenericTaibuGrid';
-import FortuneGrid from './components/FortuneGrid';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
 import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
+
+const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl border border-stone-100 bg-white px-5 py-10 text-center text-sm text-stone-500">
+      正在加载运势面板...
+    </div>
+  ),
+});
 
 // --- Icons ---
 const Spinner = () => (
@@ -8377,13 +8386,15 @@ const App: React.FC<AppProps> = ({
 
         {/* Input Phase */}
         {step === 'input' && (
-          <div className="glass-panel rounded-[24px] p-5 md:p-7">
+          <div className={isFortuneReading ? 'space-y-4' : 'glass-panel rounded-[24px] p-5 md:p-7'}>
+            {!isFortuneReading && (
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">{currentWorkspaceLabel}</div>
                 <div className="mt-1 text-2xl font-bold text-stone-800">{currentModuleLabel}</div>
               </div>
             </div>
+            )}
 
             {hasSelectedModel && supportsKnowledge && !isCaseModel && !professionalSelectedProject && (
               <KnowledgeToggleCard

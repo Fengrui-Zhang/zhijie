@@ -1,6 +1,16 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceDot,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import type { GenericTaibuResponse } from '../types';
 
 type Props = {
@@ -301,23 +311,6 @@ const DIMENSION_COLOR: Record<DimensionKey, string> = {
   social: '#8b5cf6',
 };
 
-type TrendPoint = {
-  x: number;
-  y: number;
-  value: number;
-  label: string;
-  fullDate?: string;
-  dimension?: DimensionKey;
-};
-
-const chartX = (index: number, total: number) => (total <= 1 ? 50 : 8 + (index / (total - 1)) * 84);
-const chartY = (value: number, min = 25, max = 100) => {
-  const safe = Math.max(25, Math.min(100, Number(value) || 52));
-  const low = Math.max(0, Math.min(100, min));
-  const high = Math.max(low + 1, Math.min(100, max));
-  return 12 + ((high - safe) / (high - low)) * 76;
-};
-
 const getAdaptiveChartRange = (values: number[]) => {
   const safeValues = values
     .map((value) => Number(value))
@@ -333,11 +326,6 @@ const getAdaptiveChartRange = (values: number[]) => {
   return max - min < 30
     ? { min: Math.max(0, min - 6), max: Math.min(100, max + 6) }
     : { min, max };
-};
-
-const chartGridValues = (range: { min: number; max: number }) => {
-  const step = (range.max - range.min) / 3;
-  return [range.min, range.min + step, range.min + step * 2, range.max];
 };
 
 const dimensionShortLabel = (label: string) => label.replace('运势', '').replace('运', '');
@@ -365,17 +353,6 @@ const shiftDate = (date: Date, days: number) => {
 const shiftMonth = (year: number, month: number, offset: number) => {
   const next = new Date(year, month - 1 + offset, 1);
   return next;
-};
-
-const smoothPath = (points: Array<{ x: number; y: number }>) => {
-  if (!points.length) return '';
-  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
-  return points.reduce((path, point, index) => {
-    if (index === 0) return `M ${point.x},${point.y}`;
-    const prev = points[index - 1];
-    const midX = (prev.x + point.x) / 2;
-    return `${path} C ${midX},${prev.y} ${midX},${point.y} ${point.x},${point.y}`;
-  }, '');
 };
 
 const CaseSelector = ({
@@ -767,6 +744,25 @@ const InterpretationModeControl = ({
   </div>
 );
 
+const TrendTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const source = payload[0]?.payload || {};
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-lg">
+      <div className="mb-1 font-bold text-stone-800">{source.fullDate || label}</div>
+      <div className="space-y-1">
+        {payload.map((entry: any) => (
+          <div key={entry.dataKey} className="flex items-center gap-2 text-stone-600">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span>{dimensionShortLabel(SCORE_ITEMS.find((item) => item.key === entry.dataKey)?.label || '综合')}：</span>
+            <b className="text-stone-900">{Math.round(Number(entry.value) || 0)}</b>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const FortuneTrendChart = ({
   trend,
   selectedDate,
@@ -775,28 +771,31 @@ const FortuneTrendChart = ({
   selectedDate?: string;
 }) => {
   const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall']);
-  const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
-  const { series, range } = useMemo(() => {
-    if (!trend?.length) return { series: [], range: { min: 25, max: 100 } };
+  const { chartData, range } = useMemo(() => {
+    if (!trend?.length) return { chartData: [], range: { min: 25, max: 100 } };
     const values = activeDimensions.flatMap((dimension) =>
       trend.map((item) => item.scores?.[dimension] ?? item.scores?.overall ?? 52)
     );
     const nextRange = getAdaptiveChartRange(values);
-    const nextSeries = activeDimensions.map((dimension) => ({
-      dimension,
-      points: trend.map((item, index) => {
-        const value = item.scores?.[dimension] ?? item.scores?.overall ?? 52;
-        const x = chartX(index, trend.length);
-        const y = chartY(value, nextRange.min, nextRange.max);
-        return { x, y, value, label: item.date, fullDate: item.fullDate, dimension };
-      }),
+    const nextData = trend.map((item) => ({
+      date: item.date,
+      fullDate: item.fullDate,
+      overall: item.scores?.overall ?? 52,
+      career: item.scores?.career ?? item.scores?.overall ?? 52,
+      love: item.scores?.love ?? item.scores?.overall ?? 52,
+      wealth: item.scores?.wealth ?? item.scores?.overall ?? 52,
+      health: item.scores?.health ?? item.scores?.overall ?? 52,
+      social: item.scores?.social ?? item.scores?.overall ?? 52,
     }));
-    return { series: nextSeries, range: nextRange };
+    return { chartData: nextData, range: nextRange };
   }, [trend, activeDimensions]);
 
-  if (!series.length) return null;
-  const primaryPoints = series[0]?.points || [];
-  const trendDirection = primaryPoints.length ? primaryPoints[primaryPoints.length - 1].value - primaryPoints[0].value : 0;
+  if (!chartData.length) return null;
+  const trendDirection = chartData.length
+    ? Number(chartData[chartData.length - 1]?.overall || 52) - Number(chartData[0]?.overall || 52)
+    : 0;
+  const selectedPoint = selectedDate ? chartData.find((item) => item.fullDate === selectedDate) : null;
+  const selectedKey = activeDimensions[0] || 'overall';
   const toggleDimension = (dimension: DimensionKey) => {
     setActiveDimensions((current) => {
       if (current.includes(dimension)) {
@@ -807,8 +806,8 @@ const FortuneTrendChart = ({
   };
 
   return (
-    <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
+    <div className="rounded-2xl border border-stone-100 bg-white p-4 md:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:gap-3">
         <div className="flex items-center gap-3">
           <div className="text-base font-bold text-stone-800 md:text-lg">7日运势趋势</div>
           <div className={`text-sm font-bold ${trendDirection > 5 ? 'text-emerald-600' : trendDirection < -5 ? 'text-red-500' : 'text-stone-500'}`}>
@@ -830,60 +829,37 @@ const FortuneTrendChart = ({
           ))}
         </div>
       </div>
-      <div className="relative h-56 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72">
-        <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
-          {chartGridValues(range).map((line) => (
-            <line key={line} x1="8" y1={chartY(line, range.min, range.max)} x2="92" y2={chartY(line, range.min, range.max)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
-          ))}
-          {series.map((item) => (
-            <path
-              key={item.dimension}
-              d={smoothPath(item.points)}
-              fill="none"
-              stroke={DIMENSION_COLOR[item.dimension]}
-              strokeWidth={item.dimension === activeDimensions[0] ? '3.2' : '2.7'}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
-            />
-          ))}
-          {primaryPoints.map((point) => {
-            const active = selectedDate && point.fullDate === selectedDate;
-            const tooltipPoint = { ...point, dimension: activeDimensions[0] };
-            return (
-              <g
-                key={point.fullDate || point.label}
-                tabIndex={0}
-                role="button"
-                onMouseEnter={() => setHoveredPoint(tooltipPoint)}
-                onMouseLeave={() => setHoveredPoint(null)}
-                onFocus={() => setHoveredPoint(tooltipPoint)}
-                onBlur={() => setHoveredPoint(null)}
-                onClick={() => setHoveredPoint(tooltipPoint)}
-                className="cursor-pointer outline-none"
-              >
-                <circle cx={point.x} cy={point.y} r={active ? '4.2' : '2.4'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke={active ? '#fff7ed' : '#ffffff'} strokeWidth={active ? '2.4' : '1'} />
-                <text x={point.x} y="97" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}</text>
-              </g>
-            );
-          })}
-        </svg>
-        {hoveredPoint && (
-          <div
-            className="pointer-events-none absolute z-10 min-w-[132px] rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-lg"
-            style={{
-              left: `${hoveredPoint.x}%`,
-              top: `${hoveredPoint.y}%`,
-              transform: 'translate(-50%, -112%)',
-            }}
-          >
-            <div className="font-bold text-stone-800">{hoveredPoint.fullDate || hoveredPoint.label}</div>
-            <div className="mt-1 flex items-center gap-2 text-stone-600">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DIMENSION_COLOR[hoveredPoint.dimension || activeDimensions[0]] }} />
-              <span>{dimensionShortLabel(SCORE_ITEMS.find((item) => item.key === (hoveredPoint.dimension || activeDimensions[0]))?.label || '综合')}：<b className="text-stone-900">{Math.round(hoveredPoint.value)}</b></span>
-            </div>
-          </div>
-        )}
+      <div className="h-60 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72 md:p-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 10, left: -22, bottom: 2 }}>
+            <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
+            <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#78716c' }} tickLine={false} axisLine={false} dy={8} minTickGap={12} />
+            <YAxis domain={[range.min, range.max]} tick={{ fontSize: 11, fill: '#78716c' }} tickLine={false} axisLine={false} tickCount={4} />
+            <Tooltip content={<TrendTooltip />} />
+            {activeDimensions.map((dimension) => (
+              <Line
+                key={dimension}
+                type="monotone"
+                dataKey={dimension}
+                stroke={DIMENSION_COLOR[dimension]}
+                strokeWidth={dimension === activeDimensions[0] ? 3.5 : 2.6}
+                dot={{ r: 3, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 1.5 }}
+                activeDot={{ r: 6, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 3 }}
+                opacity={dimension === activeDimensions[0] ? 1 : 0.72}
+              />
+            ))}
+            {selectedPoint && (
+              <ReferenceDot
+                x={selectedPoint.date}
+                y={Number((selectedPoint as any)[selectedKey] || selectedPoint.overall || 52)}
+                r={7}
+                fill={DIMENSION_COLOR[selectedKey]}
+                stroke="#fff"
+                strokeWidth={3}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -1166,32 +1142,30 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
 
 const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
   const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career']);
-  const [hoveredPoint, setHoveredPoint] = useState<TrendPoint | null>(null);
-  const { series, range } = useMemo(() => {
+  const { chartData, range } = useMemo(() => {
     const values = activeDimensions.flatMap((dimension) =>
       calendar.map((item: any) => item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level))
     );
     const nextRange = getAdaptiveChartRange(values);
-    const nextSeries = activeDimensions.map((dimension) => ({
-      dimension,
-      points: calendar.map((item: any, index: number) => {
-        const value = item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level);
-        const x = chartX(index, calendar.length);
-        const y = chartY(value, nextRange.min, nextRange.max);
-        return { x, y, label: `${item.day}`, value, fullDate: item.date, dimension };
-      }),
+    const nextData = calendar.map((item: any) => ({
+      date: `${item.day}日`,
+      tick: `${item.day}`,
+      fullDate: item.date,
+      day: Number(item.day || 0),
+      overall: item.scores?.overall ?? levelValue(item.level),
+      career: item.scores?.career ?? item.scores?.overall ?? levelValue(item.level),
+      love: item.scores?.love ?? item.scores?.overall ?? levelValue(item.level),
+      wealth: item.scores?.wealth ?? item.scores?.overall ?? levelValue(item.level),
+      health: item.scores?.health ?? item.scores?.overall ?? levelValue(item.level),
+      social: item.scores?.social ?? item.scores?.overall ?? levelValue(item.level),
     }));
-    return { series: nextSeries, range: nextRange };
+    return { chartData: nextData, range: nextRange };
   }, [calendar, activeDimensions]);
-  if (!series.length) return null;
-  const primaryPoints = series[0]?.points || [];
+  if (!chartData.length) return null;
   const tickLabels = new Set(
-    primaryPoints
-      .filter((point, index) => {
-        const day = Number(point.label);
-        return index === 0 || index === primaryPoints.length - 1 || [7, 14, 21, 28].includes(day);
-      })
-      .map((point) => point.label)
+    chartData
+      .filter((point, index) => index === 0 || index === chartData.length - 1 || [7, 14, 21, 28].includes(point.day))
+      .map((point) => point.tick)
   );
   const toggleDimension = (dimension: DimensionKey) => {
     setActiveDimensions((current) => {
@@ -1202,7 +1176,7 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
     });
   };
   return (
-    <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
+    <div className="rounded-2xl border border-stone-100 bg-white p-4 md:p-6">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:mb-4 md:gap-3">
         <div className="text-base font-bold text-stone-800 md:text-lg">运势起伏</div>
         <div className="flex flex-wrap gap-1.5 md:gap-2">
@@ -1213,62 +1187,35 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
           ))}
         </div>
       </div>
-      <div className="relative h-60 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-80">
-        <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible">
-          {chartGridValues(range).map((line) => (
-            <line key={line} x1="8" y1={chartY(line, range.min, range.max)} x2="92" y2={chartY(line, range.min, range.max)} stroke="#e7e5e4" strokeWidth="0.4" strokeDasharray="1.5 2" />
-          ))}
-          {series.map((item) => (
-            <path
-              key={item.dimension}
-              d={smoothPath(item.points)}
-              fill="none"
-              stroke={DIMENSION_COLOR[item.dimension]}
-              strokeWidth={item.dimension === activeDimensions[0] ? '3.2' : '2.8'}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={item.dimension === activeDimensions[0] ? 1 : 0.72}
+      <div className="h-[clamp(220px,32vw,360px)] w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 12, right: 12, left: -22, bottom: 2 }}>
+            <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
+            <XAxis
+              dataKey="tick"
+              tick={{ fontSize: 12, fill: '#78716c' }}
+              tickLine={false}
+              axisLine={false}
+              dy={8}
+              interval={0}
+              tickFormatter={(value) => (tickLabels.has(String(value)) ? `${value}日` : '')}
             />
-          ))}
-          {primaryPoints.map((point, index) => {
-            const tooltipPoint = { ...point, dimension: activeDimensions[0] };
-            const showDot = index === 0 || index === primaryPoints.length - 1 || index % 3 === 0;
-            return (
-              <g
-                key={point.fullDate || point.label}
-                tabIndex={0}
-                role="button"
-                onMouseEnter={() => setHoveredPoint(tooltipPoint)}
-                onMouseLeave={() => setHoveredPoint(null)}
-                onFocus={() => setHoveredPoint(tooltipPoint)}
-                onBlur={() => setHoveredPoint(null)}
-                onClick={() => setHoveredPoint(tooltipPoint)}
-                className="cursor-pointer outline-none"
-              >
-                <circle cx={point.x} cy={point.y} r={showDot ? '2.25' : '1.25'} fill={DIMENSION_COLOR[activeDimensions[0]]} stroke="#fff" strokeWidth={showDot ? '1' : '0'} opacity={showDot ? 1 : 0.25} />
-                {tickLabels.has(point.label) && (
-                  <text x={point.x} y="97" textAnchor="middle" className="fill-stone-500 text-[5px]">{point.label}日</text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        {hoveredPoint && (
-          <div
-            className="pointer-events-none absolute z-10 min-w-[128px] rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-lg"
-            style={{
-              left: `${hoveredPoint.x}%`,
-              top: `${hoveredPoint.y}%`,
-              transform: 'translate(-50%, -112%)',
-            }}
-          >
-            <div className="font-bold text-stone-800">{hoveredPoint.fullDate || `${hoveredPoint.label}日`}</div>
-            <div className="mt-1 flex items-center gap-2 text-stone-600">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DIMENSION_COLOR[hoveredPoint.dimension || activeDimensions[0]] }} />
-              <span>{dimensionShortLabel(SCORE_ITEMS.find((item) => item.key === (hoveredPoint.dimension || activeDimensions[0]))?.label || '综合')}：<b className="text-stone-900">{Math.round(hoveredPoint.value)}</b></span>
-            </div>
-          </div>
-        )}
+            <YAxis domain={[range.min, range.max]} tick={{ fontSize: 11, fill: '#78716c' }} tickLine={false} axisLine={false} tickCount={4} />
+            <Tooltip content={<TrendTooltip />} />
+            {activeDimensions.map((dimension) => (
+              <Line
+                key={dimension}
+                type="monotone"
+                dataKey={dimension}
+                stroke={DIMENSION_COLOR[dimension]}
+                strokeWidth={dimension === activeDimensions[0] ? 3.5 : 2.8}
+                dot={chartData.length <= 15 ? { r: 2.8, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 1.4 } : false}
+                activeDot={{ r: 6, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 3 }}
+                opacity={dimension === activeDimensions[0] ? 1 : 0.72}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
