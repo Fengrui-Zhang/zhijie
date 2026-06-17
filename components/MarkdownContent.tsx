@@ -163,6 +163,61 @@ const getScoreEntries = (value: unknown, fallbackLabels?: FallbackScoreLabel[]):
   });
 };
 
+const WUXING_LABELS = ['木', '火', '土', '金', '水'];
+
+const inferWuxingScore = (record: UnknownRecord) => {
+  const direct = record.score ?? record.value ?? record.energy ?? record.percent ?? record.percentage ?? record.power;
+  if (direct !== undefined && direct !== null && direct !== '') return clampScore(direct);
+
+  const text = [
+    record.status,
+    record.level,
+    record.strength,
+    record.description,
+    record.label,
+  ].map((item) => toText(item)).join(' ');
+
+  if (/极旺|过旺|very\s*strong/i.test(text)) return 90;
+  if (/偏旺|较旺|strong|旺|强/i.test(text)) return 76;
+  if (/中和|平衡|适中|balanced|normal/i.test(text)) return 60;
+  if (/偏弱|较弱|weak/i.test(text)) return 36;
+  if (/极弱|过弱|衰|very\s*weak/i.test(text)) return 22;
+  return null;
+};
+
+const getWuxingEntries = (value: unknown): ScoreEntry[] => {
+  const normalizeEntry = (raw: unknown, index: number, fallbackKey?: string): ScoreEntry | null => {
+    const record = toRecord(raw);
+    if (!record) {
+      const label = fallbackKey || WUXING_LABELS[index] || `五行 ${index + 1}`;
+      const score = typeof raw === 'number' || typeof raw === 'string' ? clampScore(raw) : null;
+      return score == null ? null : { key: label, label, score };
+    }
+
+    const label = toText(
+      record.element || record.name || record.label || record.key || fallbackKey || WUXING_LABELS[index],
+      WUXING_LABELS[index] || `五行 ${index + 1}`
+    );
+    const score = inferWuxingScore(record);
+    if (score == null) return null;
+    return {
+      key: toText(record.key || record.element || record.name || label, label),
+      label,
+      score,
+    };
+  };
+
+  if (Array.isArray(value)) {
+    return value.map((item, index) => normalizeEntry(item, index)).filter((item): item is ScoreEntry => Boolean(item));
+  }
+
+  const record = toRecord(value);
+  if (!record) return [];
+  return Object.entries(record)
+    .map(([key, raw], index) => normalizeEntry(raw, index, key))
+    .filter((item): item is ScoreEntry => Boolean(item));
+};
+
 const ChartShell = ({
   chart,
   children,
@@ -287,7 +342,7 @@ const FortuneCalendarBlock = ({ chart }: { chart: ChartPayload }) => {
 };
 
 const WuxingEnergyBlock = ({ chart }: { chart: ChartPayload }) => {
-  const entries = getScoreEntries(chart.data.elements || chart.data.scores || chart.data.items);
+  const entries = getWuxingEntries(chart.data.elements || chart.data.scores || chart.data.items);
   if (!entries.length) return null;
   return (
     <ChartShell chart={chart}>
