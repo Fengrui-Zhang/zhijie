@@ -471,6 +471,36 @@ const buildStandaloneCaseReferenceText = (items: CaseItem[]) => {
   ].join('\n');
 };
 
+const buildStandaloneSessionReferenceText = (
+  items: Array<{ title: string; modelType: string; messages: ChatMessage[] }>
+) => {
+  const blocks = items
+    .map((item, index) => {
+      const messages = item.messages
+        .slice(-12)
+        .map((msg) => {
+          const role = msg.role === 'model' ? '解读' : '用户';
+          return `${role}：${msg.content.trim().slice(0, 1200)}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+      if (!messages) return '';
+      return [
+        `【引用会话 ${index + 1}：${item.title}｜${MODEL_LABELS[item.modelType as ModelType] || item.modelType}】`,
+        messages,
+      ].join('\n');
+    })
+    .filter(Boolean);
+
+  if (blocks.length === 0) return '';
+
+  return [
+    '用户已在本次聊天中引用以下历史会话。回答时可参考其中已有上下文、盘面结论与问答脉络；不要逐字复述历史内容，除非用户要求。',
+    '',
+    blocks.join('\n\n'),
+  ].join('\n');
+};
+
 const buildJointAnalysisPrompt = (jointData: JointChartData) => {
   const baziBundle = buildLifeReadingAnalysisBundle(ModelType.BAZI, jointData.baziChartData, '');
   const ziweiBundle = buildLifeReadingAnalysisBundle(ModelType.ZIWEI, jointData.ziweiChartData, '');
@@ -1679,6 +1709,8 @@ const App: React.FC<AppProps> = ({
   const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
   const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
+  const [standaloneSelectedSessionIds, setStandaloneSelectedSessionIds] = useState<string[]>([]);
+  const [standaloneSessionSelectValue, setStandaloneSessionSelectValue] = useState('');
   const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(
     initialSettingsTab === 'charts' || initialSettingsTab === 'knowledge' ? 'general' : initialSettingsTab
   );
@@ -2337,6 +2369,7 @@ const App: React.FC<AppProps> = ({
       if (res.ok) {
         const data = await res.json();
         setSavedSessions(data);
+        setStandaloneSelectedSessionIds((current) => current.filter((id) => data.some((item: SessionItem) => item.id === id)));
       }
     } catch {
       // silently ignore
@@ -2926,6 +2959,13 @@ const App: React.FC<AppProps> = ({
             ? sessionChartParams.sourceCaseIds.filter((item): item is string => typeof item === 'string')
             : []
         );
+        setStandaloneSelectedSessionIds(
+          Array.isArray(sessionChartParams.sourceSessionIds)
+            ? sessionChartParams.sourceSessionIds.filter((item): item is string => typeof item === 'string')
+            : []
+        );
+        setStandaloneCaseSelectValue('');
+        setStandaloneSessionSelectValue('');
         setChatHistory([]);
         setChartData(null);
         setActiveChartParams({});
@@ -3898,8 +3938,7 @@ const App: React.FC<AppProps> = ({
     clearViewState();
   };
 
-  const handleAddStandaloneCaseReference = () => {
-    const nextId = standaloneCaseSelectValue;
+  const handleSelectStandaloneCaseReference = (nextId: string) => {
     if (!nextId) return;
     setStandaloneSelectedCaseIds((current) => {
       if (current.includes(nextId)) return current;
@@ -3912,12 +3951,27 @@ const App: React.FC<AppProps> = ({
     setStandaloneSelectedCaseIds((current) => current.filter((id) => id !== caseId));
   };
 
+  const handleSelectStandaloneSessionReference = (nextId: string) => {
+    if (!nextId) return;
+    setStandaloneSelectedSessionIds((current) => {
+      if (current.includes(nextId)) return current;
+      return [...current, nextId].slice(-4);
+    });
+    setStandaloneSessionSelectValue('');
+  };
+
+  const handleRemoveStandaloneSessionReference = (sessionId: string) => {
+    setStandaloneSelectedSessionIds((current) => current.filter((id) => id !== sessionId));
+  };
+
   const handleNewStandaloneChat = () => {
     setStandaloneChatMessages([]);
     setStandaloneChatInput('');
     setStandaloneChatError('');
     setStandaloneSelectedCaseIds([]);
     setStandaloneCaseSelectValue('');
+    setStandaloneSelectedSessionIds([]);
+    setStandaloneSessionSelectValue('');
     setStandaloneSessionId(null);
     setActiveSessionId(null);
   };
@@ -3943,9 +3997,39 @@ const App: React.FC<AppProps> = ({
         .map((id) => standaloneCaseOptions.find((item) => item.id === id))
         .filter((item): item is CaseItem => Boolean(item));
       const caseReferenceText = buildStandaloneCaseReferenceText(selectedCases);
+      const selectedSessionSummaries = savedSessions
+        .filter((item) => standaloneSelectedSessionIds.includes(item.id));
+      const selectedSessionDetails = await Promise.all(
+        selectedSessionSummaries.map(async (item) => {
+          try {
+            const res = await fetch(`/api/sessions/${item.id}`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            const messages: ChatMessage[] = (data.messages || []).map(
+              (m: { id: string; role: string; content: string; createdAt: string }) => ({
+                id: m.id,
+                role: m.role as 'user' | 'model',
+                content: m.content,
+                timestamp: new Date(m.createdAt),
+              })
+            );
+            return {
+              title: data.title || item.title,
+              modelType: data.modelType || item.modelType,
+              messages,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      const sessionReferenceText = buildStandaloneSessionReferenceText(
+        selectedSessionDetails.filter((item): item is { title: string; modelType: string; messages: ChatMessage[] } => Boolean(item))
+      );
       const standaloneSystemInstruction = applyPersonalizationToSystemInstruction([
         '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
         caseReferenceText,
+        sessionReferenceText,
       ].filter(Boolean).join('\n\n'));
       const apiMessages = [
         {
@@ -3995,6 +4079,7 @@ const App: React.FC<AppProps> = ({
             `聊天 - ${content.slice(0, 20)}`,
             {
               sourceCaseIds: selectedCases.map((item) => item.id),
+              sourceSessionIds: selectedSessionSummaries.map((item) => item.id),
               knowledgeBoard: standaloneChatUseKnowledge ? standaloneChatKnowledgeBoard : '',
             },
             {
@@ -4002,6 +4087,11 @@ const App: React.FC<AppProps> = ({
               sourceCases: selectedCases.map((item) => ({
                 id: item.id,
                 title: getCaseDisplayName(item),
+                modelType: item.modelType,
+              })),
+              sourceSessions: selectedSessionSummaries.map((item) => ({
+                id: item.id,
+                title: item.title,
                 modelType: item.modelType,
               })),
             }
@@ -7977,45 +8067,60 @@ const App: React.FC<AppProps> = ({
     .map((id) => standaloneCaseOptions.find((item) => item.id === id))
     .filter((item): item is CaseItem => Boolean(item));
   const standaloneAvailableCaseOptions = standaloneCaseOptions.filter((item) => !standaloneSelectedCaseIds.includes(item.id));
+  const standaloneSelectedSessions = standaloneSelectedSessionIds
+    .map((id) => savedSessions.find((item) => item.id === id))
+    .filter((item): item is SessionItem => Boolean(item));
+  const standaloneAvailableSessionOptions = savedSessions.filter(
+    (item) => item.id !== standaloneSessionId && !standaloneSelectedSessionIds.includes(item.id)
+  );
 
   const renderChatWorkspace = () => (
     <div className="glass-panel flex h-[calc(100vh-128px)] min-h-[620px] flex-col overflow-hidden rounded-[32px]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
-          <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-2xl font-bold text-stone-800">新聊天</div>
           <button
             type="button"
             onClick={handleNewStandaloneChat}
-            className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 transition hover:bg-white hover:text-stone-900"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/70 text-lg font-semibold leading-none text-stone-600 transition hover:bg-white hover:text-stone-900"
+            aria-label="新建聊天"
+            title="新建聊天"
           >
-            新建聊天
+            +
           </button>
-          <div className="flex flex-wrap items-center gap-2 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
-            <span className="pl-1 text-xs font-semibold text-stone-500">引用命例</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
+            <span className="pl-1 text-xs font-semibold text-stone-500">命例</span>
             <select
               value={standaloneCaseSelectValue}
-              onChange={(event) => setStandaloneCaseSelectValue(event.target.value)}
-              className="max-w-[180px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
+              onChange={(event) => handleSelectStandaloneCaseReference(event.target.value)}
+              className="max-w-[150px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
               disabled={standaloneAvailableCaseOptions.length === 0}
             >
-              <option value="">{standaloneAvailableCaseOptions.length ? '选择命例' : '暂无命例'}</option>
+              <option value="">{standaloneAvailableCaseOptions.length ? '选择' : '暂无'}</option>
               {standaloneAvailableCaseOptions.map((item) => (
                 <option key={item.id} value={item.id}>
                   {getCaseModelDisplayLabel(item.modelType)} · {getCaseDisplayName(item)}
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              onClick={handleAddStandaloneCaseReference}
-              disabled={!standaloneCaseSelectValue}
-              className="rounded-full bg-stone-900 px-2.5 py-1 text-xs font-semibold text-amber-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
+            <span className="pl-1 text-xs font-semibold text-stone-500">会话</span>
+            <select
+              value={standaloneSessionSelectValue}
+              onChange={(event) => handleSelectStandaloneSessionReference(event.target.value)}
+              className="max-w-[150px] rounded-full border border-stone-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-stone-600 outline-none disabled:opacity-45"
+              disabled={standaloneAvailableSessionOptions.length === 0}
             >
-              添加
-            </button>
+              <option value="">{standaloneAvailableSessionOptions.length ? '选择' : '暂无'}</option>
+              {standaloneAvailableSessionOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {MODEL_LABELS[item.modelType] || item.modelType} · {item.title}
+                </option>
+              ))}
+            </select>
           </div>
           <button
             type="button"
@@ -8041,7 +8146,7 @@ const App: React.FC<AppProps> = ({
           </select>
         </div>
       </div>
-      {standaloneSelectedCases.length > 0 && (
+      {(standaloneSelectedCases.length > 0 || standaloneSelectedSessions.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-100/80 bg-white/42 px-6 py-3 md:px-8">
           <span className="text-xs font-semibold text-stone-400">已引用</span>
           {standaloneSelectedCases.map((item) => (
@@ -8056,6 +8161,23 @@ const App: React.FC<AppProps> = ({
                 onClick={() => handleRemoveStandaloneCaseReference(item.id)}
                 className="text-stone-400 transition hover:text-stone-700"
                 aria-label={`移除${getCaseDisplayName(item)}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {standaloneSelectedSessions.map((item) => (
+            <span
+              key={item.id}
+              className="inline-flex items-center gap-2 rounded-full border border-sky-100 bg-sky-50/80 px-3 py-1.5 text-xs font-semibold text-stone-700"
+            >
+              <span className="text-sky-700">会话</span>
+              <span>{item.title}</span>
+              <button
+                type="button"
+                onClick={() => handleRemoveStandaloneSessionReference(item.id)}
+                className="text-stone-400 transition hover:text-stone-700"
+                aria-label={`移除${item.title}`}
               >
                 ×
               </button>
