@@ -197,6 +197,14 @@ const hiddenText = (stems?: string, gods?: string) => {
   return stemList.map((stem, index) => `${stem}${godList[index] ? `(${godList[index]})` : ''}`).join(' ');
 };
 
+const formatFlowDayLabel = (date?: string, fallbackDay?: number | string) => {
+  const match = typeof date === 'string' ? date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/) : null;
+  if (match) {
+    return `${Number(match[2])}月${Number(match[3])}日`;
+  }
+  return fallbackDay ? `${fallbackDay}日` : '—';
+};
+
 const addTenGodLocation = (
   store: TenGodLocationMap,
   god: string,
@@ -458,7 +466,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const [selectedDayunIndex, setSelectedDayunIndex] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   React.useEffect(() => {
     onTabChange?.(activeTab);
@@ -494,7 +502,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     if (!selectedMonthItem || !fortuneContext) return [];
     return calculateBaziLiuRiData(selectedMonthItem.startDate, selectedMonthItem.endDate, fortuneContext);
   }, [fortuneContext, selectedMonthItem]);
-  const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.day === selectedDay) : null;
+  const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.date === selectedDay) : null;
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
   const dayElement = elementLabel(dayMaster);
   const patternText = base_info.zhengge || patternFromTenGod(bazi_info.tg_cg_god?.[1]) || '—';
@@ -811,11 +819,13 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
 
         {selectedMonth && liuriList.length > 0 && (
           <section>
-            <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年{selectedMonth}月流日</div>
+            <div className="mb-2 text-sm font-bold text-stone-800">
+              流日（{selectedMonthItem?.startDate || `${selectedYear}年${selectedMonth}月`} — {selectedMonthItem?.endDate || ''}）
+            </div>
             <div className="flex flex-wrap gap-2 pb-1">
               {liuriList.map((item: any) => (
-                <ChipButton key={item.date} active={selectedDay === item.day} onClick={() => setSelectedDay((current) => current === item.day ? null : item.day)}>
-                  <div className="text-xs">{item.day}日</div>
+                <ChipButton key={item.date} active={selectedDay === item.date} onClick={() => setSelectedDay((current) => current === item.date ? null : item.date)}>
+                  <div className="text-xs">{formatFlowDayLabel(item.date, item.day)}</div>
                   <div className="text-sm font-bold">{item.ganZhi}</div>
                 </ChipButton>
               ))}
