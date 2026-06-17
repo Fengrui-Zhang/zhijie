@@ -177,6 +177,22 @@ function buildTrueSolarInfo(params: BaseParams, chart: { trueSolarTimeInfo?: Baz
   };
 }
 
+function patternFromTenGod(tenGod?: string) {
+  const map: Record<string, string> = {
+    正官: '正官格',
+    七杀: '七杀格',
+    正财: '财格',
+    偏财: '财格',
+    正印: '印格',
+    偏印: '印格',
+    食神: '食神格',
+    伤官: '伤官格',
+    比肩: '比劫格',
+    劫财: '比劫格',
+  };
+  return tenGod ? map[tenGod] || '' : '';
+}
+
 function buildBaseInfo(params: BaseParams, dayun?: DayunOutput, chart?: BaziOutput) {
   const solar = `${params.year}-${pad2(params.month)}-${pad2(params.day)} ${pad2(params.hours)}:${pad2(params.minute)}`;
   return {
@@ -186,7 +202,7 @@ function buildBaseInfo(params: BaseParams, dayun?: DayunOutput, chart?: BaziOutp
     nongli: params.calendarType === 'lunar' ? `农历${params.year}-${pad2(params.month)}-${pad2(params.day)}${params.isLeapMonth ? '（闰月）' : ''}` : '',
     qiyun: dayun ? `${dayun.startAge}岁（${dayun.startAgeDetail}）` : '',
     jiaoyun: '',
-    zhengge: '',
+    zhengge: patternFromTenGod(chart?.fourPillars?.month?.tenGod),
     zhen: chart ? buildTrueSolarInfo(params, chart) : undefined,
   };
 }
@@ -667,19 +683,46 @@ function adaptXiaoliuren(params: BaseParams, chart: XiaoliurenOutput) {
   };
 }
 
-function adaptAlmanac(params: BaseParams, chart: AlmanacOutput) {
+function kongWangFromGanZhi(stem?: string, branch?: string) {
+  const stems = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+  const branches = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+  const stemIndex = stems.indexOf(stem || '');
+  const branchIndex = branches.indexOf(branch || '');
+  if (stemIndex < 0 || branchIndex < 0) return '';
+  const dayIndex = Array.from({ length: 60 }, (_, index) => index)
+    .find((index) => index % 10 === stemIndex && index % 12 === branchIndex);
+  if (dayIndex === undefined) return '';
+  return ['戌亥', '申酉', '午未', '辰巳', '寅卯', '子丑'][Math.floor(dayIndex / 10)] || '';
+}
+
+function withKongWang<T extends AlmanacOutput>(chart: T) {
+  const kongWang = kongWangFromGanZhi(chart.dayInfo?.stem, chart.dayInfo?.branch);
+  if (!kongWang) return chart;
   return {
-    taibuText: toAlmanacText(chart),
-    taibuJson: toAlmanacJson(chart),
+    ...chart,
+    kongWang,
+    almanac: {
+      ...(chart as any).almanac,
+      kongWang,
+    },
+  } as T & { kongWang: string; almanac: T['almanac'] & { kongWang: string } };
+}
+
+function adaptAlmanac(params: BaseParams, chart: AlmanacOutput) {
+  const enhancedChart = withKongWang(chart);
+  return {
+    taibuText: toAlmanacText(enhancedChart),
+    taibuJson: toAlmanacJson(enhancedChart),
     base_info: buildGenericBaseInfo(params, {
-      date: chart.date,
-      ganZhi: chart.dayInfo.ganZhi,
-      dayStem: chart.dayInfo.stem,
-      dayBranch: chart.dayInfo.branch,
-      tenGod: chart.tenGod || '',
+      date: enhancedChart.date,
+      ganZhi: enhancedChart.dayInfo.ganZhi,
+      dayStem: enhancedChart.dayInfo.stem,
+      dayBranch: enhancedChart.dayInfo.branch,
+      tenGod: enhancedChart.tenGod || '',
+      kongWang: (enhancedChart as any).kongWang || '',
     }),
     detail_info: {
-      almanac: chart,
+      almanac: enhancedChart,
     },
   };
 }
@@ -964,14 +1007,14 @@ async function buildDailyFortune(params: BaseParams) {
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
   const fortune = fortuneFromDate(bazi, new Date(target.year, target.month - 1, target.day));
-  const almanac = await calculateDailyAlmanac({
+  const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(target),
     dayMaster: bazi.fourPillars.day.stem,
     birthYear: params.year,
     birthMonth: params.month,
     birthDay: params.day,
     birthHour: params.hours,
-  });
+  }));
   const trend = buildTrend(bazi, new Date(target.year, target.month - 1, target.day));
   const text = [
     '【每日运势】',
@@ -1041,14 +1084,14 @@ async function buildMonthlyFortune(params: BaseParams) {
   );
   const summary = generateMonthlySummary(monthly.tenGod, monthly.levels.overall);
   const calendar = buildMonthCalendar(bazi, target.year, target.month);
-  const almanac = await calculateDailyAlmanac({
+  const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(midMonthParams),
     dayMaster: bazi.fourPillars.day.stem,
     birthYear: params.year,
     birthMonth: params.month,
     birthDay: params.day,
     birthHour: params.hours,
-  });
+  }));
   const text = [
     '【每月运势】',
     `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,

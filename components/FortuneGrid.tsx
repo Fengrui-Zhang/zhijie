@@ -365,7 +365,7 @@ const CaseSelector = ({
     <select
       value={selectedCaseId || caseOptions[0]?.id || ''}
       onChange={(event) => onCaseChange(event.target.value)}
-      className="rounded-2xl border border-white/70 bg-white/70 px-3 py-2 text-sm font-bold text-stone-700 outline-none transition hover:bg-white"
+      className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 outline-none transition hover:bg-amber-100"
       aria-label="选择命主"
     >
       {caseOptions.map((item) => (
@@ -379,6 +379,17 @@ const asList = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (typeof value === 'string' && value.trim()) return [value.trim()];
   return [];
+};
+
+const firstText = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (Array.isArray(value)) {
+      const text = value.map(String).filter(Boolean).join('');
+      if (text.trim()) return text.trim();
+    }
+  }
+  return '';
 };
 
 const escapeXml = (value: string) =>
@@ -704,7 +715,7 @@ const ScoreBars = ({ fortune }: { fortune: any }) => (
             <span className={`text-sm font-bold ${levelTone(level)}`}>{level}</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-            <div className={`h-full rounded-full ${levelBar(level)} transition-all duration-700`} style={{ width: `${Math.max(8, Math.min(100, value))}%` }} />
+            <div className={`h-full rounded-full ${levelBar(level)} transition-all duration-700 ease-out`} style={{ width: `${Math.max(8, Math.min(100, value))}%` }} />
           </div>
         </div>
       );
@@ -734,9 +745,6 @@ const InterpretationModeControl = ({
             active ? activeClass : 'text-stone-500 hover:bg-white hover:text-stone-800'
           }`}
         >
-          <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${active ? 'bg-white/20' : 'bg-white text-stone-400'}`}>
-            {MODE_CONFIG[item].icon}
-          </span>
           <span>{MODE_LABELS[item]}</span>
         </button>
       );
@@ -846,6 +854,9 @@ const FortuneTrendChart = ({
                 dot={{ r: 3, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 1.5 }}
                 activeDot={{ r: 6, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 3 }}
                 opacity={dimension === activeDimensions[0] ? 1 : 0.72}
+                isAnimationActive
+                animationDuration={700}
+                animationEasing="ease-out"
               />
             ))}
             {selectedPoint && (
@@ -960,7 +971,20 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
   const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
   const almanacPayload = fortune.almanac || {};
-  const almanac = almanacPayload.almanac || {};
+  const almanac = almanacPayload.almanac || almanacPayload || {};
+  const chartJson = (data.taibuJson || {}) as any;
+  const kongWangText = firstText(
+    almanac.kongWang,
+    almanac.kongwang,
+    almanac.kong,
+    almanacPayload.kongWang,
+    almanacPayload.kongwang,
+    chartJson.almanac?.kongWang,
+    chartJson.almanac?.kongwang,
+    chartJson.almanac?.almanac?.kongWang,
+    chartJson.almanac?.dateInfo?.kongWang,
+    chartJson.detail_info?.almanac?.kongWang
+  );
   const currentDate = parseDate(fortune.date || String(data.base_info?.date || ''));
   const yi = asList(almanac.suitable || almanac.yi);
   const ji = asList(almanac.avoid || almanac.ji);
@@ -989,7 +1013,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
               <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
               <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
               <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
-              <div className={`rounded-full bg-stone-50 px-3 py-1 font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
+              <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
             </div>
           </div>
 
@@ -1019,7 +1043,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3">
               {[
                 ['冲煞', almanac.chongSha],
-                ['空亡', almanacPayload.kongWang],
+                ['空亡', kongWangText],
                 ['胎神', almanac.taiShen],
                 ['天神', `${almanac.tianShen || '—'}${almanac.tianShenType ? `（${almanac.tianShenType}）` : ''}`],
                 ['二十八宿', `${almanac.lunarMansion || '—'}${almanac.lunarMansionLuck ? `（${almanac.lunarMansionLuck}）` : ''}`],
@@ -1212,6 +1236,9 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
                 dot={chartData.length <= 15 ? { r: 2.8, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 1.4 } : false}
                 activeDot={{ r: 6, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 3 }}
                 opacity={dimension === activeDimensions[0] ? 1 : 0.72}
+                isAnimationActive
+                animationDuration={700}
+                animationEasing="ease-out"
               />
             ))}
           </LineChart>
@@ -1274,7 +1301,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
                 <span className={levelTone(fortune.overall || '平')}>{fortune.overall || '平'}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-stone-100">
-                <div className={`h-full ${levelBar(fortune.overall || '平')}`} style={{ width: `${fortune._chart?.overall || 52}%` }} />
+                <div className={`h-full rounded-full ${levelBar(fortune.overall || '平')} transition-all duration-700 ease-out`} style={{ width: `${fortune._chart?.overall || 52}%` }} />
               </div>
             </div>
           </div>

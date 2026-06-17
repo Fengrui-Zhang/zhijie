@@ -1889,7 +1889,6 @@ const App: React.FC<AppProps> = ({
       setGuestFollowUpCount(nextFollowUpCount);
       localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
       setStep('chart');
-      requestSectionScroll('case-detail');
       return;
     }
 
@@ -1908,11 +1907,10 @@ const App: React.FC<AppProps> = ({
       setActiveSessionId(null);
       setSessionAnalysisModel(null);
       setStep('chart');
-      requestSectionScroll('case-detail');
     } catch {
       // silently ignore
     }
-  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions, requestSectionScroll]);
+  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1279px)');
@@ -3555,6 +3553,16 @@ const App: React.FC<AppProps> = ({
 
   const handleRemoveStandaloneCaseReference = (caseId: string) => {
     setStandaloneSelectedCaseIds((current) => current.filter((id) => id !== caseId));
+  };
+
+  const handleNewStandaloneChat = () => {
+    setStandaloneChatMessages([]);
+    setStandaloneChatInput('');
+    setStandaloneChatError('');
+    setStandaloneSelectedCaseIds([]);
+    setStandaloneCaseSelectValue('');
+    setStandaloneSessionId(null);
+    setActiveSessionId(null);
   };
 
   const handleStandaloneChatSubmit = async (event?: React.FormEvent) => {
@@ -6969,7 +6977,7 @@ const App: React.FC<AppProps> = ({
           { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
           { id: 'records-bottom', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
           { id: 'chat-bottom', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
-          { id: 'more-bottom', label: '更多', symbol: '+', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
+          { id: 'more-bottom', label: '更多', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
         ].map((item) => (
           <button
             key={item.id}
@@ -6979,7 +6987,6 @@ const App: React.FC<AppProps> = ({
               item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
             }`}
           >
-            {'symbol' in item && item.symbol && <span className="block text-lg leading-none">{item.symbol}</span>}
             <span className="block">{item.label}</span>
           </button>
         ))}
@@ -7283,22 +7290,15 @@ const App: React.FC<AppProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleOpenRecordWorkspaceSession(item.id)}
+                              onClick={() => {
+                                if (window.confirm(`确认删除“${item.title}”？删除后无法恢复。`)) {
+                                  void handleDeleteSession(item.id);
+                                }
+                              }}
                               className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                                 selected
-                                  ? 'border-amber-200/40 text-amber-100 hover:bg-white/10'
-                                  : 'border-stone-200 text-stone-600 hover:border-stone-300 hover:bg-white/70'
-                              }`}
-                            >
-                              打开
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteSession(item.id)}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                                selected
-                                  ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
-                                  : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
+                                  ? 'border-stone-200/30 text-amber-100/80 hover:bg-white/10'
+                                  : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-white/70'
                               }`}
                             >
                               删除
@@ -7331,6 +7331,13 @@ const App: React.FC<AppProps> = ({
           <div className="mt-1 text-2xl font-bold text-stone-800">新聊天</div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleNewStandaloneChat}
+            className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-stone-600 transition hover:bg-white hover:text-stone-900"
+          >
+            新建聊天
+          </button>
           <div className="flex flex-wrap items-center gap-2 rounded-full border border-stone-200 bg-white/65 px-2 py-1">
             <span className="pl-1 text-xs font-semibold text-stone-500">引用命例</span>
             <select
@@ -8279,7 +8286,7 @@ const App: React.FC<AppProps> = ({
         />
       )}
 
-      {isLoggedIn && workspaceView === 'divination' && (
+      {isCompactLayout && (
         <div
           className={`xl:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${activeCompactPanel ? 'pointer-events-auto' : 'pointer-events-none'}`}
           aria-hidden={!activeCompactPanel}

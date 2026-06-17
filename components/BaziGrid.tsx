@@ -38,6 +38,22 @@ const elementLabel = (stem: string) => {
   return map[stem] || '';
 };
 
+const patternFromTenGod = (tenGod?: string) => {
+  const map: Record<string, string> = {
+    正官: '正官格',
+    七杀: '七杀格',
+    正财: '财格',
+    偏财: '财格',
+    正印: '印格',
+    偏印: '印格',
+    食神: '食神格',
+    伤官: '伤官格',
+    比肩: '比劫格',
+    劫财: '比劫格',
+  };
+  return tenGod ? map[tenGod] || '' : '';
+};
+
 const dayMasterDescriptions: Record<string, string> = {
   甲: '甲木如参天大树，重原则、有担当，适合在清晰秩序中稳步生长。命局得水木相助则志向舒展，火土金过重时需留意压力和消耗。',
   乙: '乙木如花草藤蔓，柔韧细腻，擅长协调与适应。得水木则灵感生发，金土过旺时容易顾虑增多，需要保持边界。',
@@ -418,6 +434,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
   const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.day === selectedDay) : null;
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
   const dayElement = elementLabel(dayMaster);
+  const patternText = base_info.zhengge || patternFromTenGod(bazi_info.tg_cg_god?.[1]) || '—';
   const highlightedTenGods = useMemo(() => collectTenGods(data), [data]);
   const savedWuxingAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'wuxing');
   const savedPersonalityAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'personality');
@@ -578,7 +595,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
           <section className="rounded-[28px] border border-white/60 bg-white/55 p-5 shadow-sm backdrop-blur-xl">
             <div className="mb-5 text-base font-bold text-stone-800">日主特征</div>
             <div className="flex flex-col gap-5 md:flex-row md:items-start">
-              <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-3xl font-bold text-white shadow-sm ${getWuxingColor(dayMaster)}`}>
+              <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-stone-100 bg-white/80 text-3xl font-bold shadow-sm md:h-20 md:w-20 md:text-5xl ${getWuxingColor(dayMaster)}`}>
                 {dayMaster || '—'}
               </div>
               <div className="min-w-0 flex-1">
@@ -592,7 +609,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, onAnalys
                   {[
                     ['空亡', bazi_info.kw || '—'],
                     ['起运', base_info.qiyun || '—'],
-                    ['格局', base_info.zhengge || '—'],
+                    ['格局', patternText],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-2xl border border-white/70 bg-white/50 px-4 py-3">
                       <div className="text-xs text-stone-400">{label}</div>
