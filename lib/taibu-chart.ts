@@ -1273,6 +1273,56 @@ function flowBaseWeightByPreference(
   );
 }
 
+type PreferencePolarity = 'favorable' | 'unfavorable' | 'neutral';
+
+function elementPreferenceValue(element: FiveElement | undefined, preference: BaziPreference) {
+  if (!element) return 0;
+  if (preference.favorableElements.includes(element)) return 1;
+  if (preference.unfavorableElements.includes(element)) return -1;
+  return 0;
+}
+
+function polarityFromValue(value: number): PreferencePolarity {
+  if (value > 0.15) return 'favorable';
+  if (value < -0.15) return 'unfavorable';
+  return 'neutral';
+}
+
+function stemPreferencePolarity(
+  userDayStem: HeavenlyStem,
+  stem: HeavenlyStem,
+  tenGod: string,
+  relation: string,
+  preference: BaziPreference
+): PreferencePolarity {
+  const elementValue = elementPreferenceValue(STEM_ELEMENTS_MAP[stem], preference);
+  if (elementValue !== 0) return polarityFromValue(elementValue);
+  if (preference.favorableTenGods.includes(tenGod) || preference.favorableRelations.includes(relation)) return 'favorable';
+  if (preference.unfavorableTenGods.includes(tenGod) || preference.unfavorableRelations.includes(relation)) return 'unfavorable';
+  return 'neutral';
+}
+
+function branchPreferencePolarity(branch: string, preference: BaziPreference): PreferencePolarity {
+  const weightedHiddenStems = getWeightedHiddenStems(branch);
+  if (weightedHiddenStems.length) {
+    return polarityFromValue(weightedHiddenStems.reduce((sum, item) => (
+      sum + elementPreferenceValue(STEM_ELEMENTS_MAP[item.stem], preference) * item.weight
+    ), 0));
+  }
+  return polarityFromValue(elementPreferenceValue(BRANCH_ELEMENTS[branch], preference));
+}
+
+function formatPreferencePolarity(flowKind: FortuneFlowKind, polarity: PreferencePolarity) {
+  if (flowKind === 'monthly') {
+    if (polarity === 'favorable') return '地支藏干偏喜';
+    if (polarity === 'unfavorable') return '地支藏干偏忌';
+    return '地支藏干取中和';
+  }
+  if (polarity === 'favorable') return '天干属喜';
+  if (polarity === 'unfavorable') return '天干属忌';
+  return '天干取中和';
+}
+
 function adjustHiddenTenGodsByPreference(userDayStem: HeavenlyStem, branch: string, preference: BaziPreference) {
   const weightedHiddenStems = getWeightedHiddenStems(branch);
   const result: Partial<FortuneScores> = {};
@@ -1375,8 +1425,9 @@ function calcFortuneByStemBranchWithPreference(
   const overall = clampWeight((career + love + wealth + health + social) / 5);
   const scores = { overall, career, love, wealth, health, social };
   const relationLabel = RELATION_LABELS[relation] || relation;
-  const isFavorable = preference.favorableTenGods.includes(tenGod) || preference.favorableRelations.includes(relation);
-  const isUnfavorable = preference.unfavorableTenGods.includes(tenGod) || preference.unfavorableRelations.includes(relation);
+  const mainPolarity = flowKind === 'monthly'
+    ? branchPreferencePolarity(flowBranch, preference)
+    : stemPreferencePolarity(userDayStem, flowStem, tenGod, relation, preference);
   const branchDetail = getWeightedHiddenStems(flowBranch)
     .map(({ stem, weight }) => `${stem}${STEM_ELEMENTS_MAP[stem]}${Math.round(weight * 100)}%`)
     .join('、');
@@ -1390,7 +1441,7 @@ function calcFortuneByStemBranchWithPreference(
     strengthScore: preference.strengthScore,
     favorableElements: preference.favorableElements,
     unfavorableElements: preference.unfavorableElements,
-    reason: `${preferenceSummary}。本次${flowStem}${flowBranch}以${flowKind === 'monthly' ? '地支' : '天干'}为主，天干${flowStem}为${tenGod}（${relationLabel}），地支${flowBranch}${branchDetail ? `藏${branchDetail}` : ''}，${isFavorable ? '主气属喜' : isUnfavorable ? '主气属忌' : '主气取中和'}。`,
+    reason: `${preferenceSummary}。本次${flowStem}${flowBranch}以${flowKind === 'monthly' ? '地支' : '天干'}为主，天干${flowStem}为${tenGod}（${relationLabel}），地支${flowBranch}${branchDetail ? `藏${branchDetail}` : ''}，${formatPreferencePolarity(flowKind, mainPolarity)}。`,
   };
   return {
     tenGod,
