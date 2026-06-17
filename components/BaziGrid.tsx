@@ -205,6 +205,20 @@ const formatFlowDayLabel = (date?: string, fallbackDay?: number | string) => {
   return fallbackDay ? `${fallbackDay}日` : '—';
 };
 
+const formatSolarDateShort = (date?: string) => {
+  const match = typeof date === 'string' ? date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/) : null;
+  if (!match) return '';
+  return `${Number(match[2])}.${Number(match[3])}`;
+};
+
+const formatFlowMonthRange = (item?: any) => {
+  const start = formatSolarDateShort(item?.startDate);
+  const end = formatSolarDateShort(item?.endDate);
+  if (start && end) return `${start}-${end}`;
+  if (start) return start;
+  return item?.month ? `${item.month}月` : '—';
+};
+
 const addTenGodLocation = (
   store: TenGodLocationMap,
   god: string,
@@ -576,7 +590,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
         kind: 'flow' as const,
         key: 'liuyue',
         title: '流月',
-        subtitle: `${selectedMonthItem.month}月 · ${selectedMonthItem.jieQi || ''}`,
+        subtitle: `${formatFlowMonthRange(selectedMonthItem)} · ${selectedMonthItem.jieQi || ''}`,
         ganZhi: selectedMonthItem.ganZhi,
         values: {
           主星: selectedMonthItem.tenGod || '—',
@@ -805,11 +819,11 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
 
         {selectedYear && liuyueList.length > 0 && (
           <section>
-            <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年流月</div>
+            <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年流月（阳历节气区间）</div>
             <div className="flex flex-wrap gap-2 pb-1">
               {liuyueList.map((item: any) => (
                 <ChipButton key={item.month} active={selectedMonth === item.month} onClick={() => selectMonth(item.month)}>
-                  <div className="text-xs">{item.month}月</div>
+                  <div className="text-xs">{formatFlowMonthRange(item)}</div>
                   <div className="text-sm font-bold">{item.ganZhi}</div>
                 </ChipButton>
               ))}
@@ -820,7 +834,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
         {selectedMonth && liuriList.length > 0 && (
           <section>
             <div className="mb-2 text-sm font-bold text-stone-800">
-              流日（{selectedMonthItem?.startDate || `${selectedYear}年${selectedMonth}月`} — {selectedMonthItem?.endDate || ''}）
+              流日（阳历 {formatFlowMonthRange(selectedMonthItem)}）
             </div>
             <div className="flex flex-wrap gap-2 pb-1">
               {liuriList.map((item: any) => (
