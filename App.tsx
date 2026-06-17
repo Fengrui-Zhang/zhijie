@@ -1702,6 +1702,7 @@ const App: React.FC<AppProps> = ({
   const [klineSelected, setKlineSelected] = useState<KlineSelection>(null);
   const [klineProgress, setKlineProgress] = useState(0);
   const [klineYearProgress, setKlineYearProgress] = useState(0);
+  const [baziResultTab, setBaziResultTab] = useState<'basic' | 'professional' | 'ai' | 'notes'>('basic');
 
   const registrationEnabled = siteSettings.registrationEnabled;
   const guestModeEnabled = siteSettings.guestModeEnabled;
@@ -2157,6 +2158,12 @@ const App: React.FC<AppProps> = ({
     setKlineYearProgress(0);
     klineYearProgressRef.current = 0;
   }, [klineStatus]);
+
+  useEffect(() => {
+    if (baziResultTab !== 'ai' && klineModalOpen) {
+      setKlineModalOpen(false);
+    }
+  }, [baziResultTab, klineModalOpen]);
 
   useEffect(() => {
     if (!showInitialAnalysisModal) return;
@@ -7687,15 +7694,15 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderSettingsWorkspace = () => (
-    <div className="glass-panel overflow-hidden rounded-[32px]">
-      <div className="border-b border-stone-100 px-6 py-5 md:px-8">
+    <div className="glass-panel max-w-full overflow-visible rounded-[24px] md:rounded-[32px]">
+      <div className="border-b border-stone-100 px-4 py-4 md:px-8 md:py-5">
         <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
         <div className="mt-1 text-2xl font-bold text-stone-800">设置</div>
       </div>
 
-      <div className="grid min-h-[520px] lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="border-b border-stone-100 bg-white/35 p-3 lg:border-b-0 lg:border-r">
-          <div className="flex gap-2 overflow-x-auto lg:block lg:space-y-1">
+      <div className="grid min-h-[520px] min-w-0 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-w-0 border-b border-stone-100 bg-white/35 p-2 md:p-3 lg:border-b-0 lg:border-r">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:block lg:space-y-1">
             {SETTINGS_WORKSPACE_TABS.map((tab) => {
               const selected = settingsWorkspaceTab === tab.id;
               return (
@@ -7703,7 +7710,7 @@ const App: React.FC<AppProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => handleSettingsWorkspaceTabChange(tab.id)}
-                  className={`flex min-w-[142px] items-center gap-3 rounded-2xl px-3 py-3 text-left transition lg:w-full ${
+                  className={`flex min-w-0 items-center gap-2 rounded-2xl px-2.5 py-2.5 text-left transition md:gap-3 md:px-3 md:py-3 lg:w-full ${
                     selected
                       ? 'bg-stone-200/70 text-stone-900 shadow-sm'
                       : 'text-stone-500 hover:bg-white/70 hover:text-stone-800'
@@ -7726,7 +7733,7 @@ const App: React.FC<AppProps> = ({
           </div>
         </aside>
 
-        <section className="min-w-0 p-5 md:p-7">
+        <section className="min-w-0 overflow-x-hidden p-3 md:p-7">
           {settingsWorkspaceTab === 'profile' && (
             <div className="space-y-5">
               <div>
@@ -7782,7 +7789,7 @@ const App: React.FC<AppProps> = ({
 
           {settingsWorkspaceTab === 'personalization' && (
             <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid min-w-0 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="block text-sm font-bold text-stone-600">身份</span>
                   <input
@@ -7794,7 +7801,7 @@ const App: React.FC<AppProps> = ({
                       identity: event.target.value.slice(0, 120),
                     }))}
                     placeholder="例如：创业者"
-                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm outline-none"
+                    className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm outline-none"
                   />
                 </label>
                 <label className="block">
@@ -7805,7 +7812,7 @@ const App: React.FC<AppProps> = ({
                       ...current,
                       expressionStyle: event.target.value as ExpressionStyle,
                     }))}
-                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                    className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
                   >
                     {EXPRESSION_STYLE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
@@ -7816,7 +7823,7 @@ const App: React.FC<AppProps> = ({
 
               <div>
                 <div className="text-sm font-bold text-stone-600">命盘注入详细级别</div>
-                <div className="mt-2 grid overflow-hidden rounded-2xl border border-stone-200 bg-white/70 p-1 md:grid-cols-3">
+                <div className="mt-2 grid grid-cols-3 overflow-hidden rounded-2xl border border-stone-200 bg-white/70 p-1">
                   {CHART_DETAIL_OPTIONS.map((option) => {
                     const selected = personalizationDraft.chartPromptDetailLevel === option.value;
                     return (
@@ -7827,8 +7834,8 @@ const App: React.FC<AppProps> = ({
                           ...current,
                           chartPromptDetailLevel: option.value,
                         }))}
-                        className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-                          selected ? 'bg-sky-500 text-white shadow-sm' : 'text-stone-500 hover:bg-white'
+                        className={`w-full rounded-xl px-2 py-2 text-xs font-bold transition md:px-4 md:py-2.5 md:text-sm ${
+                          selected ? 'bg-amber-600 text-amber-50 shadow-sm' : 'text-stone-500 hover:bg-white'
                         }`}
                       >
                         {option.label}
@@ -7854,7 +7861,7 @@ const App: React.FC<AppProps> = ({
                     customInstructions: event.target.value.slice(0, 4000),
                   }))}
                   placeholder="例如：先给结论，再给依据；避免空话和术语堆叠。"
-                  className="glass-input mt-2 min-h-36 w-full resize-y rounded-2xl px-4 py-3 text-sm leading-7 outline-none"
+                  className="glass-input mt-2 min-h-36 w-full min-w-0 resize-y rounded-2xl px-4 py-3 text-sm leading-7 outline-none"
                 />
               </label>
 
@@ -7867,7 +7874,7 @@ const App: React.FC<AppProps> = ({
                   <div className="mb-2 text-sm font-bold text-stone-600">
                     维度选择（至少 3 个，最多 12 个）
                   </div>
-                  <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 xl:grid-cols-4">
                     {FORTUNE_DIMENSIONS.map((dimension) => {
                       const selected = personalizationDraft.selectedDimensions.includes(dimension.key);
                       return (
@@ -7875,14 +7882,14 @@ const App: React.FC<AppProps> = ({
                           key={dimension.key}
                           type="button"
                           onClick={() => togglePersonalizationDimension(dimension.key)}
-                          className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                          className={`flex min-w-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-xs font-semibold transition md:gap-3 md:px-4 md:py-3 md:text-sm ${
                             selected
-                              ? 'border-sky-200 bg-sky-50 text-sky-700'
+                              ? 'border-amber-200 bg-amber-50 text-amber-700'
                               : 'border-stone-200 bg-white/65 text-stone-500 hover:bg-white'
                           }`}
                         >
-                          <span className="text-lg leading-none">{dimension.icon}</span>
-                          <span>{dimension.label}</span>
+                          <span className="shrink-0 text-base leading-none md:text-lg">{dimension.icon}</span>
+                          <span className="min-w-0 truncate">{dimension.label}</span>
                         </button>
                       );
                     })}
@@ -7890,7 +7897,7 @@ const App: React.FC<AppProps> = ({
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid min-w-0 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="block text-sm font-bold text-stone-600">默认展示大运期数</span>
                   <select
@@ -7899,7 +7906,7 @@ const App: React.FC<AppProps> = ({
                       ...current,
                       dayunPeriods: clampDayunPeriods(event.target.value),
                     }))}
-                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                    className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
                   >
                     {Array.from({ length: 8 }, (_, index) => index + 3).map((value) => (
                       <option key={value} value={value}>{value} 期</option>
@@ -7914,7 +7921,7 @@ const App: React.FC<AppProps> = ({
                       ...current,
                       chartStyle: event.target.value as VisualizationChartStyle,
                     }))}
-                    className="glass-input mt-2 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                    className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
                   >
                     {CHART_STYLE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
@@ -9452,6 +9459,7 @@ const App: React.FC<AppProps> = ({
                       caseId={activeCase?.modelType === ModelType.BAZI ? activeCase.id : null}
                       initialAnalysisData={activeCase?.modelType === ModelType.BAZI ? activeCase.initialAnalysisData : null}
                       personalizationPrompt={buildPersonalizationPrompt(personalizationSettings)}
+                      onTabChange={setBaziResultTab}
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
                     />
                   )}
@@ -10691,7 +10699,7 @@ const App: React.FC<AppProps> = ({
       )}
 
       {/* K线浮球 */}
-      {modelType === ModelType.BAZI && step === 'chart' && klinePos && !activeProfessionalFeature && (
+      {workspaceView === 'divination' && modelType === ModelType.BAZI && step === 'chart' && baziResultTab === 'ai' && klinePos && !activeProfessionalFeature && (
         <div className="fixed z-40 select-none" style={{ left: klinePos.x, top: klinePos.y }}>
           <button
             type="button"
@@ -10720,7 +10728,7 @@ const App: React.FC<AppProps> = ({
       )}
 
       {/* K线弹窗 */}
-      {klineModalOpen && (
+      {workspaceView === 'divination' && klineModalOpen && baziResultTab === 'ai' && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4 py-6">
           <div className="glass-panel relative isolate flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-white/65 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(250,250,249,0.72))] shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
             <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(248,250,252,0.64))]" />

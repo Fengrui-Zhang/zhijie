@@ -27,6 +27,7 @@ const supportedChartTypes = new Set([
   'life_fortune_trend',
   'wuxing_energy',
   'life_timeline',
+  'personality_petal',
   'divination_verdict',
 ]);
 
@@ -317,6 +318,43 @@ const LifeTimelineBlock = ({ chart }: { chart: ChartPayload }) => {
   );
 };
 
+const PersonalityPetalBlock = ({ chart }: { chart: ChartPayload }) => {
+  const traits = getScoreEntries(chart.data.traits || chart.data.items || chart.data.dimensions);
+  const topTraits = Array.isArray(chart.data.topTraits) ? chart.data.topTraits.map((item) => toText(item)).filter(Boolean) : [];
+  const summary = toText(chart.data.summary || chart.data.description);
+  if (!traits.length && !topTraits.length && !summary) return null;
+
+  return (
+    <ChartShell chart={chart}>
+      {summary && <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-stone-700">{summary}</div>}
+      {traits.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {traits.slice(0, 10).map((trait) => (
+            <div key={trait.key} className="rounded-2xl border border-stone-100 bg-white/72 px-3 py-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-semibold text-stone-800">{trait.label}</span>
+                <span className="font-bold text-amber-700">{trait.score}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-100">
+                <div className="h-full rounded-full bg-amber-500" style={{ width: `${trait.score}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {topTraits.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {topTraits.slice(0, 8).map((trait) => (
+            <span key={trait} className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              {trait}
+            </span>
+          ))}
+        </div>
+      )}
+    </ChartShell>
+  );
+};
+
 const VisualizationBlock = ({ chart }: { chart: ChartPayload }) => {
   if (chart.chartType === 'fortune_radar') return <FortuneRadarBlock chart={chart} />;
   if (chart.chartType === 'fortune_trend' || chart.chartType === 'life_fortune_trend') return <FortuneTrendBlock chart={chart} />;
@@ -324,6 +362,7 @@ const VisualizationBlock = ({ chart }: { chart: ChartPayload }) => {
   if (chart.chartType === 'wuxing_energy') return <WuxingEnergyBlock chart={chart} />;
   if (chart.chartType === 'divination_verdict') return <DivinationVerdictBlock chart={chart} />;
   if (chart.chartType === 'life_timeline') return <LifeTimelineBlock chart={chart} />;
+  if (chart.chartType === 'personality_petal') return <PersonalityPetalBlock chart={chart} />;
   return null;
 };
 

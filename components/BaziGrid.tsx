@@ -9,6 +9,7 @@ interface Props {
   caseId?: string | null;
   initialAnalysisData?: unknown;
   personalizationPrompt?: string;
+  onTabChange?: (tab: BaziTab) => void;
   onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }
 
@@ -22,6 +23,14 @@ const labelForPillar = ['年柱', '月柱', '日柱', '时柱'];
 const rowLabels = ['主星', '天干', '地支', '藏干', '纳音', '神煞'];
 type BaziTab = 'basic' | 'professional' | 'ai' | 'notes';
 type AnalysisType = 'wuxing' | 'personality';
+type TenGodSourceKey = 'tiangan' | 'dizhi' | 'canggan';
+type TenGodLocationMap = Record<string, Partial<Record<TenGodSourceKey, string[]>>>;
+
+const tenGodSourceLabels: Record<TenGodSourceKey, string> = {
+  tiangan: '天干',
+  dizhi: '地支',
+  canggan: '藏干',
+};
 
 const elementLabel = (stem: string) => {
   const map: Record<string, string> = {
@@ -187,13 +196,35 @@ const hiddenText = (stems?: string, gods?: string) => {
   return stemList.map((stem, index) => `${stem}${godList[index] ? `(${godList[index]})` : ''}`).join(' ');
 };
 
-const collectTenGods = (data: BaziResponse) => {
-  const values = [
-    ...(data.bazi_info.tg_cg_god || []),
-    ...(data.bazi_info.dz_cg_god || []).flatMap((item) => splitList(item)),
-    ...(data.dayun_info.big_god || []),
-  ];
-  return Array.from(new Set(values.filter((item) => tenGodKnowledge[item] && item !== '日主')));
+const addTenGodLocation = (
+  store: TenGodLocationMap,
+  god: string,
+  source: TenGodSourceKey,
+  location: string,
+) => {
+  if (!tenGodKnowledge[god] || god === '日主') return;
+  const entry = store[god] || {};
+  const list = entry[source] || [];
+  if (!list.includes(location)) list.push(location);
+  store[god] = { ...entry, [source]: list };
+};
+
+const collectTenGodLocations = (data: BaziResponse): TenGodLocationMap => {
+  const store: TenGodLocationMap = {};
+  (data.bazi_info.tg_cg_god || []).forEach((god, index) => {
+    addTenGodLocation(store, god, 'tiangan', labelForPillar[index] || `第${index + 1}柱`);
+  });
+  (data.bazi_info.dz_cg_god || []).forEach((gods, pillarIndex) => {
+    splitList(gods).forEach((god, godIndex) => {
+      addTenGodLocation(
+        store,
+        god,
+        godIndex === 0 ? 'dizhi' : 'canggan',
+        labelForPillar[pillarIndex] || `第${pillarIndex + 1}柱`,
+      );
+    });
+  });
+  return store;
 };
 
 const toRecord = (value: unknown): Record<string, unknown> | null => (
@@ -296,8 +327,8 @@ const AnalysisCard = ({
   );
 };
 
-const TenGodKnowledge = ({ highlighted }: { highlighted: string[] }) => {
-  const [expanded, setExpanded] = useState<string | null>(highlighted[0] || null);
+const TenGodKnowledge = ({ locations }: { locations: TenGodLocationMap }) => {
+  const [expanded, setExpanded] = useState<string | null>(null);
   return (
     <section className="rounded-[26px] border border-white/60 bg-white/55 p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -309,7 +340,11 @@ const TenGodKnowledge = ({ highlighted }: { highlighted: string[] }) => {
       <div className="divide-y divide-stone-100 overflow-hidden rounded-[22px] border border-white/70 bg-white/55">
         {Object.entries(tenGodKnowledge).map(([god, info]) => {
           const active = expanded === god;
-          const marked = highlighted.includes(god);
+          const sourceMap = locations[god] || {};
+          const sourceEntries = (Object.keys(tenGodSourceLabels) as TenGodSourceKey[])
+            .map((key) => ({ key, values: sourceMap[key] || [] }))
+            .filter((item) => item.values.length > 0);
+          const marked = sourceEntries.length > 0;
           return (
             <div key={god}>
               <button
@@ -317,14 +352,34 @@ const TenGodKnowledge = ({ highlighted }: { highlighted: string[] }) => {
                 onClick={() => setExpanded(active ? null : god)}
                 className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/70 ${marked ? 'bg-amber-50/70' : ''}`}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="font-bold text-stone-800">{god}</span>
-                  {marked && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">命盘中有</span>}
+                  {sourceEntries.map(({ key, values }) => (
+                    <span
+                      key={key}
+                      title={`${tenGodSourceLabels[key]}：${values.join('、')}`}
+                      className="rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
+                    >
+                      {tenGodSourceLabels[key]}
+                    </span>
+                  ))}
                 </div>
-                <div className="text-xs text-stone-500">{info.shortDesc} {active ? '收起' : '展开'}</div>
+                <div className="shrink-0 text-xs text-stone-500">
+                  <span>{info.shortDesc}</span>
+                  <span className="ml-2 font-bold text-amber-700">{active ? '收起' : '展开'}</span>
+                </div>
               </button>
               {active && (
                 <div className="space-y-3 px-4 pb-4 text-sm leading-7 text-stone-600">
+                  {marked && (
+                    <div className="flex flex-wrap gap-2">
+                      {sourceEntries.map(({ key, values }) => (
+                        <span key={key} className="rounded-full border border-stone-200 bg-white/75 px-2.5 py-1 text-xs text-stone-600">
+                          {tenGodSourceLabels[key]}：{values.join('、')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div><span className="font-bold text-stone-700">别名：</span>{info.alias}</div>
                   <div><span className="font-bold text-stone-700">五行关系：</span>{info.element}</div>
                   <div>{info.meaning}</div>
@@ -395,7 +450,7 @@ const ChipButton = ({
   </button>
 );
 
-const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, onAnalysisSaved }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, onTabChange, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
   const dayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -403,6 +458,10 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab, onTabChange]);
 
   const pillars = labelForPillar.map((label, index) => {
     const value = bazi_info.bazi[index] || '';
@@ -438,7 +497,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
   const dayElement = elementLabel(dayMaster);
   const patternText = base_info.zhengge || patternFromTenGod(bazi_info.tg_cg_god?.[1]) || '—';
-  const highlightedTenGods = useMemo(() => collectTenGods(data), [data]);
+  const tenGodLocations = useMemo(() => collectTenGodLocations(data), [data]);
   const savedWuxingAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'wuxing');
   const savedPersonalityAnalysis = getSavedBasicAnalysis(initialAnalysisData, 'personality');
   const notesKey = useMemo(() => {
@@ -625,7 +684,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             </div>
           </section>
 
-          <TenGodKnowledge highlighted={highlightedTenGods} />
+          <TenGodKnowledge locations={tenGodLocations} />
         </div>
       )}
 

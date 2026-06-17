@@ -5,6 +5,13 @@ import { DEFAULT_ANALYSIS_MODEL, resolveChatModel } from '../../../../lib/analys
 import { prisma } from '../../../../lib/prisma';
 
 type BaziAnalysisType = 'wuxing' | 'personality';
+type SupportedAnalysisChartType =
+  | 'life_fortune_trend'
+  | 'fortune_radar'
+  | 'wuxing_energy'
+  | 'life_timeline'
+  | 'fortune_calendar'
+  | 'personality_petal';
 
 const WUXING_PROMPT = `你是一位专业的命理分析师，擅长八字五行分析。请根据用户提供的八字信息，进行专业的五行分析。
 
@@ -47,12 +54,32 @@ const PERSONALITY_PROMPT = `你是一位专业的命理分析师，擅长通过�
 - 语言温暖亲切，富有洞察力
 - 总字数控制在500-800字`;
 
-const VISUAL_RESPONSE_INSTRUCTION = [
-  '当分析适合用图示总结时，可在自然语言结论之后附加一个 fenced code block，语言标记使用 chart-json。',
-  'chart-json 必须是严格 JSON，支持 chartType：wuxing_energy、fortune_radar、life_timeline、fortune_trend。',
-  '五行分析优先使用 wuxing_energy；人格分析可使用 fortune_radar 或 life_timeline。',
-  '不要为了图表牺牲正文判断；没有明确评分、趋势或阶段信息时不要输出图表块。',
-].join('\n');
+const CHART_PROMPT_HINTS: Record<SupportedAnalysisChartType, string> = {
+  life_fortune_trend: '适合展示大运/流年趋势，data 需包含 currentAge、currentYear、periods、lifeHighlight。',
+  fortune_radar: '适合展示当前多维评分，data 需包含 period、scores、overallScore、overallLabel、topAdvice。',
+  wuxing_energy: '适合展示五行能量分布，data 需包含 elements、favorableElement、unfavorableElement、advice、interactions。',
+  life_timeline: '适合展示人生关键节点，data 需包含 currentAge、milestones。',
+  personality_petal: '适合展示人格特质花瓣图，data 需包含 traits、topTraits、summary。',
+  fortune_calendar: '适合展示月度/年度运势日历热力图，data 需包含 year、month、days（每日 overallScore + level）、monthSummary。',
+};
+
+const getAllowedChartTypes = (type: BaziAnalysisType): SupportedAnalysisChartType[] => (
+  type === 'wuxing'
+    ? ['life_fortune_trend', 'fortune_radar', 'wuxing_energy', 'life_timeline', 'fortune_calendar']
+    : ['personality_petal', 'life_timeline', 'fortune_radar', 'fortune_calendar']
+);
+
+const buildVisualizationOutputContractPrompt = (allowedChartTypes: SupportedAnalysisChartType[]) => {
+  const lines = [
+    '【重要】请在分析中输出至少一个 ```chart-json 代码块。',
+    '代码块内部必须是合法 JSON，包含 chartType、title、data 字段。',
+    '请使用以下图表类型：',
+    ...allowedChartTypes.map((chartType) => `- ${chartType}: ${CHART_PROMPT_HINTS[chartType]}`),
+    '不要输出注释、省略号或无法解析的占位字段。',
+    '优先给出最有价值的 1-2 个图表。',
+  ];
+  return lines.join('\n');
+};
 
 const extractErrorMessage = (input: unknown): string => {
   if (!input) return '';
@@ -142,8 +169,8 @@ export async function POST(request: Request) {
     : '';
   const systemPrompt = [
     body.type === 'wuxing' ? WUXING_PROMPT : PERSONALITY_PROMPT,
-    VISUAL_RESPONSE_INSTRUCTION,
     personalizationPrompt,
+    buildVisualizationOutputContractPrompt(getAllowedChartTypes(body.type)),
   ].join('\n\n');
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
