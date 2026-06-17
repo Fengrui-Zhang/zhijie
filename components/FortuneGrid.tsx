@@ -1252,11 +1252,120 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
   );
 };
 
+const YearlyMonthlyTrend = ({ trend, selectedMonth }: { trend: any[]; selectedMonth?: number }) => {
+  const [activeDimensions, setActiveDimensions] = useState<DimensionKey[]>(['overall', 'career']);
+  const { chartData, range } = useMemo(() => {
+    if (!trend?.length) return { chartData: [], range: { min: 25, max: 100 } };
+    const values = activeDimensions.flatMap((dimension) =>
+      trend.map((item: any) => item.scores?.[dimension] ?? item.scores?.overall ?? levelValue(item.level))
+    );
+    const nextRange = getAdaptiveChartRange(values);
+    const nextData = trend.map((item: any) => ({
+      date: item.label || `${item.month}月`,
+      tick: `${item.month}`,
+      fullDate: item.fullDate || `${item.month}月`,
+      month: Number(item.month || 0),
+      overall: item.scores?.overall ?? levelValue(item.level),
+      career: item.scores?.career ?? item.scores?.overall ?? levelValue(item.level),
+      love: item.scores?.love ?? item.scores?.overall ?? levelValue(item.level),
+      wealth: item.scores?.wealth ?? item.scores?.overall ?? levelValue(item.level),
+      health: item.scores?.health ?? item.scores?.overall ?? levelValue(item.level),
+      social: item.scores?.social ?? item.scores?.overall ?? levelValue(item.level),
+    }));
+    return { chartData: nextData, range: nextRange };
+  }, [trend, activeDimensions]);
+
+  if (!chartData.length) return null;
+  const trendDirection = Number(chartData[chartData.length - 1]?.overall || 52) - Number(chartData[0]?.overall || 52);
+  const selectedPoint = selectedMonth ? chartData.find((item) => item.month === selectedMonth) : null;
+  const selectedKey = activeDimensions[0] || 'overall';
+  const toggleDimension = (dimension: DimensionKey) => {
+    setActiveDimensions((current) => {
+      if (current.includes(dimension)) {
+        return current.length === 1 ? current : current.filter((item) => item !== dimension);
+      }
+      return [...current, dimension];
+    });
+  };
+
+  return (
+    <div className="mt-5 rounded-2xl border border-stone-100 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-bold text-stone-800 md:text-base">全年运势趋势</div>
+          <div className={`text-xs font-bold ${trendDirection > 5 ? 'text-emerald-600' : trendDirection < -5 ? 'text-red-500' : 'text-stone-500'}`}>
+            {trendDirection > 5 ? '上升' : trendDirection < -5 ? '下降' : '平稳'}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {SCORE_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => toggleDimension(item.key)}
+              className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                activeDimensions.includes(item.key)
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                  : 'bg-stone-50 text-stone-500 hover:bg-white'
+              }`}
+            >
+              {dimensionShortLabel(item.label)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="h-[clamp(180px,22vw,260px)] w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData} margin={{ top: 10, right: 8, left: -24, bottom: 2 }}>
+            <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
+            <XAxis
+              dataKey="tick"
+              tick={{ fontSize: 11, fill: '#78716c' }}
+              tickLine={false}
+              axisLine={false}
+              dy={8}
+              tickFormatter={(value) => `${value}月`}
+            />
+            <YAxis domain={[range.min, range.max]} tick={{ fontSize: 10, fill: '#78716c' }} tickLine={false} axisLine={false} tickCount={4} />
+            <Tooltip content={<TrendTooltip />} />
+            {activeDimensions.map((dimension) => (
+              <Line
+                key={dimension}
+                type="monotone"
+                dataKey={dimension}
+                stroke={DIMENSION_COLOR[dimension]}
+                strokeWidth={dimension === activeDimensions[0] ? 3 : 2.4}
+                dot={{ r: 2.5, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 1.2 }}
+                activeDot={{ r: 5.5, fill: DIMENSION_COLOR[dimension], stroke: '#fff', strokeWidth: 2.5 }}
+                opacity={dimension === activeDimensions[0] ? 1 : 0.72}
+                isAnimationActive
+                animationDuration={700}
+                animationEasing="ease-out"
+              />
+            ))}
+            {selectedPoint && (
+              <ReferenceDot
+                x={selectedPoint.tick}
+                y={Number((selectedPoint as any)[selectedKey] || selectedPoint.overall || 52)}
+                r={6}
+                fill={DIMENSION_COLOR[selectedKey]}
+                stroke="#fff"
+                strokeWidth={3}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
 const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
   const calendar = Array.isArray(fortune.calendar) ? fortune.calendar : [];
+  const yearTrend = Array.isArray(fortune.yearTrend) ? fortune.yearTrend : [];
   const year = Number(fortune.year || new Date().getFullYear());
   const month = Number(fortune.month || new Date().getMonth() + 1);
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -1308,6 +1417,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
                 <div className={`h-full rounded-full ${levelBar(fortune.overall || '平')} transition-all duration-700 ease-out`} style={{ width: `${fortune._chart?.overall || 52}%` }} />
               </div>
             </div>
+            <YearlyMonthlyTrend trend={yearTrend} selectedMonth={month} />
           </div>
           <div>
             <div className="mb-2 text-base font-bold text-stone-800 md:mb-3 md:text-lg">运势批语</div>

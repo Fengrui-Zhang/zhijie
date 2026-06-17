@@ -1051,6 +1051,32 @@ function buildMonthCalendar(bazi: BaziOutput, year: number, month: number) {
   });
 }
 
+function buildYearMonthlyTrend(bazi: BaziOutput, year: number) {
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const solar = Solar.fromYmd(year, month, 15);
+    const eightChar = solar.getLunar().getEightChar();
+    const monthStem = eightChar.getMonthGan() as HeavenlyStem;
+    const monthBranch = eightChar.getMonthZhi();
+    const result = calcFortuneByStemBranch(
+      bazi.dayMaster as HeavenlyStem,
+      bazi.fourPillars.day.branch,
+      monthStem,
+      monthBranch
+    );
+    return {
+      month,
+      label: `${month}月`,
+      fullDate: `${year}-${pad2(month)}`,
+      ganZhi: `${monthStem}${monthBranch}`,
+      tenGod: result.tenGod,
+      scores: result.scores,
+      level: result.levels.overall,
+      ...result.levels,
+    };
+  });
+}
+
 async function buildDailyFortune(params: BaseParams) {
   const target = {
     ...params,
@@ -1138,6 +1164,7 @@ async function buildMonthlyFortune(params: BaseParams) {
   );
   const summary = generateMonthlySummary(monthly.tenGod, monthly.levels.overall);
   const calendar = buildMonthCalendar(bazi, target.year, target.month);
+  const yearTrend = buildYearMonthlyTrend(bazi, target.year);
   const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(midMonthParams),
     dayMaster: bazi.fourPillars.day.stem,
@@ -1166,7 +1193,7 @@ async function buildMonthlyFortune(params: BaseParams) {
 
   return {
     taibuText: text,
-    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), monthly, summary, calendar },
+    taibuJson: { bazi: toBaziJson(bazi), almanac: toAlmanacJson(almanac), monthly, summary, calendar, yearTrend },
     base_info: buildGenericBaseInfo(params, {
       month: `${target.year}-${pad2(target.month)}`,
       dayMaster: `${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
@@ -1183,6 +1210,7 @@ async function buildMonthlyFortune(params: BaseParams) {
         _chart: monthly.scores,
         summary,
         calendar,
+        yearTrend,
         almanac,
       },
     },
