@@ -1380,12 +1380,17 @@ function calcFortuneByStemBranchWithPreference(
   const branchDetail = getWeightedHiddenStems(flowBranch)
     .map(({ stem, weight }) => `${stem}${STEM_ELEMENTS_MAP[stem]}${Math.round(weight * 100)}%`)
     .join('、');
+  const preferenceSummary = [
+    `命局强弱：${strengthLabel(preference.strengthLevel)}（${preference.strengthScore}）`,
+    `喜用：${preference.favorableElements.join('、') || '未明确'}`,
+    `忌神：${preference.unfavorableElements.join('、') || '未明确'}`,
+  ].join('；');
   const preferenceMeta: FortunePreferenceMeta = {
     strengthLevel: strengthLabel(preference.strengthLevel),
     strengthScore: preference.strengthScore,
     favorableElements: preference.favorableElements,
     unfavorableElements: preference.unfavorableElements,
-    reason: `${preference.explanation} 本次${flowStem}${flowBranch}以${flowKind === 'monthly' ? '地支' : '天干'}为主，天干${flowStem}为${tenGod}（${relationLabel}），地支${flowBranch}${branchDetail ? `藏${branchDetail}` : ''}，${isFavorable ? '主气属喜' : isUnfavorable ? '主气属忌' : '主气取中和'}。`,
+    reason: `${preferenceSummary}。本次${flowStem}${flowBranch}以${flowKind === 'monthly' ? '地支' : '天干'}为主，天干${flowStem}为${tenGod}（${relationLabel}），地支${flowBranch}${branchDetail ? `藏${branchDetail}` : ''}，${isFavorable ? '主气属喜' : isUnfavorable ? '主气属忌' : '主气取中和'}。`,
   };
   return {
     tenGod,
