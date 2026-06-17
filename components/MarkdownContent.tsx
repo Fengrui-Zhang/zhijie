@@ -12,6 +12,17 @@ type ChartPayload = {
   data: UnknownRecord;
 };
 
+type ScoreEntry = {
+  key: string;
+  label: string;
+  score: number;
+};
+
+type FallbackScoreLabel = {
+  key: string;
+  label: string;
+};
+
 const chartLanguages = new Set([
   'chart',
   'chart-json',
@@ -53,6 +64,38 @@ const toText = (value: unknown, fallback = '') => {
 
 const clampScore = (value: unknown) => Math.max(0, Math.min(100, toNumber(value, 0)));
 
+const FORTUNE_SCORE_LABELS: FallbackScoreLabel[] = [
+  { key: 'career', label: '事业/学业' },
+  { key: 'wealth', label: '财富' },
+  { key: 'love', label: '感情/婚姻' },
+  { key: 'health', label: '健康' },
+  { key: 'family', label: '家庭/长辈' },
+  { key: 'social', label: '人际/贵人' },
+  { key: 'windfall', label: '偏财/投资' },
+  { key: 'travel', label: '出行/迁移' },
+  { key: 'creativity', label: '创意/灵感' },
+  { key: 'children', label: '子女' },
+  { key: 'legal', label: '官非/法律' },
+  { key: 'spiritual', label: '精神/心灵' },
+];
+
+const PERSONALITY_SCORE_LABELS: FallbackScoreLabel[] = [
+  { key: 'expression', label: '外向表达' },
+  { key: 'intuition', label: '直觉洞察' },
+  { key: 'logic', label: '理性决策' },
+  { key: 'structure', label: '结构规划' },
+  { key: 'stability', label: '情绪稳定' },
+  { key: 'action', label: '行动力' },
+  { key: 'empathy', label: '共情力' },
+  { key: 'adaptability', label: '适应力' },
+];
+
+const isGenericScoreLabel = (value: string) => /^(项目|维度|指标)\s*\d+$/u.test(value.trim());
+
+const getFallbackScoreLabel = (fallbackLabels: FallbackScoreLabel[] | undefined, index: number) => (
+  fallbackLabels?.[index] || { key: `item-${index}`, label: `项目 ${index + 1}` }
+);
+
 const parseChartPayload = (raw: string, language?: string): ChartPayload | null => {
   const normalizedLanguage = (language || '').toLowerCase();
   if (normalizedLanguage && !chartLanguages.has(normalizedLanguage)) return null;
@@ -84,29 +127,37 @@ const scoreColor = (score: number) => {
   return 'bg-rose-500';
 };
 
-const getScoreEntries = (value: unknown) => {
+const getScoreEntries = (value: unknown, fallbackLabels?: FallbackScoreLabel[]): ScoreEntry[] => {
   if (Array.isArray(value)) {
     return value
       .map((item, index) => {
+        const fallback = getFallbackScoreLabel(fallbackLabels, index);
         const record = toRecord(item);
-        if (!record) return null;
+        if (!record) {
+          const score = typeof item === 'number' || typeof item === 'string' ? clampScore(item) : null;
+          return score == null || !fallbackLabels ? null : { key: fallback.key, label: fallback.label, score };
+        }
+        const rawLabel = toText(record.label || record.name || record.key);
         return {
-          key: toText(record.key || record.name || record.label, `item-${index}`),
-          label: toText(record.label || record.name || record.key, `项目 ${index + 1}`),
+          key: toText(record.key || record.name || record.label, fallback.key),
+          label: rawLabel && !isGenericScoreLabel(rawLabel) ? rawLabel : fallback.label,
           score: clampScore(record.score || record.value),
         };
       })
-      .filter((item): item is { key: string; label: string; score: number } => Boolean(item));
+      .filter((item): item is ScoreEntry => Boolean(item));
   }
 
   const record = toRecord(value);
   if (!record) return [];
 
-  return Object.entries(record).map(([key, raw]) => {
+  return Object.entries(record).map(([key, raw], index) => {
+    const fallback = getFallbackScoreLabel(fallbackLabels, index);
     const item = toRecord(raw);
+    const rawLabel = item ? toText(item.label || item.name || key, key) : key;
+    const normalizedLabel = rawLabel && !isGenericScoreLabel(rawLabel) ? rawLabel : fallback.label;
     return {
-      key,
-      label: item ? toText(item.label || item.name || key, key) : key,
+      key: key && !isGenericScoreLabel(key) ? key : fallback.key,
+      label: normalizedLabel,
       score: item ? clampScore(item.score || item.value) : clampScore(raw),
     };
   });
@@ -130,7 +181,7 @@ const ChartShell = ({
   </div>
 );
 
-const ScoreBars = ({ entries }: { entries: { key: string; label: string; score: number }[] }) => (
+const ScoreBars = ({ entries }: { entries: ScoreEntry[] }) => (
   <div className="grid gap-3 sm:grid-cols-2">
     {entries.map((entry) => (
       <div key={entry.key} className="rounded-2xl border border-stone-100 bg-stone-50/70 px-3 py-2.5">
@@ -147,7 +198,7 @@ const ScoreBars = ({ entries }: { entries: { key: string; label: string; score: 
 );
 
 const FortuneRadarBlock = ({ chart }: { chart: ChartPayload }) => {
-  const scores = getScoreEntries(chart.data.scores || chart.data.dimensions || chart.data.items);
+  const scores = getScoreEntries(chart.data.scores || chart.data.dimensions || chart.data.items, FORTUNE_SCORE_LABELS);
   const overallScore = clampScore(chart.data.overallScore || chart.data.score);
 
   if (!scores.length && !overallScore) return null;
@@ -319,7 +370,7 @@ const LifeTimelineBlock = ({ chart }: { chart: ChartPayload }) => {
 };
 
 const PersonalityPetalBlock = ({ chart }: { chart: ChartPayload }) => {
-  const traits = getScoreEntries(chart.data.traits || chart.data.items || chart.data.dimensions);
+  const traits = getScoreEntries(chart.data.traits || chart.data.items || chart.data.dimensions, PERSONALITY_SCORE_LABELS);
   const topTraits = Array.isArray(chart.data.topTraits) ? chart.data.topTraits.map((item) => toText(item)).filter(Boolean) : [];
   const summary = toText(chart.data.summary || chart.data.description);
   if (!traits.length && !topTraits.length && !summary) return null;
