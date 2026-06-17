@@ -5888,6 +5888,7 @@ const App: React.FC<AppProps> = ({
         targetYear: isFortuneReading ? date.getFullYear() : undefined,
         targetMonth: isFortuneReading ? date.getMonth() + 1 : undefined,
         targetDay: isFortuneReading ? date.getDate() : undefined,
+        fortuneAlgorithmMode: isFortuneReading ? siteSettings.fortuneAlgorithmMode : undefined,
         pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
         taiyi_mode: modelType === ModelType.TAIYI ? 'hour' : undefined,
         question,

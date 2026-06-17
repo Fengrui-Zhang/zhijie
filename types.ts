@@ -75,6 +75,7 @@ export interface BaseParams {
   targetYear?: number;
   targetMonth?: number;
   targetDay?: number;
+  fortuneAlgorithmMode?: 'default' | 'preference';
 }
 
 export interface GenericTaibuResponse {

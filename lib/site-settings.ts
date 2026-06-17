@@ -18,6 +18,7 @@ type SiteSettingsRecord = {
   registrationEnabled: boolean;
   registrationClosedContact: string;
   guestModeEnabled: boolean;
+  fortuneAlgorithmMode: string;
   updatedAt: Date;
 };
 
@@ -31,6 +32,7 @@ const toCreateData = () => ({
   registrationEnabled: DEFAULT_SITE_SETTINGS.registrationEnabled,
   registrationClosedContact: DEFAULT_SITE_SETTINGS.registrationClosedContact,
   guestModeEnabled: DEFAULT_SITE_SETTINGS.guestModeEnabled,
+  fortuneAlgorithmMode: DEFAULT_SITE_SETTINGS.fortuneAlgorithmMode,
 });
 
 export const serializePublicSiteSettings = (
@@ -49,6 +51,7 @@ export const serializePublicSiteSettings = (
     registrationEnabled: settings.registrationEnabled,
     registrationClosedContact: settings.registrationClosedContact,
     guestModeEnabled: settings.guestModeEnabled,
+    fortuneAlgorithmMode: settings.fortuneAlgorithmMode,
   });
 };
 
@@ -78,6 +81,7 @@ export async function updateSiteSettings(input: PublicSiteSettings) {
       registrationEnabled: next.registrationEnabled,
       registrationClosedContact: next.registrationClosedContact,
       guestModeEnabled: next.guestModeEnabled,
+      fortuneAlgorithmMode: next.fortuneAlgorithmMode,
     },
     create: {
       id: SITE_SETTINGS_ID,
@@ -89,6 +93,7 @@ export async function updateSiteSettings(input: PublicSiteSettings) {
       registrationEnabled: next.registrationEnabled,
       registrationClosedContact: next.registrationClosedContact,
       guestModeEnabled: next.guestModeEnabled,
+      fortuneAlgorithmMode: next.fortuneAlgorithmMode,
     },
   });
 

@@ -547,6 +547,37 @@ export default function AdminPanel({ onBack }: Props) {
                         </button>
                       </div>
                     </div>
+
+                    <div className="rounded-[20px] border border-white/60 bg-white/45 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-stone-700">日运/月运算法</div>
+                          <p className="mt-1 text-xs text-stone-500">喜忌逻辑会先判断八字强弱与喜忌，再计算日运、月运和趋势评分。</p>
+                        </div>
+                        <div className="inline-flex rounded-full border border-stone-200 bg-white/60 p-1">
+                          {[
+                            ['default', '默认逻辑'],
+                            ['preference', '喜忌逻辑'],
+                          ].map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setSiteSettings((current) => ({
+                                ...current,
+                                fortuneAlgorithmMode: value as PublicSiteSettings['fortuneAlgorithmMode'],
+                              }))}
+                              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                siteSettings.fortuneAlgorithmMode === value
+                                  ? 'bg-stone-900 text-amber-200 shadow-sm'
+                                  : 'text-stone-500 hover:text-stone-800'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

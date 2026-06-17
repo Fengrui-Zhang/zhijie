@@ -47,6 +47,7 @@ model SiteSettings {
   registrationEnabled       Boolean  @default(true)
   registrationClosedContact String   @default("微信：zixu9498422")
   guestModeEnabled          Boolean  @default(true)
+  fortuneAlgorithmMode      String   @default("default")
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 }

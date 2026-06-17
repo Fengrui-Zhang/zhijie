@@ -793,8 +793,35 @@ type FortuneScores = {
 type FortuneLevels = Record<keyof FortuneScores, FortuneLevel>;
 type HeavenlyStem = '甲' | '乙' | '丙' | '丁' | '戊' | '己' | '庚' | '辛' | '壬' | '癸';
 type FiveElement = '木' | '火' | '土' | '金' | '水';
+type FortuneAlgorithmMode = 'default' | 'preference';
+type BaziStrengthLevel = 'veryWeak' | 'weak' | 'balanced' | 'strong' | 'veryStrong';
+type BaziPreference = {
+  strengthScore: number;
+  strengthLevel: BaziStrengthLevel;
+  favorableRelations: string[];
+  unfavorableRelations: string[];
+  favorableTenGods: string[];
+  unfavorableTenGods: string[];
+  favorableElements: FiveElement[];
+  unfavorableElements: FiveElement[];
+  explanation: string;
+};
+type FortunePreferenceMeta = {
+  strengthLevel: string;
+  strengthScore: number;
+  favorableElements: FiveElement[];
+  unfavorableElements: FiveElement[];
+  reason: string;
+};
+type FortuneCalcResult = {
+  tenGod: string;
+  levels: FortuneLevels;
+  scores: FortuneScores;
+  preferenceMeta?: FortunePreferenceMeta;
+};
 
 const LEVEL_ORDER: FortuneLevel[] = ['凶', '小凶', '平', '中吉', '吉', '大吉'];
+const FORTUNE_ALGORITHM_MODES: FortuneAlgorithmMode[] = ['default', 'preference'];
 const ELEMENT_RELATION_WEIGHTS: Record<string, number> = {
   same: 70,
   produce: 75,
@@ -836,6 +863,62 @@ const ELEMENT_DIRECTIONS: Record<FiveElement, string> = {
   金: '西方',
   水: '北方',
 };
+const RELATION_LABELS: Record<string, string> = {
+  produced: '生我',
+  same: '同我',
+  produce: '我生',
+  control: '我克',
+  controlled: '克我',
+};
+const TEN_GOD_BY_RELATION: Record<string, string[]> = {
+  produced: ['正印', '偏印'],
+  same: ['比肩', '劫财'],
+  produce: ['食神', '伤官'],
+  control: ['正财', '偏财'],
+  controlled: ['正官', '七杀'],
+};
+const WEAK_RELATION_BASE: Record<string, number> = {
+  produced: 86,
+  same: 76,
+  produce: 54,
+  control: 50,
+  controlled: 46,
+};
+const STRONG_RELATION_BASE: Record<string, number> = {
+  controlled: 82,
+  produce: 78,
+  control: 72,
+  same: 52,
+  produced: 48,
+};
+const BALANCED_RELATION_BASE: Record<string, number> = {
+  produced: 68,
+  same: 66,
+  produce: 66,
+  control: 64,
+  controlled: 62,
+};
+const MONTH_BRANCH_SUPPORT: Record<string, number> = {
+  produced: 40,
+  same: 34,
+  produce: 14,
+  control: 10,
+  controlled: 4,
+};
+const STEM_SUPPORT: Record<string, number> = {
+  produced: 7,
+  same: 6,
+  produce: 2,
+  control: 1,
+  controlled: -3,
+};
+const ROOT_SUPPORT: Record<string, number> = {
+  produced: 10,
+  same: 9,
+  produce: 3,
+  control: 2,
+  controlled: -4,
+};
 
 function clampWeight(value: number) {
   return Math.max(30, Math.min(98, Math.round(value)));
@@ -868,6 +951,133 @@ function fortuneLevelToChartValue(level: FortuneLevel) {
     凶: 30,
   };
   return map[level];
+}
+
+function normalizeFortuneAlgorithmMode(value: unknown): FortuneAlgorithmMode {
+  return FORTUNE_ALGORITHM_MODES.includes(value as FortuneAlgorithmMode)
+    ? value as FortuneAlgorithmMode
+    : 'default';
+}
+
+function uniqueElements(values: FiveElement[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function relationForElement(userElement: FiveElement, targetElement: FiveElement) {
+  return getElementRelation(userElement, targetElement);
+}
+
+function tenGodsForRelations(relations: string[]) {
+  return Array.from(new Set(relations.flatMap((relation) => TEN_GOD_BY_RELATION[relation] || [])));
+}
+
+function elementsForRelations(userElement: FiveElement, relations: string[]) {
+  const allElements: FiveElement[] = ['木', '火', '土', '金', '水'];
+  return uniqueElements(allElements.filter((element) => relations.includes(relationForElement(userElement, element))));
+}
+
+function strengthLabel(level: BaziStrengthLevel) {
+  const labels: Record<BaziStrengthLevel, string> = {
+    veryWeak: '极弱',
+    weak: '偏弱',
+    balanced: '中和',
+    strong: '偏强',
+    veryStrong: '极强',
+  };
+  return labels[level];
+}
+
+function getPillarStem(pillar: unknown): HeavenlyStem | '' {
+  return typeof (pillar as { stem?: unknown })?.stem === 'string'
+    ? (pillar as { stem: HeavenlyStem }).stem
+    : '';
+}
+
+function getPillarBranch(pillar: unknown): string {
+  return typeof (pillar as { branch?: unknown })?.branch === 'string'
+    ? (pillar as { branch: string }).branch
+    : '';
+}
+
+function analyzeBaziPreference(bazi: BaziOutput): BaziPreference {
+  const userDayStem = bazi.dayMaster as HeavenlyStem;
+  const userElement = STEM_ELEMENTS_MAP[userDayStem];
+  const pillars = bazi.fourPillars;
+  const monthBranch = getPillarBranch(pillars.month);
+  const monthElement = BRANCH_ELEMENTS[monthBranch];
+  const monthRelation = monthElement ? relationForElement(userElement, monthElement) : 'same';
+  const monthScore = MONTH_BRANCH_SUPPORT[monthRelation] ?? 20;
+
+  const otherStems = [pillars.year, pillars.month, pillars.hour]
+    .map(getPillarStem)
+    .filter((stem): stem is HeavenlyStem => Boolean(stem));
+  const stemRaw = otherStems.reduce((sum, stem) => {
+    const relation = relationForElement(userElement, STEM_ELEMENTS_MAP[stem]);
+    return sum + (STEM_SUPPORT[relation] ?? 0);
+  }, 0);
+  const stemScore = Math.max(0, Math.min(20, 8 + stemRaw));
+
+  const branchWeights = [1, 1.2, 1.4, 1];
+  const branches = [pillars.year, pillars.month, pillars.day, pillars.hour].map(getPillarBranch);
+  const rootRaw = branches.reduce((sum, branch, branchIndex) => {
+    const hiddenStems = BRANCH_HIDDEN_STEMS[branch] || [];
+    const hiddenWeights = [1, 0.45, 0.2];
+    return sum + hiddenStems.reduce((hiddenSum, stem, stemIndex) => {
+      const relation = relationForElement(userElement, STEM_ELEMENTS_MAP[stem]);
+      return hiddenSum + (ROOT_SUPPORT[relation] ?? 0) * (hiddenWeights[stemIndex] || 0.1) * (branchWeights[branchIndex] || 1);
+    }, 0);
+  }, 0);
+  const rootScore = Math.max(0, Math.min(30, 10 + rootRaw));
+
+  const elementCounts = new Map<FiveElement, number>();
+  otherStems.concat([userDayStem]).forEach((stem) => {
+    const element = STEM_ELEMENTS_MAP[stem];
+    elementCounts.set(element, (elementCounts.get(element) || 0) + 1.2);
+  });
+  branches.forEach((branch) => {
+    const element = BRANCH_ELEMENTS[branch];
+    if (element) elementCounts.set(element, (elementCounts.get(element) || 0) + 1);
+    (BRANCH_HIDDEN_STEMS[branch] || []).forEach((stem, index) => {
+      const hiddenElement = STEM_ELEMENTS_MAP[stem];
+      elementCounts.set(hiddenElement, (elementCounts.get(hiddenElement) || 0) + ([0.55, 0.25, 0.1][index] || 0.05));
+    });
+  });
+  const selfSupport = (elementCounts.get(userElement) || 0);
+  const maxElementCount = Math.max(...Array.from(elementCounts.values()), 0);
+  const balanceScore = Math.max(0, Math.min(10, 5 + (selfSupport >= 2.5 ? 2 : -1) - Math.max(0, maxElementCount - 5)));
+  const strengthScore = Math.max(0, Math.min(100, Math.round(monthScore + stemScore + rootScore + balanceScore)));
+  const strengthLevel: BaziStrengthLevel =
+    strengthScore >= 78 ? 'veryStrong'
+      : strengthScore >= 62 ? 'strong'
+        : strengthScore >= 45 ? 'balanced'
+          : strengthScore >= 32 ? 'weak'
+            : 'veryWeak';
+
+  const favorableRelations = strengthLevel === 'balanced'
+    ? ['produce', 'control', 'controlled']
+    : ['weak', 'veryWeak'].includes(strengthLevel)
+      ? ['produced', 'same']
+      : ['produce', 'control', 'controlled'];
+  const unfavorableRelations = strengthLevel === 'balanced'
+    ? []
+    : ['weak', 'veryWeak'].includes(strengthLevel)
+      ? ['produce', 'control', 'controlled']
+      : ['produced', 'same'];
+
+  const favorableElements = elementsForRelations(userElement, favorableRelations);
+  const unfavorableElements = elementsForRelations(userElement, unfavorableRelations);
+
+  return {
+    strengthScore,
+    strengthLevel,
+    favorableRelations,
+    unfavorableRelations,
+    favorableTenGods: tenGodsForRelations(favorableRelations),
+    unfavorableTenGods: tenGodsForRelations(unfavorableRelations),
+    favorableElements,
+    unfavorableElements,
+    explanation: `命主${strengthLabel(strengthLevel)}，喜${favorableElements.join('、') || '调和'}，忌${unfavorableElements.join('、') || '偏枯'}。`,
+  };
 }
 
 function calcHiddenStemBonus(userDayStem: HeavenlyStem, branch: string) {
@@ -918,12 +1128,81 @@ function calcBranchInteraction(userDayBranch: string, flowBranch: string) {
   return result;
 }
 
+function calcHiddenStemPreferenceBonus(userDayStem: HeavenlyStem, branch: string, preference: BaziPreference) {
+  const hiddenStems = BRANCH_HIDDEN_STEMS[branch];
+  if (!hiddenStems?.length) return 0;
+  const weights = [1, 0.45, 0.2];
+  const userElement = STEM_ELEMENTS_MAP[userDayStem];
+  return hiddenStems.reduce((sum, stem, index) => {
+    const relation = relationForElement(userElement, STEM_ELEMENTS_MAP[stem]);
+    const favorable = preference.favorableRelations.includes(relation);
+    const unfavorable = preference.unfavorableRelations.includes(relation);
+    const raw = preference.strengthLevel === 'balanced'
+      ? (ELEMENT_RELATION_WEIGHTS[relation] || 65) - 65
+      : favorable
+        ? 6
+        : unfavorable
+          ? -6
+          : 0;
+    return sum + raw * (weights[index] || 0.1);
+  }, 0);
+}
+
+function scaleBranchInteractionByPreference(
+  branchBonus: Omit<FortuneScores, 'overall'>,
+  userDayStem: HeavenlyStem,
+  flowBranch: string,
+  preference: BaziPreference
+) {
+  const flowElement = BRANCH_ELEMENTS[flowBranch];
+  const relation = flowElement ? relationForElement(STEM_ELEMENTS_MAP[userDayStem], flowElement) : '';
+  const favorable = preference.favorableRelations.includes(relation);
+  const unfavorable = preference.unfavorableRelations.includes(relation);
+  const scalePositive = favorable ? 1.25 : unfavorable ? 0.5 : 1;
+  const scaleNegative = favorable ? 1.25 : unfavorable ? 0.55 : 1;
+  const scaleValue = (value: number) => Math.round(value * (value >= 0 ? scalePositive : scaleNegative));
+  return {
+    career: scaleValue(branchBonus.career),
+    love: scaleValue(branchBonus.love),
+    wealth: scaleValue(branchBonus.wealth),
+    health: scaleValue(branchBonus.health),
+    social: scaleValue(branchBonus.social),
+  };
+}
+
+function preferenceBaseWeight(relation: string, preference: BaziPreference) {
+  if (preference.strengthLevel === 'balanced') return BALANCED_RELATION_BASE[relation] ?? 64;
+  if (['weak', 'veryWeak'].includes(preference.strengthLevel)) return WEAK_RELATION_BASE[relation] ?? 60;
+  return STRONG_RELATION_BASE[relation] ?? 60;
+}
+
+function adjustTenGodByPreference(tenGod: string, preference: BaziPreference) {
+  const base = TEN_GOD_ADJUSTMENTS[tenGod] || {};
+  const isBalanced = preference.strengthLevel === 'balanced';
+  const isFavorable = preference.favorableTenGods.includes(tenGod);
+  const isUnfavorable = preference.unfavorableTenGods.includes(tenGod);
+  const next: Partial<FortuneScores> = {};
+  (['career', 'love', 'wealth', 'health', 'social'] as Array<keyof Omit<FortuneScores, 'overall'>>).forEach((key) => {
+    const value = base[key] || 0;
+    if (isBalanced) {
+      next[key] = Math.round(value * 0.5);
+    } else if (isFavorable) {
+      next[key] = value >= 0 ? Math.round(value * 1.12) : Math.round(value * 0.45);
+    } else if (isUnfavorable) {
+      next[key] = value > 0 ? -Math.max(2, Math.round(value * 0.55)) : Math.round(value * 1.15);
+    } else {
+      next[key] = value;
+    }
+  });
+  return next;
+}
+
 function calcFortuneByStemBranch(
   userDayStem: HeavenlyStem,
   userDayBranch: string,
   flowStem: HeavenlyStem,
   flowBranch: string
-) {
+): FortuneCalcResult {
   const relation = getElementRelation(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[flowStem]);
   const baseWeight = ELEMENT_RELATION_WEIGHTS[relation] || 65;
   const tenGod = calculateTenGod(userDayStem, flowStem);
@@ -949,6 +1228,70 @@ function calcFortuneByStemBranch(
     } satisfies FortuneLevels,
     scores,
   };
+}
+
+function calcFortuneByStemBranchWithPreference(
+  userDayStem: HeavenlyStem,
+  userDayBranch: string,
+  flowStem: HeavenlyStem,
+  flowBranch: string,
+  preference: BaziPreference
+): FortuneCalcResult {
+  const relation = relationForElement(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[flowStem]);
+  const baseWeight = preferenceBaseWeight(relation, preference);
+  const tenGod = calculateTenGod(userDayStem, flowStem);
+  const hiddenBonus = calcHiddenStemPreferenceBonus(userDayStem, flowBranch, preference);
+  const branchBonus = scaleBranchInteractionByPreference(
+    calcBranchInteraction(userDayBranch, flowBranch),
+    userDayStem,
+    flowBranch,
+    preference
+  );
+  const adj = adjustTenGodByPreference(tenGod, preference);
+  const career = clampWeight(baseWeight + (adj.career || 0) + hiddenBonus + branchBonus.career);
+  const love = clampWeight(baseWeight + (adj.love || 0) + hiddenBonus + branchBonus.love);
+  const wealth = clampWeight(baseWeight + (adj.wealth || 0) + hiddenBonus + branchBonus.wealth);
+  const health = clampWeight(baseWeight + (adj.health || 0) + hiddenBonus + branchBonus.health);
+  const social = clampWeight(baseWeight + (adj.social || 0) + hiddenBonus + branchBonus.social);
+  const overall = clampWeight((career + love + wealth + health + social) / 5);
+  const scores = { overall, career, love, wealth, health, social };
+  const relationLabel = RELATION_LABELS[relation] || relation;
+  const isFavorable = preference.favorableTenGods.includes(tenGod) || preference.favorableRelations.includes(relation);
+  const isUnfavorable = preference.unfavorableTenGods.includes(tenGod) || preference.unfavorableRelations.includes(relation);
+  const preferenceMeta: FortunePreferenceMeta = {
+    strengthLevel: strengthLabel(preference.strengthLevel),
+    strengthScore: preference.strengthScore,
+    favorableElements: preference.favorableElements,
+    unfavorableElements: preference.unfavorableElements,
+    reason: `命主${strengthLabel(preference.strengthLevel)}，喜${preference.favorableElements.join('、') || '调和'}；本次${flowStem}${flowBranch}为${tenGod}（${relationLabel}），${isFavorable ? '属喜' : isUnfavorable ? '属忌' : '取中和'}。`,
+  };
+  return {
+    tenGod,
+    levels: {
+      overall: weightToLevel(overall),
+      career: weightToLevel(career),
+      love: weightToLevel(love),
+      wealth: weightToLevel(wealth),
+      health: weightToLevel(health),
+      social: weightToLevel(social),
+    } satisfies FortuneLevels,
+    scores,
+    preferenceMeta,
+  };
+}
+
+function calcFortuneByStemBranchMode(
+  userDayStem: HeavenlyStem,
+  userDayBranch: string,
+  flowStem: HeavenlyStem,
+  flowBranch: string,
+  mode: FortuneAlgorithmMode,
+  preference?: BaziPreference
+): FortuneCalcResult {
+  if (mode === 'preference' && preference) {
+    return calcFortuneByStemBranchWithPreference(userDayStem, userDayBranch, flowStem, flowBranch, preference);
+  }
+  return calcFortuneByStemBranch(userDayStem, userDayBranch, flowStem, flowBranch);
 }
 
 function getLuckyElement(userElement: FiveElement): FiveElement {
@@ -1000,14 +1343,19 @@ function generateMonthlySummary(tenGod: string, overall: FortuneLevel) {
   return summary;
 }
 
-function fortuneFromDate(bazi: BaziOutput, date: Date) {
+function fortuneFromDate(
+  bazi: BaziOutput,
+  date: Date,
+  mode: FortuneAlgorithmMode = 'default',
+  preference?: BaziPreference
+) {
   const solar = Solar.fromYmd(date.getFullYear(), date.getMonth() + 1, date.getDate());
   const eightChar = solar.getLunar().getEightChar();
   const dayStem = eightChar.getDayGan() as HeavenlyStem;
   const dayBranch = eightChar.getDayZhi();
   const userDayStem = bazi.dayMaster as HeavenlyStem;
   const userDayBranch = bazi.fourPillars.day.branch;
-  const result = calcFortuneByStemBranch(userDayStem, userDayBranch, dayStem, dayBranch);
+  const result = calcFortuneByStemBranchMode(userDayStem, userDayBranch, dayStem, dayBranch, mode, preference);
   const luckyElement = getLuckyElement(STEM_ELEMENTS_MAP[userDayStem]);
   return {
     date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
@@ -1019,14 +1367,20 @@ function fortuneFromDate(bazi: BaziOutput, date: Date) {
     luckyColor: ELEMENT_COLORS[luckyElement],
     luckyDirection: ELEMENT_DIRECTIONS[luckyElement],
     _chart: result.scores,
+    preferenceMeta: result.preferenceMeta,
   };
 }
 
-function buildTrend(bazi: BaziOutput, centerDate: Date) {
+function buildTrend(
+  bazi: BaziOutput,
+  centerDate: Date,
+  mode: FortuneAlgorithmMode = 'default',
+  preference?: BaziPreference
+) {
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(centerDate);
     date.setDate(centerDate.getDate() + index - 2);
-    const fortune = fortuneFromDate(bazi, date);
+    const fortune = fortuneFromDate(bazi, date, mode, preference);
     return {
       date: `${date.getMonth() + 1}/${date.getDate()}`,
       fullDate: fortune.date,
@@ -1037,11 +1391,17 @@ function buildTrend(bazi: BaziOutput, centerDate: Date) {
   });
 }
 
-function buildMonthCalendar(bazi: BaziOutput, year: number, month: number) {
+function buildMonthCalendar(
+  bazi: BaziOutput,
+  year: number,
+  month: number,
+  mode: FortuneAlgorithmMode = 'default',
+  preference?: BaziPreference
+) {
   const daysInMonth = new Date(year, month, 0).getDate();
   return Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1;
-    const fortune = fortuneFromDate(bazi, new Date(year, month - 1, day));
+    const fortune = fortuneFromDate(bazi, new Date(year, month - 1, day), mode, preference);
     return {
       day,
       level: fortune.overall,
@@ -1051,18 +1411,25 @@ function buildMonthCalendar(bazi: BaziOutput, year: number, month: number) {
   });
 }
 
-function buildYearMonthlyTrend(bazi: BaziOutput, year: number) {
+function buildYearMonthlyTrend(
+  bazi: BaziOutput,
+  year: number,
+  mode: FortuneAlgorithmMode = 'default',
+  preference?: BaziPreference
+) {
   return Array.from({ length: 12 }, (_, index) => {
     const month = index + 1;
     const solar = Solar.fromYmd(year, month, 15);
     const eightChar = solar.getLunar().getEightChar();
     const monthStem = eightChar.getMonthGan() as HeavenlyStem;
     const monthBranch = eightChar.getMonthZhi();
-    const result = calcFortuneByStemBranch(
+    const result = calcFortuneByStemBranchMode(
       bazi.dayMaster as HeavenlyStem,
       bazi.fourPillars.day.branch,
       monthStem,
-      monthBranch
+      monthBranch,
+      mode,
+      preference
     );
     return {
       month,
@@ -1072,6 +1439,7 @@ function buildYearMonthlyTrend(bazi: BaziOutput, year: number) {
       tenGod: result.tenGod,
       scores: result.scores,
       level: result.levels.overall,
+      preferenceMeta: result.preferenceMeta,
       ...result.levels,
     };
   });
@@ -1086,7 +1454,9 @@ async function buildDailyFortune(params: BaseParams) {
   };
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
-  const fortune = fortuneFromDate(bazi, new Date(target.year, target.month - 1, target.day));
+  const algorithmMode = normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
+  const preference = algorithmMode === 'preference' ? analyzeBaziPreference(bazi) : undefined;
+  const fortune = fortuneFromDate(bazi, new Date(target.year, target.month - 1, target.day), algorithmMode, preference);
   const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(target),
     dayMaster: bazi.fourPillars.day.stem,
@@ -1095,13 +1465,18 @@ async function buildDailyFortune(params: BaseParams) {
     birthDay: params.day,
     birthHour: params.hours,
   }));
-  const trend = buildTrend(bazi, new Date(target.year, target.month - 1, target.day));
+  const trend = buildTrend(bazi, new Date(target.year, target.month - 1, target.day), algorithmMode, preference);
   const text = [
     '【每日运势】',
     `姓名：${params.name || '匿名'}（${sexLabel(params.sex)}）`,
     `日期：${dateOnlyString(target)}`,
     `日干支：${fortune.dayStem}${fortune.dayBranch}`,
     `十神：${fortune.tenGod}`,
+    ...(algorithmMode === 'preference' && preference ? [
+      `命局强弱：${strengthLabel(preference.strengthLevel)}（${preference.strengthScore}）`,
+      `喜用：${preference.favorableElements.join('、') || '调和'}`,
+      '算法：喜忌逻辑',
+    ] : []),
     '',
     `综合：${fortune.overall}`,
     `事业：${fortune.career}`,
@@ -1129,6 +1504,9 @@ async function buildDailyFortune(params: BaseParams) {
         ...fortune,
         trend,
         almanac,
+        algorithmMode,
+        preference,
+        preferenceMeta: fortune.preferenceMeta,
         chartValueMap: {
           overall: fortuneLevelToChartValue(fortune.overall),
           career: fortuneLevelToChartValue(fortune.career),
@@ -1151,20 +1529,24 @@ async function buildMonthlyFortune(params: BaseParams) {
   };
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
+  const algorithmMode = normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
+  const preference = algorithmMode === 'preference' ? analyzeBaziPreference(bazi) : undefined;
   const midMonthParams = { ...target, day: Math.min(15, target.day || 15) };
   const solar = Solar.fromYmd(target.year, target.month, 15);
   const eightChar = solar.getLunar().getEightChar();
   const monthStem = eightChar.getMonthGan() as HeavenlyStem;
   const monthBranch = eightChar.getMonthZhi();
-  const monthly = calcFortuneByStemBranch(
+  const monthly = calcFortuneByStemBranchMode(
     bazi.dayMaster as HeavenlyStem,
     bazi.fourPillars.day.branch,
     monthStem,
-    monthBranch
+    monthBranch,
+    algorithmMode,
+    preference
   );
   const summary = generateMonthlySummary(monthly.tenGod, monthly.levels.overall);
-  const calendar = buildMonthCalendar(bazi, target.year, target.month);
-  const yearTrend = buildYearMonthlyTrend(bazi, target.year);
+  const calendar = buildMonthCalendar(bazi, target.year, target.month, algorithmMode, preference);
+  const yearTrend = buildYearMonthlyTrend(bazi, target.year, algorithmMode, preference);
   const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(midMonthParams),
     dayMaster: bazi.fourPillars.day.stem,
@@ -1180,6 +1562,11 @@ async function buildMonthlyFortune(params: BaseParams) {
     `命局日主：${bazi.fourPillars.day.stem}${bazi.fourPillars.day.branch}`,
     `流月干支：${monthStem}${monthBranch}`,
     `主运十神：${monthly.tenGod}`,
+    ...(algorithmMode === 'preference' && preference ? [
+      `命局强弱：${strengthLabel(preference.strengthLevel)}（${preference.strengthScore}）`,
+      `喜用：${preference.favorableElements.join('、') || '调和'}`,
+      '算法：喜忌逻辑',
+    ] : []),
     '',
     `综合：${monthly.levels.overall}`,
     `事业：${monthly.levels.career}`,
@@ -1212,6 +1599,9 @@ async function buildMonthlyFortune(params: BaseParams) {
         calendar,
         yearTrend,
         almanac,
+        algorithmMode,
+        preference,
+        preferenceMeta: monthly.preferenceMeta,
       },
     },
   };

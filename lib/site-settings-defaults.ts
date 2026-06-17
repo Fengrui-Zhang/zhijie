@@ -9,6 +9,7 @@ export interface PublicSiteSettings {
   registrationEnabled: boolean;
   registrationClosedContact: string;
   guestModeEnabled: boolean;
+  fortuneAlgorithmMode: 'default' | 'preference';
 }
 
 export const DEFAULT_REGISTRATION_CONTACT = '微信：zixu9498422';
@@ -28,6 +29,7 @@ export const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   registrationEnabled: true,
   registrationClosedContact: DEFAULT_REGISTRATION_CONTACT,
   guestModeEnabled: true,
+  fortuneAlgorithmMode: 'default',
 };
 
 export const normalizeAnnouncementItems = (value: unknown): string[] => {
@@ -59,6 +61,9 @@ export const normalizePublicSiteSettings = (value: unknown): PublicSiteSettings 
   const registrationClosedContact = typeof source.registrationClosedContact === 'string' && source.registrationClosedContact.trim()
     ? source.registrationClosedContact.trim()
     : DEFAULT_SITE_SETTINGS.registrationClosedContact;
+  const fortuneAlgorithmMode = source.fortuneAlgorithmMode === 'preference'
+    ? 'preference'
+    : DEFAULT_SITE_SETTINGS.fortuneAlgorithmMode;
 
   return {
     announcementTitle,
@@ -73,5 +78,6 @@ export const normalizePublicSiteSettings = (value: unknown): PublicSiteSettings 
     guestModeEnabled: typeof source.guestModeEnabled === 'boolean'
       ? source.guestModeEnabled
       : DEFAULT_SITE_SETTINGS.guestModeEnabled,
+    fortuneAlgorithmMode,
   };
 };
