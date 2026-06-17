@@ -719,6 +719,17 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
 
 type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
 type SettingsWorkspaceTab = 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
+type MobileBottomNavItemId =
+  | ModelType.BAZI
+  | ModelType.ZIWEI
+  | ModelType.DAILY_FORTUNE
+  | ModelType.MONTHLY_FORTUNE
+  | ModelType.QIMEN
+  | ModelType.LIUYAO
+  | ModelType.MEIHUA
+  | ModelType.ALMANAC
+  | 'records'
+  | 'chat';
 type ExpressionStyle = 'direct' | 'gentle';
 type ChartPromptDetailLevel = 'default' | 'more' | 'full';
 type FortuneDimensionKey =
@@ -746,7 +757,57 @@ type PersonalizationSettings = {
   chartStyle: VisualizationChartStyle;
 };
 
+type AppPreferenceSettings = {
+  mobileBottomNav: MobileBottomNavItemId[];
+  historyEnabled: boolean;
+  defaultCaseId: string;
+};
+
 const PERSONALIZATION_STORAGE_KEY = 'zhijie:personalization-settings:v1';
+const APP_PREFERENCES_STORAGE_KEY = 'zhijie:app-preferences:v1';
+
+const MOBILE_BOTTOM_NAV_OPTIONS: Array<{ id: MobileBottomNavItemId; label: string }> = [
+  { id: ModelType.BAZI, label: '八字' },
+  { id: ModelType.ZIWEI, label: '紫微' },
+  { id: ModelType.DAILY_FORTUNE, label: '日运' },
+  { id: ModelType.MONTHLY_FORTUNE, label: '月运' },
+  { id: ModelType.QIMEN, label: '奇门' },
+  { id: ModelType.LIUYAO, label: '六爻' },
+  { id: ModelType.MEIHUA, label: '梅花' },
+  { id: ModelType.ALMANAC, label: '择日' },
+  { id: 'records', label: '记录' },
+  { id: 'chat', label: '聊天' },
+];
+
+const DEFAULT_APP_PREFERENCES: AppPreferenceSettings = {
+  mobileBottomNav: [ModelType.BAZI, ModelType.DAILY_FORTUNE, 'records', 'chat'],
+  historyEnabled: true,
+  defaultCaseId: '',
+};
+
+const isMobileBottomNavItemId = (value: unknown): value is MobileBottomNavItemId => (
+  typeof value === 'string' && MOBILE_BOTTOM_NAV_OPTIONS.some((item) => item.id === value)
+);
+
+const normalizeMobileBottomNav = (value: unknown): MobileBottomNavItemId[] => {
+  const rawItems = Array.isArray(value) ? value.filter(isMobileBottomNavItemId) : [];
+  const uniqueItems = rawItems.filter((item, index) => rawItems.indexOf(item) === index);
+  const next = [...uniqueItems];
+  for (const fallback of DEFAULT_APP_PREFERENCES.mobileBottomNav) {
+    if (next.length >= 4) break;
+    if (!next.includes(fallback)) next.push(fallback);
+  }
+  return next.slice(0, 4);
+};
+
+const normalizeAppPreferences = (value: unknown): AppPreferenceSettings => {
+  const source = value && typeof value === 'object' ? value as Partial<AppPreferenceSettings> : {};
+  return {
+    mobileBottomNav: normalizeMobileBottomNav(source.mobileBottomNav),
+    historyEnabled: typeof source.historyEnabled === 'boolean' ? source.historyEnabled : true,
+    defaultCaseId: typeof source.defaultCaseId === 'string' ? source.defaultCaseId : '',
+  };
+};
 
 const FORTUNE_DIMENSIONS: Array<{ key: FortuneDimensionKey; label: string; icon: string }> = [
   { key: 'career', label: '事业/学业', icon: '💼' },
@@ -889,8 +950,6 @@ const SETTINGS_WORKSPACE_TABS: Array<{
   { id: 'profile', label: '我的', group: '账户', icon: '人', description: '账户与额度' },
   { id: 'general', label: '常规', group: '账户', icon: '设', description: '界面与记录' },
   { id: 'personalization', label: '个性化', group: '账户', icon: '∞', description: '回答与图表偏好' },
-  { id: 'charts', label: '命盘', group: '资料', icon: '盘', description: '八字与紫微信息' },
-  { id: 'knowledge', label: '知识参考', group: '资料', icon: '书', description: '问答引用设置' },
   { id: 'help', label: '帮助', group: '支持', icon: '？', description: '常见问题' },
   { id: 'security', label: '安全', group: '账户', icon: '锁', description: '密码与账号' },
 ];
@@ -1619,7 +1678,11 @@ const App: React.FC<AppProps> = ({
   const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
   const [standaloneSelectedCaseIds, setStandaloneSelectedCaseIds] = useState<string[]>([]);
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
-  const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(initialSettingsTab);
+  const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(
+    initialSettingsTab === 'charts' || initialSettingsTab === 'knowledge' ? 'general' : initialSettingsTab
+  );
+  const [appPreferences, setAppPreferences] = useState<AppPreferenceSettings>(DEFAULT_APP_PREFERENCES);
+  const [appPreferencesSavedAt, setAppPreferencesSavedAt] = useState('');
   const [personalizationSettings, setPersonalizationSettings] = useState<PersonalizationSettings>(DEFAULT_PERSONALIZATION_SETTINGS);
   const [personalizationDraft, setPersonalizationDraft] = useState<PersonalizationSettings>(DEFAULT_PERSONALIZATION_SETTINGS);
   const [personalizationSavedAt, setPersonalizationSavedAt] = useState('');
@@ -1646,6 +1709,32 @@ const App: React.FC<AppProps> = ({
     activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const isCaseModel = isCaseModelType(modelType) && !activeProfessionalFeature;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(APP_PREFERENCES_STORAGE_KEY);
+      if (!raw) return;
+      setAppPreferences(normalizeAppPreferences(JSON.parse(raw)));
+    } catch {
+      setAppPreferences(DEFAULT_APP_PREFERENCES);
+    }
+  }, []);
+
+  const updateAppPreferences = useCallback((
+    updater: (current: AppPreferenceSettings) => AppPreferenceSettings,
+    message?: string
+  ) => {
+    setAppPreferences((current) => {
+      const next = normalizeAppPreferences(updater(current));
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(APP_PREFERENCES_STORAGE_KEY, JSON.stringify(next));
+        setAppPreferencesSavedAt(message || '已保存');
+        window.setTimeout(() => setAppPreferencesSavedAt(''), 1800);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2029,8 +2118,12 @@ const App: React.FC<AppProps> = ({
       const items = readGuestCases()
         .filter((item) => item.modelType === ModelType.BAZI)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const preferredId = items.some((item) => item.id === appPreferences.defaultCaseId)
+        ? appPreferences.defaultCaseId
+        : items[0]?.id || '';
       setFortuneCaseOptions(items);
-      setFortuneCaseId((current) => current || items[0]?.id || '');
+      setFortuneCaseId((current) => current || preferredId);
+      setAlmanacCaseId((current) => current || preferredId);
       return;
     }
 
@@ -2039,12 +2132,16 @@ const App: React.FC<AppProps> = ({
       if (!res.ok) return;
       const data = await res.json();
       const items = Array.isArray(data) ? data : [];
+      const preferredId = items.some((item) => item.id === appPreferences.defaultCaseId)
+        ? appPreferences.defaultCaseId
+        : items[0]?.id || '';
       setFortuneCaseOptions(items);
-      setFortuneCaseId((current) => current || items[0]?.id || '');
+      setFortuneCaseId((current) => current || preferredId);
+      setAlmanacCaseId((current) => current || preferredId);
     } catch {
       // silently ignore
     }
-  }, [isLoggedIn, readGuestCases]);
+  }, [appPreferences.defaultCaseId, isLoggedIn, readGuestCases]);
 
   const hydrateStandaloneCaseOptions = useCallback(async () => {
     if (!isLoggedIn) {
@@ -2248,7 +2345,8 @@ const App: React.FC<AppProps> = ({
 
   // --- Session Persistence ---
   const fetchSessions = useCallback(async () => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !appPreferences.historyEnabled) {
+      setSavedSessions([]);
       setSessionsLoading(false);
       return;
     }
@@ -2264,7 +2362,7 @@ const App: React.FC<AppProps> = ({
     } finally {
       setSessionsLoading(false);
     }
-  }, [isLoggedIn]);
+  }, [appPreferences.historyEnabled, isLoggedIn]);
 
   useEffect(() => {
     fetchSessions();
@@ -2369,7 +2467,7 @@ const App: React.FC<AppProps> = ({
     cData: unknown,
     caseId?: string | null
   ): Promise<string | null> => {
-    if (!isLoggedIn) return null;
+    if (!isLoggedIn || !appPreferences.historyEnabled) return null;
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
@@ -2760,6 +2858,56 @@ const App: React.FC<AppProps> = ({
     } catch {
       // silently ignore
     }
+  };
+
+  const handleHistoryEnabledChange = async (enabled: boolean) => {
+    if (enabled) {
+      updateAppPreferences((current) => ({ ...current, historyEnabled: true }));
+      if (isLoggedIn) {
+        setSessionsLoading(true);
+        try {
+          const res = await fetch('/api/sessions');
+          if (res.ok) {
+            const data = await res.json();
+            setSavedSessions(Array.isArray(data) ? data : []);
+          }
+        } catch {
+          // silently ignore
+        } finally {
+          setSessionsLoading(false);
+        }
+      }
+      return;
+    }
+
+    const confirmed = window.confirm('若取消，将丢失所有历史记录，并且不再记录会话历史');
+    if (!confirmed) return;
+
+    updateAppPreferences((current) => ({ ...current, historyEnabled: false }), '历史记录已关闭');
+    setSavedSessions([]);
+    setActiveSessionId(null);
+    setStandaloneSessionId(null);
+    clearChatSession();
+    if (isLoggedIn) {
+      try {
+        await fetch('/api/sessions', { method: 'DELETE' });
+      } catch {
+        // silently ignore
+      }
+    }
+  };
+
+  const handleMobileBottomNavSlotChange = (index: number, value: MobileBottomNavItemId) => {
+    updateAppPreferences((current) => {
+      const next = normalizeMobileBottomNav(current.mobileBottomNav);
+      const previous = next[index];
+      const existingIndex = next.indexOf(value);
+      if (existingIndex !== -1 && existingIndex !== index) {
+        next[existingIndex] = previous;
+      }
+      next[index] = value;
+      return { ...current, mobileBottomNav: next };
+    });
   };
 
   const handleLoadSession = async (id: string) => {
@@ -3681,7 +3829,7 @@ const App: React.FC<AppProps> = ({
       const routedSettingsTab = ROUTE_SETTINGS_TABS[window.location.pathname];
       if (routedSettingsTab) {
         setWorkspaceView('settings');
-        setSettingsWorkspaceTab(routedSettingsTab);
+        setSettingsWorkspaceTab(routedSettingsTab === 'charts' || routedSettingsTab === 'knowledge' ? 'general' : routedSettingsTab);
         setProfessionalSelectedProject(null);
         setProfessionalModalOpen(false);
         return;
@@ -6443,8 +6591,10 @@ const App: React.FC<AppProps> = ({
           ]);
           fetchSessions();
           fetchUserProfile();
-        } else {
+        } else if (appPreferences.historyEnabled) {
           setError('对话已生成，但历史保存失败，请稍后重试');
+        } else {
+          fetchUserProfile();
         }
       } else {
         const nextGuestFollowUpCount = effectiveGuestFollowUpCount + 1;
@@ -7489,12 +7639,18 @@ const App: React.FC<AppProps> = ({
 
   const renderMobileBottomNav = () => (
     <nav className="fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-stone-100 bg-white/86 p-2 shadow-lg shadow-stone-900/10 backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${appPreferences.mobileBottomNav.length + 1}, minmax(0, 1fr))` }}>
         {[
-          { id: ModelType.BAZI, label: '八字', action: () => handleModelChange(ModelType.BAZI), active: modelType === ModelType.BAZI && workspaceView === 'divination' },
-          { id: ModelType.DAILY_FORTUNE, label: '日运', action: () => handleModelChange(ModelType.DAILY_FORTUNE), active: modelType === ModelType.DAILY_FORTUNE && workspaceView === 'divination' },
-          { id: 'records-bottom', label: '记录', action: () => navigateWorkspace('records'), active: workspaceView === 'records' },
-          { id: 'chat-bottom', label: '聊天', action: () => navigateWorkspace('chat'), active: workspaceView === 'chat' },
+          ...appPreferences.mobileBottomNav.map((id) => {
+            const option = MOBILE_BOTTOM_NAV_OPTIONS.find((item) => item.id === id);
+            const isWorkspace = id === 'records' || id === 'chat';
+            return {
+              id,
+              label: option?.label || '入口',
+              action: () => (isWorkspace ? navigateWorkspace(id) : handleModelChange(id as ModelType)),
+              active: isWorkspace ? workspaceView === id : modelType === id && workspaceView === 'divination',
+            };
+          }),
           { id: 'more-bottom', label: '更多', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
         ].map((item) => (
           <button
@@ -8083,30 +8239,113 @@ const App: React.FC<AppProps> = ({
             <div className="space-y-5">
               <div>
                 <div className="text-lg font-bold text-stone-800">常规偏好</div>
-                <div className="mt-1 text-sm text-stone-500">保留简洁默认设置，避免干扰排盘和问答。</div>
               </div>
               <div className="divide-y divide-stone-100 overflow-hidden rounded-3xl border border-white/65 bg-white/58">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                <div className="px-5 py-4">
                   <div>
-                    <div className="text-sm font-bold text-stone-700">默认入口</div>
-                    <div className="mt-1 text-xs text-stone-400">进入网站后优先显示四柱八字。</div>
+                    <div className="text-sm font-bold text-stone-700">移动端底部菜单</div>
+                    <div className="mt-1 text-xs text-stone-400">选择 4 个常驻入口，按从左到右的顺序显示；“更多”会固定保留。</div>
                   </div>
-                  <span className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600">四柱八字</span>
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {appPreferences.mobileBottomNav.map((navId, index) => (
+                      <label key={`mobile-nav-${index}`} className="min-w-0">
+                        <span className="mb-1 block text-[11px] font-semibold text-stone-400">第 {index + 1} 项</span>
+                        <select
+                          value={navId}
+                          onChange={(event) => handleMobileBottomNavSlotChange(index, event.target.value as MobileBottomNavItemId)}
+                          className="glass-input w-full min-w-0 rounded-2xl px-3 py-2.5 text-sm font-semibold text-stone-700 outline-none"
+                        >
+                          {MOBILE_BOTTOM_NAV_OPTIONS.map((option) => (
+                            <option
+                              key={option.id}
+                              value={option.id}
+                              disabled={appPreferences.mobileBottomNav.includes(option.id) && option.id !== navId}
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <div className="text-sm font-bold text-stone-700">历史记录</div>
+                    <div className="mt-1 text-xs text-stone-400">只控制会话历史保存，不影响命例、排盘记录和 AI 初始化分析。</div>
                   </div>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">已启用</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={appPreferences.historyEnabled}
+                    onClick={() => void handleHistoryEnabledChange(!appPreferences.historyEnabled)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      appPreferences.historyEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {appPreferences.historyEnabled ? '已开启' : '已关闭'}
+                  </button>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
-                    <div className="text-sm font-bold text-stone-700">知识参考</div>
-                    <div className="mt-1 text-xs text-stone-400">支持在八字、奇门等问答中参考古籍资料。</div>
+                    <div className="text-sm font-bold text-stone-700">排盘问答参考古籍</div>
+                    <div className="mt-1 text-xs text-stone-400">八字、奇门等支持携带内置资料片段。</div>
                   </div>
-                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">手动控制</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={useKnowledge}
+                    onClick={() => setUseKnowledge((current) => !current)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      useKnowledge ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {useKnowledge ? '已开启' : '已关闭'}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                  <div>
+                    <div className="text-sm font-bold text-stone-700">独立聊天参考资料</div>
+                    <div className="mt-1 text-xs text-stone-400">新聊天中可选择四柱八字或奇门遁甲资料。</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={standaloneChatUseKnowledge}
+                    onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                      standaloneChatUseKnowledge ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-500'
+                    }`}
+                  >
+                    {standaloneChatUseKnowledge ? '已开启' : '已关闭'}
+                  </button>
+                </div>
+                <div className="px-5 py-4">
+                  <div className="text-sm font-bold text-stone-700">默认资料方向</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      ['bazi', '四柱八字'],
+                      ['qimen', '奇门遁甲'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setStandaloneChatKnowledgeBoard(value as 'bazi' | 'qimen')}
+                        className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                          standaloneChatKnowledgeBoard === value
+                            ? 'glass-panel-dark border-transparent text-amber-200'
+                            : 'border-stone-200 bg-white/65 text-stone-600 hover:bg-white'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+              {appPreferencesSavedAt && (
+                <div className="text-sm font-semibold text-emerald-700">{appPreferencesSavedAt}</div>
+              )}
             </div>
           )}
 
@@ -8143,6 +8382,37 @@ const App: React.FC<AppProps> = ({
                   </select>
                 </label>
               </div>
+
+              <label className="block">
+                <span className="block text-sm font-bold text-stone-600">默认命盘</span>
+                <select
+                  value={appPreferences.defaultCaseId}
+                  onChange={(event) => {
+                    const nextCaseId = event.target.value;
+                    updateAppPreferences((current) => ({
+                      ...current,
+                      defaultCaseId: nextCaseId,
+                    }));
+                    if (nextCaseId) {
+                      setFortuneCaseId(nextCaseId);
+                      setAlmanacCaseId(nextCaseId);
+                    }
+                  }}
+                  className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
+                >
+                  <option value="">不指定，按命例库顺序选择</option>
+                  {standaloneCaseOptions
+                    .filter((item) => item.modelType === ModelType.BAZI)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {getCaseDisplayName(item)}
+                      </option>
+                    ))}
+                </select>
+                <div className="mt-2 text-xs leading-5 text-stone-400">
+                  日运、月运和择日会优先使用这个八字命盘；没有选择或命盘不存在时自动回退到第一条八字命例。
+                </div>
+              </label>
 
               <div>
                 <div className="text-sm font-bold text-stone-600">命盘注入详细级别</div>

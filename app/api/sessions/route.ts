@@ -60,3 +60,16 @@ export async function POST(request: Request) {
 
   return NextResponse.json(created, { status: 201 });
 }
+
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: '未登录' }, { status: 401 });
+  }
+
+  await prisma.divinationSession.deleteMany({
+    where: { userId: session.user.id },
+  });
+
+  return NextResponse.json({ ok: true });
+}
