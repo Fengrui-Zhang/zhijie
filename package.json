@@ -11,6 +11,7 @@
     "lint": "next lint",
     "ingest:knowledge": "node scripts/ingest-knowledge.mjs",
     "rechart:cases": "npx tsx scripts/rebuild-local-charts.ts",
+    "backfill:wuxing-calibration": "npx tsx scripts/backfill-wuxing-calibration.ts",
     "seed": "npx tsx prisma/seed.ts",
     "experiment:bazi": "node --experimental-strip-types ./实验/cli.ts",
     "experiment:casebook": "node --experimental-strip-types ./实验/casebook.ts",

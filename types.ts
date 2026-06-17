@@ -76,6 +76,15 @@ export interface BaseParams {
   targetMonth?: number;
   targetDay?: number;
   fortuneAlgorithmMode?: 'default' | 'preference';
+  fortuneCalibration?: {
+    source: 'ai_wuxing';
+    strengthLevel?: 'veryWeak' | 'weak' | 'balanced' | 'strong' | 'veryStrong';
+    strengthScore?: number;
+    favorableElements?: string[];
+    unfavorableElements?: string[];
+    elementScores?: Record<string, number>;
+    reason?: string;
+  };
 }
 
 export interface GenericTaibuResponse {

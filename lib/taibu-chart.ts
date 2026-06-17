@@ -987,6 +987,56 @@ function strengthLabel(level: BaziStrengthLevel) {
   return labels[level];
 }
 
+function normalizeCalibrationStrength(value: unknown): BaziStrengthLevel | undefined {
+  return value === 'veryWeak' || value === 'weak' || value === 'balanced' || value === 'strong' || value === 'veryStrong'
+    ? value
+    : undefined;
+}
+
+function normalizeCalibrationElements(values: unknown): FiveElement[] {
+  if (!Array.isArray(values)) return [];
+  const elements: FiveElement[] = ['木', '火', '土', '金', '水'];
+  return uniqueElements(values.flatMap((item) => {
+    const text = String(item || '');
+    return elements.filter((element) => text.includes(element));
+  }));
+}
+
+function preferenceFromCalibration(
+  base: BaziPreference,
+  bazi: BaziOutput,
+  rawCalibration: BaseParams['fortuneCalibration'] | undefined
+): BaziPreference {
+  if (!rawCalibration || rawCalibration.source !== 'ai_wuxing') return base;
+  const dayStem = bazi.dayMaster as HeavenlyStem;
+  const dayElement = STEM_ELEMENTS_MAP[dayStem];
+  const strengthLevel = normalizeCalibrationStrength(rawCalibration.strengthLevel) || base.strengthLevel;
+  const strengthScore = Number.isFinite(rawCalibration.strengthScore)
+    ? Math.max(0, Math.min(100, Math.round(Number(rawCalibration.strengthScore))))
+    : base.strengthScore;
+  const favorableElements = normalizeCalibrationElements(rawCalibration.favorableElements);
+  const unfavorableElements = normalizeCalibrationElements(rawCalibration.unfavorableElements);
+  const favorableRelations = favorableElements.length
+    ? Array.from(new Set(favorableElements.map((element) => relationForElement(dayElement, element))))
+    : base.favorableRelations;
+  const unfavorableRelations = unfavorableElements.length
+    ? Array.from(new Set(unfavorableElements.map((element) => relationForElement(dayElement, element))))
+    : base.unfavorableRelations.filter((relation) => !favorableRelations.includes(relation));
+  const nextFavorableElements = favorableElements.length ? favorableElements : elementsForRelations(dayElement, favorableRelations);
+  const nextUnfavorableElements = unfavorableElements.length ? unfavorableElements : elementsForRelations(dayElement, unfavorableRelations);
+  return {
+    strengthScore,
+    strengthLevel,
+    favorableRelations,
+    unfavorableRelations,
+    favorableTenGods: tenGodsForRelations(favorableRelations),
+    unfavorableTenGods: tenGodsForRelations(unfavorableRelations),
+    favorableElements: nextFavorableElements,
+    unfavorableElements: nextUnfavorableElements,
+    explanation: rawCalibration.reason || `AI校准：命主${strengthLabel(strengthLevel)}，喜${nextFavorableElements.join('、') || '调和'}。`,
+  };
+}
+
 function getPillarStem(pillar: unknown): HeavenlyStem | '' {
   return typeof (pillar as { stem?: unknown })?.stem === 'string'
     ? (pillar as { stem: HeavenlyStem }).stem
@@ -1263,7 +1313,7 @@ function calcFortuneByStemBranchWithPreference(
     strengthScore: preference.strengthScore,
     favorableElements: preference.favorableElements,
     unfavorableElements: preference.unfavorableElements,
-    reason: `命主${strengthLabel(preference.strengthLevel)}，喜${preference.favorableElements.join('、') || '调和'}；本次${flowStem}${flowBranch}为${tenGod}（${relationLabel}），${isFavorable ? '属喜' : isUnfavorable ? '属忌' : '取中和'}。`,
+    reason: `${preference.explanation} 本次${flowStem}${flowBranch}为${tenGod}（${relationLabel}），${isFavorable ? '属喜' : isUnfavorable ? '属忌' : '取中和'}。`,
   };
   return {
     tenGod,
@@ -1454,8 +1504,11 @@ async function buildDailyFortune(params: BaseParams) {
   };
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
-  const algorithmMode = normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
-  const preference = algorithmMode === 'preference' ? analyzeBaziPreference(bazi) : undefined;
+  const hasAiCalibration = params.fortuneCalibration?.source === 'ai_wuxing';
+  const algorithmMode = hasAiCalibration ? 'preference' : normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
+  const preference = algorithmMode === 'preference'
+    ? preferenceFromCalibration(analyzeBaziPreference(bazi), bazi, params.fortuneCalibration)
+    : undefined;
   const fortune = fortuneFromDate(bazi, new Date(target.year, target.month - 1, target.day), algorithmMode, preference);
   const almanac = withKongWang(await calculateDailyAlmanac({
     date: dateOnlyString(target),
@@ -1475,7 +1528,7 @@ async function buildDailyFortune(params: BaseParams) {
     ...(algorithmMode === 'preference' && preference ? [
       `命局强弱：${strengthLabel(preference.strengthLevel)}（${preference.strengthScore}）`,
       `喜用：${preference.favorableElements.join('、') || '调和'}`,
-      '算法：喜忌逻辑',
+      `算法：${hasAiCalibration ? 'AI校准喜忌逻辑' : '喜忌逻辑'}`,
     ] : []),
     '',
     `综合：${fortune.overall}`,
@@ -1505,6 +1558,7 @@ async function buildDailyFortune(params: BaseParams) {
         trend,
         almanac,
         algorithmMode,
+        aiCalibrationEnabled: hasAiCalibration,
         preference,
         preferenceMeta: fortune.preferenceMeta,
         chartValueMap: {
@@ -1529,8 +1583,11 @@ async function buildMonthlyFortune(params: BaseParams) {
   };
   const input = commonBirthInput(params);
   const bazi = calculateBazi(input);
-  const algorithmMode = normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
-  const preference = algorithmMode === 'preference' ? analyzeBaziPreference(bazi) : undefined;
+  const hasAiCalibration = params.fortuneCalibration?.source === 'ai_wuxing';
+  const algorithmMode = hasAiCalibration ? 'preference' : normalizeFortuneAlgorithmMode(params.fortuneAlgorithmMode);
+  const preference = algorithmMode === 'preference'
+    ? preferenceFromCalibration(analyzeBaziPreference(bazi), bazi, params.fortuneCalibration)
+    : undefined;
   const midMonthParams = { ...target, day: Math.min(15, target.day || 15) };
   const solar = Solar.fromYmd(target.year, target.month, 15);
   const eightChar = solar.getLunar().getEightChar();
@@ -1565,7 +1622,7 @@ async function buildMonthlyFortune(params: BaseParams) {
     ...(algorithmMode === 'preference' && preference ? [
       `命局强弱：${strengthLabel(preference.strengthLevel)}（${preference.strengthScore}）`,
       `喜用：${preference.favorableElements.join('、') || '调和'}`,
-      '算法：喜忌逻辑',
+      `算法：${hasAiCalibration ? 'AI校准喜忌逻辑' : '喜忌逻辑'}`,
     ] : []),
     '',
     `综合：${monthly.levels.overall}`,
@@ -1600,6 +1657,7 @@ async function buildMonthlyFortune(params: BaseParams) {
         yearTrend,
         almanac,
         algorithmMode,
+        aiCalibrationEnabled: hasAiCalibration,
         preference,
         preferenceMeta: monthly.preferenceMeta,
       },

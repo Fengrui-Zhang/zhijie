@@ -33,6 +33,7 @@ import {
   type CaseRelationItem,
 } from './lib/case-relations';
 import { deriveInitialAnalysisFromSession } from './lib/initial-analysis';
+import { getStoredWuxingCalibration, type WuxingCalibration } from './lib/bazi-wuxing-calibration';
 import {
   appendCaseSpecialTag,
   BAZI_COMPATIBILITY_SESSION_TYPE,
@@ -1618,6 +1619,8 @@ const App: React.FC<AppProps> = ({
   const [professionalCaseOptions, setProfessionalCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseOptions, setFortuneCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseId, setFortuneCaseId] = useState<string>('');
+  const [fortuneAiCalibrationEnabledByCaseId, setFortuneAiCalibrationEnabledByCaseId] = useState<Record<string, boolean>>({});
+  const [fortuneAiCalibrationLoading, setFortuneAiCalibrationLoading] = useState(false);
   const [almanacDate, setAlmanacDate] = useState(() => toDateOnlyString(new Date()));
   const [almanacCaseId, setAlmanacCaseId] = useState('');
   const [almanacSelectionResult, setAlmanacSelectionResult] = useState<AlmanacSelectionResult | null>(null);
@@ -5860,6 +5863,9 @@ const App: React.FC<AppProps> = ({
         ? fortuneCaseOptions.find((item) => item.id === fortuneCaseId)
         : null;
       const fortuneCaseParams = (fortuneCase?.chartParams || {}) as Record<string, any>;
+      const fortuneAiCalibration = isFortuneReading && fortuneCaseId && fortuneAiCalibrationEnabledByCaseId[fortuneCaseId]
+        ? getStoredWuxingCalibration(fortuneCase?.initialAnalysisData)
+        : null;
 
       const lifePlaceText = buildBirthPlaceText(province, city, district);
       const lifeCoord = findPlaceCoord(district, city, province);
@@ -5888,7 +5894,8 @@ const App: React.FC<AppProps> = ({
         targetYear: isFortuneReading ? date.getFullYear() : undefined,
         targetMonth: isFortuneReading ? date.getMonth() + 1 : undefined,
         targetDay: isFortuneReading ? date.getDate() : undefined,
-        fortuneAlgorithmMode: isFortuneReading ? siteSettings.fortuneAlgorithmMode : undefined,
+        fortuneAlgorithmMode: isFortuneReading ? (fortuneAiCalibration ? 'preference' : siteSettings.fortuneAlgorithmMode) : undefined,
+        fortuneCalibration: fortuneAiCalibration || undefined,
         pan_model: isLiupanModeModel(modelType) ? liuyaoMode : undefined,
         taiyi_mode: modelType === ModelType.TAIYI ? 'hour' : undefined,
         question,
@@ -6727,6 +6734,106 @@ const App: React.FC<AppProps> = ({
     await sendFollowUpMessage(inputMessage);
   };
 
+  const syncFortuneCaseInitialAnalysis = useCallback((caseId: string, nextInitialAnalysisData: unknown) => {
+    const updatedAt = new Date().toISOString();
+    setFortuneCaseOptions((current) => current.map((item) => (
+      item.id === caseId
+        ? { ...item, initialAnalysisData: nextInitialAnalysisData as any, updatedAt }
+        : item
+    )));
+    setCaseItems((current) => current.map((item) => (
+      item.id === caseId
+        ? { ...item, initialAnalysisData: nextInitialAnalysisData as any, updatedAt }
+        : item
+    )));
+    setActiveCase((current) => current?.id === caseId
+      ? { ...current, initialAnalysisData: nextInitialAnalysisData as any, updatedAt }
+      : current
+    );
+  }, []);
+
+  const ensureFortuneAiCalibration = useCallback(async (caseId: string): Promise<WuxingCalibration | null> => {
+    if (!isLoggedIn) {
+      setError('请先登录并保存命例后再使用 AI 校准。');
+      return null;
+    }
+
+    const existingCase = fortuneCaseOptions.find((item) => item.id === caseId);
+    const existingCalibration = getStoredWuxingCalibration(existingCase?.initialAnalysisData);
+    if (existingCalibration) return existingCalibration;
+
+    setFortuneAiCalibrationLoading(true);
+    setError('');
+    try {
+      const detail = await fetchLoggedCaseDetail(caseId);
+      const detailCalibration = getStoredWuxingCalibration(detail?.initialAnalysisData);
+      if (detail?.initialAnalysisData && detailCalibration) {
+        syncFortuneCaseInitialAnalysis(caseId, detail.initialAnalysisData);
+        return detailCalibration;
+      }
+
+      const response = await fetch('/api/bazi/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'wuxing',
+          caseId,
+          force: false,
+          personalizationPrompt: buildPersonalizationPrompt(personalizationSettings),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof payload.error === 'string' ? payload.error : 'AI 校准失败，请稍后重试');
+      }
+      if (payload.initialAnalysisData !== undefined) {
+        syncFortuneCaseInitialAnalysis(caseId, payload.initialAnalysisData);
+      }
+      const calibration = getStoredWuxingCalibration(payload.initialAnalysisData);
+      if (!calibration) {
+        throw new Error('AI 五行分析结果不足，暂时无法用于校准。');
+      }
+      fetchUserProfile();
+      return calibration;
+    } catch (err: any) {
+      setError(err.message || 'AI 校准失败，请稍后重试');
+      return null;
+    } finally {
+      setFortuneAiCalibrationLoading(false);
+    }
+  }, [
+    fetchLoggedCaseDetail,
+    fortuneCaseOptions,
+    isLoggedIn,
+    personalizationSettings,
+    syncFortuneCaseInitialAnalysis,
+  ]);
+
+  const handleFortuneAiCalibrationToggle = useCallback(async () => {
+    if (!fortuneCaseId || loading || isTyping || fortuneAiCalibrationLoading) return;
+    const currentlyEnabled = Boolean(fortuneAiCalibrationEnabledByCaseId[fortuneCaseId]);
+    if (currentlyEnabled) {
+      setFortuneAiCalibrationEnabledByCaseId((current) => ({ ...current, [fortuneCaseId]: false }));
+      autoFortuneChartKeyRef.current = '';
+      setChartData(null);
+      setStep('input');
+      return;
+    }
+    const calibration = await ensureFortuneAiCalibration(fortuneCaseId);
+    if (!calibration) return;
+    setFortuneAiCalibrationEnabledByCaseId((current) => ({ ...current, [fortuneCaseId]: true }));
+    autoFortuneChartKeyRef.current = '';
+    setChartData(null);
+    setStep('input');
+  }, [
+    ensureFortuneAiCalibration,
+    fortuneAiCalibrationEnabledByCaseId,
+    fortuneAiCalibrationLoading,
+    fortuneCaseId,
+    isTyping,
+    loading,
+  ]);
+
   const handleFortuneDateChange = async (targetDate: Date) => {
     if (loading || isTyping) return;
     const value = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}T00:00`;
@@ -6774,11 +6881,11 @@ const App: React.FC<AppProps> = ({
     const keyDate = modelType === ModelType.MONTHLY_FORTUNE
       ? `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}`
       : `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
-    const key = `${modelType}:${fortuneCaseId}:${keyDate}`;
+    const key = `${modelType}:${fortuneCaseId}:${keyDate}:${fortuneAiCalibrationEnabledByCaseId[fortuneCaseId] ? 'ai' : 'system'}`;
     if (autoFortuneChartKeyRef.current === key) return;
     autoFortuneChartKeyRef.current = key;
     handleCalculate({ targetDate });
-  }, [modelType, step, fortuneCaseId, loading, isTyping, timeMode, customDate, authStatus, isLoggedIn, guestModeEnabled]);
+  }, [modelType, step, fortuneCaseId, loading, isTyping, timeMode, customDate, authStatus, isLoggedIn, guestModeEnabled, fortuneAiCalibrationEnabledByCaseId]);
 
   const toggleLine = (idx: number) => {
     const newLines = [...manualLines];
@@ -9487,6 +9594,13 @@ const App: React.FC<AppProps> = ({
                     caseOptions={fortuneCaseOptions.map((item) => ({ id: item.id, title: item.title }))}
                     selectedCaseId={fortuneCaseId}
                     onCaseChange={handleFortuneCaseChange}
+                    aiCalibration={fortuneCaseId ? {
+                      enabled: Boolean(fortuneAiCalibrationEnabledByCaseId[fortuneCaseId]),
+                      loading: fortuneAiCalibrationLoading,
+                      disabled: !isLoggedIn,
+                      disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
+                      onToggle: handleFortuneAiCalibrationToggle,
+                    } : undefined}
                   />
                 )}
               </div>
@@ -10182,6 +10296,13 @@ const App: React.FC<AppProps> = ({
                       caseOptions={fortuneCaseOptions.map((item) => ({ id: item.id, title: item.title }))}
                       selectedCaseId={fortuneCaseId}
                       onCaseChange={handleFortuneCaseChange}
+                      aiCalibration={fortuneCaseId ? {
+                        enabled: Boolean(fortuneAiCalibrationEnabledByCaseId[fortuneCaseId]),
+                        loading: fortuneAiCalibrationLoading,
+                        disabled: !isLoggedIn,
+                        disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
+                        onToggle: handleFortuneAiCalibrationToggle,
+                      } : undefined}
                     />
                   )}
                   {[

@@ -8,6 +8,7 @@ import {
   normalizeInitialAnalysisData,
 } from './divination-cases';
 import { deriveInitialAnalysisFromSession } from './initial-analysis';
+import { attachWuxingCalibration, getStoredWuxingCalibration, getSavedWuxingAnalysisContent } from './bazi-wuxing-calibration';
 
 export async function backfillDivinationCases(userId: string) {
   const existingCases = await prisma.divinationCase.findMany({
@@ -101,6 +102,25 @@ export async function backfillDivinationCases(userId: string) {
       initialAnalysisData: true,
     },
   });
+  const calibrationUpdates = allCases.flatMap((item) => {
+    if (getStoredWuxingCalibration(item.initialAnalysisData)) return [];
+    if (!getSavedWuxingAnalysisContent(item.initialAnalysisData)) return [];
+    const nextInitialAnalysisData = attachWuxingCalibration(item.initialAnalysisData);
+    if (nextInitialAnalysisData === item.initialAnalysisData) return [];
+    return [
+      prisma.divinationCase.update({
+        where: { id: item.id },
+        data: {
+          initialAnalysisData: nextInitialAnalysisData as unknown as Prisma.InputJsonValue,
+        },
+      }),
+    ];
+  });
+
+  if (calibrationUpdates.length > 0) {
+    await prisma.$transaction(calibrationUpdates);
+  }
+
   const casesNeedingInitialAnalysis = allCases.filter(
     (item) => !normalizeInitialAnalysisData(item.initialAnalysisData)
   );

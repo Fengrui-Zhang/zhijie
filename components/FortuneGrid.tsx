@@ -23,6 +23,13 @@ type Props = {
   caseOptions?: Array<{ id: string; title: string }>;
   selectedCaseId?: string;
   onCaseChange?: (caseId: string) => void;
+  aiCalibration?: {
+    enabled: boolean;
+    loading?: boolean;
+    disabled?: boolean;
+    disabledReason?: string;
+    onToggle: () => void;
+  };
 };
 
 type DimensionKey = 'overall' | 'career' | 'love' | 'wealth' | 'health' | 'social';
@@ -373,6 +380,30 @@ const CaseSelector = ({
         <option key={item.id} value={item.id}>{item.title}</option>
       ))}
     </select>
+  );
+};
+
+const AiCalibrationButton = ({ aiCalibration }: Pick<Props, 'aiCalibration'>) => {
+  if (!aiCalibration) return null;
+  const label = aiCalibration.loading
+    ? '校准中'
+    : aiCalibration.enabled
+      ? 'AI校准已启用'
+      : 'AI校准';
+  return (
+    <button
+      type="button"
+      onClick={aiCalibration.onToggle}
+      disabled={Boolean(aiCalibration.loading || aiCalibration.disabled)}
+      title={aiCalibration.disabledReason}
+      className={`rounded-2xl border px-3 py-2 text-sm font-bold transition ${
+        aiCalibration.enabled
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+          : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+      } disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {label}
+    </button>
   );
 };
 
@@ -969,7 +1000,7 @@ const DirectionGrid = ({ directions }: { directions?: Record<string, string> }) 
   );
 };
 
-const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange }: Props) => {
+const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange, aiCalibration }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [showHours, setShowHours] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -1017,6 +1048,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
               <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
               <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
               <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
+              <AiCalibrationButton aiCalibration={aiCalibration} />
               <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
             </div>
           </div>
@@ -1103,6 +1135,11 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
               <button type="button" onClick={() => setShareOpen(true)} className="rounded-2xl border border-stone-200 bg-white px-3 py-1.5 text-sm font-bold text-stone-600 md:px-4 md:py-2">分享</button>
             </div>
             <ScoreBars fortune={fortune} />
+            {fortune.preferenceMeta?.reason && (
+              <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs leading-6 text-emerald-800 md:px-4">
+                {fortune.preferenceMeta.reason}
+              </div>
+            )}
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/70 pt-4 md:mt-6 md:gap-4 md:pt-5">
               <div>
                 <div className="text-xs text-stone-400">幸运色</div>
@@ -1360,7 +1397,7 @@ const YearlyMonthlyTrend = ({ trend, selectedMonth }: { trend: any[]; selectedMo
   );
 };
 
-const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange }: Props) => {
+const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, caseOptions, selectedCaseId, onCaseChange, aiCalibration }: Props) => {
   const [mode, setMode] = useState<InterpretationMode>('colloquial');
   const [shareOpen, setShareOpen] = useState(false);
   const fortune = (data.detail_info as any)?.fortune || {};
@@ -1396,6 +1433,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
             <span className="mr-2">命主</span>
             <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
             {!caseOptions?.length && <span className="font-bold text-indigo-600">{String(data.base_info?.name || '当前命例')}</span>}
+            <span className="ml-2 inline-flex"><AiCalibrationButton aiCalibration={aiCalibration} /></span>
           </div>
         </div>
         <div className="grid gap-4 p-3 md:grid-cols-[0.85fr_1.15fr] md:gap-6 md:p-6">
@@ -1425,6 +1463,11 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
             <div className="mt-4 md:mt-6">
               <ScoreBars fortune={fortune} />
             </div>
+            {fortune.preferenceMeta?.reason && (
+              <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs leading-6 text-emerald-800 md:px-4">
+                {fortune.preferenceMeta.reason}
+              </div>
+            )}
             <div className="mt-4 border-t border-stone-100 pt-4 md:mt-6 md:pt-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 md:mb-4">
                 <div className="text-base font-bold text-stone-800 md:text-lg">本月指引</div>
