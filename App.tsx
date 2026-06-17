@@ -171,7 +171,6 @@ const GlowCheck = ({
 const THINKING_START = '[[THINKING]]';
 const THINKING_END = '[[/THINKING]]';
 const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当真。命运掌握在自己手中，要相信科学，理性看待。';
-const KLINE_DEV_NOTE = 'K线功能尚处于开发阶段，仅供娱乐';
 const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const GUEST_CASE_RELATIONS_STORAGE_KEY = 'guest-divination-case-relations:v1';
@@ -9051,9 +9050,6 @@ const App: React.FC<AppProps> = ({
                         已同步载入两人的八字命盘，后续追问会以合盘结果为基础进行解读。
                       </div>
                     </div>
-                    <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 text-xs font-semibold text-amber-700">
-                      Beta
-                    </span>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="glass-panel rounded-[24px] border border-white/60 p-4">
@@ -10981,8 +10977,6 @@ const App: React.FC<AppProps> = ({
                       );
                     })()}
                   </div>
-
-                  <div className="text-[11px] text-stone-400 text-center">{KLINE_DEV_NOTE}</div>
                 </div>
               )}
               </div>
