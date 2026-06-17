@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Solar } from 'lunar-javascript';
 import { calculateBaziLiuRiData, calculateBaziLiuYueData } from 'taibu-core/bazi';
 import { BaziResponse } from '../types';
 import { getWuxingColor } from '../utils/wuxing';
@@ -197,12 +198,20 @@ const hiddenText = (stems?: string, gods?: string) => {
   return stemList.map((stem, index) => `${stem}${godList[index] ? `(${godList[index]})` : ''}`).join(' ');
 };
 
-const formatFlowDayLabel = (date?: string, fallbackDay?: number | string) => {
+const formatFlowSolarDay = (date?: string, fallbackDay?: number | string) => {
   const match = typeof date === 'string' ? date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/) : null;
-  if (match) {
-    return `${Number(match[2])}月${Number(match[3])}日`;
+  if (match) return `${Number(match[3])}`;
+  return fallbackDay ? `${fallbackDay}` : '—';
+};
+
+const formatFlowLunarDay = (date?: string) => {
+  const match = typeof date === 'string' ? date.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/) : null;
+  if (!match) return '—';
+  try {
+    return Solar.fromYmd(Number(match[1]), Number(match[2]), Number(match[3])).getLunar().getDayInChinese();
+  } catch {
+    return '—';
   }
-  return fallbackDay ? `${fallbackDay}日` : '—';
 };
 
 const formatSolarDateShort = (date?: string) => {
@@ -217,6 +226,153 @@ const formatFlowMonthRange = (item?: any) => {
   if (start && end) return `${start}-${end}`;
   if (start) return start;
   return item?.month ? `${item.month}月` : '—';
+};
+
+const shortTenGod = (value?: string) => {
+  const map: Record<string, string> = {
+    比肩: '比',
+    劫财: '劫',
+    食神: '食',
+    伤官: '伤',
+    偏财: '才',
+    正财: '财',
+    七杀: '杀',
+    正官: '官',
+    偏印: '枭',
+    正印: '印',
+    日主: '日',
+  };
+  return value ? map[value] || value : '';
+};
+
+const getGanZhiParts = (item?: any) => {
+  const ganZhi = item?.ganZhi || '';
+  const gan = item?.gan || item?.stem || ganZhi.charAt(0) || '';
+  const zhi = item?.zhi || item?.branch || ganZhi.charAt(1) || '';
+  return { gan, zhi };
+};
+
+const getBranchTenGod = (item?: any) => item?.branchTenGod || item?.hiddenStems?.[0]?.tenGod || '';
+
+const parseHiddenStemPairs = (value?: string) => {
+  const text = value && value !== '—' ? value : '';
+  if (!text) return [];
+  return text
+    .split(/[、\s]+/)
+    .map((part) => {
+      const match = part.match(/^([甲乙丙丁戊己庚辛壬癸])(?:[·(（]([^()（）·]+)[)）]?)?$/);
+      if (!match) return null;
+      return { stem: match[1], tenGod: match[2] || '' };
+    })
+    .filter((item): item is { stem: string; tenGod: string } => Boolean(item));
+};
+
+const FlowStemBranch = ({
+  gan,
+  zhi,
+  stemTenGod,
+  branchTenGod,
+}: {
+  gan: string;
+  zhi: string;
+  stemTenGod?: string;
+  branchTenGod?: string;
+}) => (
+  <div className="mt-1.5 flex flex-col items-center gap-0.5">
+    <div className="flex items-baseline justify-center gap-1 leading-none">
+      <span className={`text-xl font-bold ${getWuxingColor(gan)}`}>{gan || '—'}</span>
+      {stemTenGod && <span className="text-[11px] font-medium text-stone-500">{shortTenGod(stemTenGod)}</span>}
+    </div>
+    <div className="flex items-baseline justify-center gap-1 leading-none">
+      <span className={`text-xl font-bold ${getWuxingColor(zhi)}`}>{zhi || '—'}</span>
+      {branchTenGod && <span className="text-[11px] font-medium text-stone-500">{shortTenGod(branchTenGod)}</span>}
+    </div>
+  </div>
+);
+
+const FlowItemButton = ({
+  active,
+  children,
+  onClick,
+  wide = false,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+  wide?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`min-h-[108px] shrink-0 whitespace-nowrap border-r border-stone-100 px-2.5 py-2.5 text-center transition last:border-r-0 ${
+      wide ? 'w-[96px]' : 'w-[86px]'
+    } ${
+      active
+        ? 'bg-amber-100/70 text-stone-950 shadow-[inset_0_0_0_1px_rgba(217,119,6,0.18)]'
+        : 'bg-transparent text-stone-700 hover:bg-white/70'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const FlowRail = ({ title, meta, children }: { title: string; meta?: string; children: React.ReactNode }) => (
+  <section className="border-t border-stone-100/80 py-4 first:border-t-0 first:pt-0">
+    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 px-1">
+      <div className="text-lg font-bold text-stone-900">{title}</div>
+      {meta && <div className="text-sm font-medium text-stone-500">{meta}</div>}
+    </div>
+    <div className="-mx-2 overflow-x-auto px-2 pb-1">
+      <div className="flex min-w-max overflow-hidden rounded-2xl border border-stone-100 bg-white/45">
+        {children}
+      </div>
+    </div>
+  </section>
+);
+
+const HiddenStemStack = ({ value }: { value?: string }) => {
+  const pairs = parseHiddenStemPairs(value);
+  if (!pairs.length) return <span className="text-stone-400">—</span>;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {pairs.map((item, index) => (
+        <div key={`${item.stem}-${item.tenGod}-${index}`} className="flex items-center justify-center gap-1 whitespace-nowrap">
+          <span className={`text-xs font-bold md:text-sm ${getWuxingColor(item.stem)}`}>{item.stem}</span>
+          {item.tenGod && (
+            <>
+              <span className="text-[10px] text-stone-300">·</span>
+              <span className="text-[10px] font-medium text-stone-500 md:text-xs">{item.tenGod}</span>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ShenShaList = ({ value }: { value?: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const items = splitList(value);
+  if (!items.length) return <span className="text-stone-400">—</span>;
+  const visible = expanded ? items : items.slice(0, 3);
+  return (
+    <button
+      type="button"
+      onClick={() => items.length > 3 && setExpanded((next) => !next)}
+      className="mx-auto flex max-w-full flex-col items-center gap-1 text-center"
+    >
+      {visible.map((item, index) => (
+        <span key={`${item}-${index}`} className="max-w-full truncate text-[10px] font-medium leading-4 text-stone-600 md:text-xs">
+          {item}
+        </span>
+      ))}
+      {items.length > 3 && (
+        <span className="text-[10px] font-semibold text-amber-700">
+          {expanded ? '收起' : `展开 ${items.length - 3}`}
+        </span>
+      )}
+    </button>
+  );
 };
 
 const addTenGodLocation = (
@@ -451,30 +607,8 @@ const CaseNotes = ({ storageKey }: { storageKey: string }) => {
   );
 };
 
-const ChipButton = ({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: React.ReactNode;
-  onClick: () => void;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`shrink-0 rounded-2xl border px-3 py-2 text-center transition ${
-      active
-        ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_14px_30px_rgba(28,25,23,0.18)]'
-        : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75 hover:text-stone-900'
-    }`}
-  >
-    {children}
-  </button>
-);
-
 const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved }) => {
-  const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
+  const { base_info, bazi_info, dayun_info, detail_info } = data;
   const dayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
   const [selectedDayunIndex, setSelectedDayunIndex] = useState<number | null>(null);
@@ -489,6 +623,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const pillars = labelForPillar.map((label, index) => {
     const value = bazi_info.bazi[index] || '';
     const key = ['year', 'month', 'day', 'hour'][index] as keyof BaziResponse['detail_info']['shensha'];
+    const pillarShenSha = detail_info.shensha?.[key];
     return {
       label,
       ganZhi: value,
@@ -497,7 +632,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       tgGod: bazi_info.tg_cg_god[index] || '',
       hidden: hiddenText(bazi_info.dz_cg[index], bazi_info.dz_cg_god?.[index]),
       nayin: bazi_info.na_yin[index] || '',
-      shensha: detail_info.shensha?.[key] || start_info?.jishen?.[index] || '',
+      shensha: Array.isArray(pillarShenSha) ? pillarShenSha.join(' ') : pillarShenSha || '',
     };
   });
 
@@ -517,6 +652,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     return calculateBaziLiuRiData(selectedMonthItem.startDate, selectedMonthItem.endDate, fortuneContext);
   }, [fortuneContext, selectedMonthItem]);
   const selectedDayItem = selectedDay ? liuriList.find((item: any) => item.date === selectedDay) : null;
+  const visibleDayunList = dayunList.slice(0, 10);
   const dayMaster = bazi_info.bazi[2]?.charAt(0) || detail_info.sizhu.day.tg || '';
   const dayElement = elementLabel(dayMaster);
   const patternText = base_info.zhengge || patternFromTenGod(bazi_info.tg_cg_god?.[1]) || '—';
@@ -771,6 +907,11 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                 {tableColumns.map((column) => {
                   const content = column.values[row as keyof typeof column.values] || '—';
                   const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
+                  const cellContent = row === '藏干'
+                    ? <HiddenStemStack value={String(content)} />
+                    : row === '神煞'
+                      ? <ShenShaList value={String(content)} />
+                      : content;
                   return (
                     <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-1 align-middle md:p-3">
                       <div
@@ -778,7 +919,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                           row === '天干' || row === '地支' ? `text-xl font-bold leading-7 md:text-3xl ${colorClass}` : 'text-[9px] leading-4 text-stone-700 md:text-xs md:leading-5'
                         }`}
                       >
-                        {content}
+                        {cellContent}
                       </div>
                     </td>
                   );
@@ -790,61 +931,62 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       </div>
 
       <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
-        <section>
-          <div className="mb-2 text-sm font-bold text-stone-800">大运</div>
-          <div className="flex flex-wrap gap-2 pb-1">
-            {dayunList.map((item: any, index: number) => (
-              <ChipButton key={`${item.ganZhi}-${index}`} active={selectedDayunIndex === index} onClick={() => selectDayun(index)}>
-                <div className="text-sm font-bold">{item.ganZhi}</div>
-                <div className="text-[10px] opacity-70">{item.startAge}岁 · {item.startYear}</div>
-              </ChipButton>
-            ))}
-          </div>
-        </section>
+        <FlowRail title="大运" meta={base_info.qiyun ? `${base_info.qiyun} 起运` : undefined}>
+          {visibleDayunList.map((item: any, index: number) => {
+            const { gan, zhi } = getGanZhiParts(item);
+            return (
+              <FlowItemButton key={`${item.ganZhi}-${index}`} active={selectedDayunIndex === index} onClick={() => selectDayun(index)}>
+                <div className="text-xs font-semibold text-stone-600">{item.startAge ? `${item.startAge}岁` : '—'}</div>
+                <div className="mt-1 text-xs font-medium text-stone-500">{item.startYear || '—'}</div>
+                <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
+              </FlowItemButton>
+            );
+          })}
+        </FlowRail>
 
         {selectedDayun && (
-          <section>
-            <div className="mb-2 text-sm font-bold text-stone-800">流年</div>
-            <div className="flex flex-wrap gap-2 pb-1">
-              {(selectedDayun.liunianList || []).map((item: any) => (
-                <ChipButton key={item.year} active={selectedYear === item.year} onClick={() => selectYear(item.year)}>
-                  <div className="text-xs">{item.year}</div>
-                  <div className="text-sm font-bold">{item.ganZhi}</div>
-                  <div className="text-[10px] opacity-70">{item.age}岁</div>
-                </ChipButton>
-              ))}
-            </div>
-          </section>
+          <FlowRail title="流年">
+            {(selectedDayun.liunianList || []).map((item: any) => {
+              const { gan, zhi } = getGanZhiParts(item);
+              return (
+                <FlowItemButton key={item.year} active={selectedYear === item.year} onClick={() => selectYear(item.year)}>
+                  <div className="text-xs font-semibold text-stone-600">{item.age ? `${item.age}岁` : '—'}</div>
+                  <div className="mt-1 text-xs font-medium text-stone-500">{item.year || '—'}</div>
+                  <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
+                </FlowItemButton>
+              );
+            })}
+          </FlowRail>
         )}
 
         {selectedYear && liuyueList.length > 0 && (
-          <section>
-            <div className="mb-2 text-sm font-bold text-stone-800">{selectedYear}年流月（阳历节气区间）</div>
-            <div className="flex flex-wrap gap-2 pb-1">
-              {liuyueList.map((item: any) => (
-                <ChipButton key={item.month} active={selectedMonth === item.month} onClick={() => selectMonth(item.month)}>
-                  <div className="text-xs">{formatFlowMonthRange(item)}</div>
-                  <div className="text-sm font-bold">{item.ganZhi}</div>
-                </ChipButton>
-              ))}
-            </div>
-          </section>
+          <FlowRail title="流月" meta={`${selectedYear}年`}>
+            {liuyueList.map((item: any) => {
+              const { gan, zhi } = getGanZhiParts(item);
+              return (
+                <FlowItemButton key={item.month} active={selectedMonth === item.month} onClick={() => selectMonth(item.month)} wide>
+                  <div className="text-xs font-semibold text-stone-600">{formatSolarDateShort(item.startDate) || `${item.month}月`}</div>
+                  <div className="mt-1 text-xs font-medium text-stone-500">{item.jieQi || '—'}</div>
+                  <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
+                </FlowItemButton>
+              );
+            })}
+          </FlowRail>
         )}
 
         {selectedMonth && liuriList.length > 0 && (
-          <section>
-            <div className="mb-2 text-sm font-bold text-stone-800">
-              流日（阳历 {formatFlowMonthRange(selectedMonthItem)}）
-            </div>
-            <div className="flex flex-wrap gap-2 pb-1">
-              {liuriList.map((item: any) => (
-                <ChipButton key={item.date} active={selectedDay === item.date} onClick={() => setSelectedDay((current) => current === item.date ? null : item.date)}>
-                  <div className="text-xs">{formatFlowDayLabel(item.date, item.day)}</div>
-                  <div className="text-sm font-bold">{item.ganZhi}</div>
-                </ChipButton>
-              ))}
-            </div>
-          </section>
+          <FlowRail title="流日" meta={formatFlowMonthRange(selectedMonthItem)}>
+            {liuriList.map((item: any) => {
+              const { gan, zhi } = getGanZhiParts(item);
+              return (
+                <FlowItemButton key={item.date} active={selectedDay === item.date} onClick={() => setSelectedDay((current) => current === item.date ? null : item.date)} wide>
+                  <div className="text-xs font-semibold text-stone-600">{formatFlowSolarDay(item.date, item.day)}日</div>
+                  <div className="mt-1 text-xs font-medium text-stone-500">{formatFlowLunarDay(item.date)}</div>
+                  <FlowStemBranch gan={gan} zhi={zhi} stemTenGod={item.tenGod} branchTenGod={getBranchTenGod(item)} />
+                </FlowItemButton>
+              );
+            })}
+          </FlowRail>
         )}
       </div>
         </div>
