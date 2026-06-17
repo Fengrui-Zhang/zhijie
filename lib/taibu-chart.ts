@@ -806,6 +806,7 @@ type BaziPreference = {
   unfavorableElements: FiveElement[];
   explanation: string;
 };
+type FortuneFlowKind = 'daily' | 'monthly';
 type FortunePreferenceMeta = {
   strengthLevel: string;
   strengthScore: number;
@@ -849,6 +850,20 @@ const BRANCH_HIDDEN_STEMS: Record<string, HeavenlyStem[]> = Object.fromEntries(
     stems.map((item) => item.stem as HeavenlyStem),
   ])
 ) as Record<string, HeavenlyStem[]>;
+const BRANCH_HIDDEN_STEM_WEIGHTS: Record<string, Array<{ stem: HeavenlyStem; weight: number }>> = {
+  子: [{ stem: '癸', weight: 1 }],
+  丑: [{ stem: '己', weight: 0.6 }, { stem: '辛', weight: 0.3 }, { stem: '癸', weight: 0.1 }],
+  寅: [{ stem: '甲', weight: 0.6 }, { stem: '丙', weight: 0.3 }, { stem: '戊', weight: 0.1 }],
+  卯: [{ stem: '乙', weight: 1 }],
+  辰: [{ stem: '戊', weight: 0.6 }, { stem: '乙', weight: 0.3 }, { stem: '癸', weight: 0.1 }],
+  巳: [{ stem: '丙', weight: 0.6 }, { stem: '戊', weight: 0.3 }, { stem: '庚', weight: 0.1 }],
+  午: [{ stem: '丁', weight: 0.7 }, { stem: '己', weight: 0.3 }],
+  未: [{ stem: '己', weight: 0.6 }, { stem: '丁', weight: 0.3 }, { stem: '乙', weight: 0.1 }],
+  申: [{ stem: '庚', weight: 0.6 }, { stem: '壬', weight: 0.3 }, { stem: '戊', weight: 0.1 }],
+  酉: [{ stem: '辛', weight: 1 }],
+  戌: [{ stem: '戊', weight: 0.6 }, { stem: '辛', weight: 0.3 }, { stem: '丁', weight: 0.1 }],
+  亥: [{ stem: '壬', weight: 0.7 }, { stem: '甲', weight: 0.3 }],
+};
 const ELEMENT_COLORS: Record<FiveElement, string> = {
   木: '绿色',
   火: '红色',
@@ -1016,14 +1031,15 @@ function preferenceFromCalibration(
     : base.strengthScore;
   const favorableElements = normalizeCalibrationElements(rawCalibration.favorableElements);
   const unfavorableElements = normalizeCalibrationElements(rawCalibration.unfavorableElements);
-  const favorableRelations = favorableElements.length
+  const hasExplicitPreference = favorableElements.length > 0 || unfavorableElements.length > 0;
+  const favorableRelations = hasExplicitPreference
     ? Array.from(new Set(favorableElements.map((element) => relationForElement(dayElement, element))))
     : base.favorableRelations;
-  const unfavorableRelations = unfavorableElements.length
+  const unfavorableRelations = hasExplicitPreference
     ? Array.from(new Set(unfavorableElements.map((element) => relationForElement(dayElement, element))))
     : base.unfavorableRelations.filter((relation) => !favorableRelations.includes(relation));
-  const nextFavorableElements = favorableElements.length ? favorableElements : elementsForRelations(dayElement, favorableRelations);
-  const nextUnfavorableElements = unfavorableElements.length ? unfavorableElements : elementsForRelations(dayElement, unfavorableRelations);
+  const nextFavorableElements = hasExplicitPreference ? favorableElements : elementsForRelations(dayElement, favorableRelations);
+  const nextUnfavorableElements = hasExplicitPreference ? unfavorableElements : elementsForRelations(dayElement, unfavorableRelations);
   return {
     strengthScore,
     strengthLevel,
@@ -1049,6 +1065,13 @@ function getPillarBranch(pillar: unknown): string {
     : '';
 }
 
+function getWeightedHiddenStems(branch: string) {
+  return BRANCH_HIDDEN_STEM_WEIGHTS[branch] || (BRANCH_HIDDEN_STEMS[branch] || []).map((stem, index) => ({
+    stem,
+    weight: [0.6, 0.3, 0.1][index] || 0.1,
+  }));
+}
+
 function analyzeBaziPreference(bazi: BaziOutput): BaziPreference {
   const userDayStem = bazi.dayMaster as HeavenlyStem;
   const userElement = STEM_ELEMENTS_MAP[userDayStem];
@@ -1070,11 +1093,11 @@ function analyzeBaziPreference(bazi: BaziOutput): BaziPreference {
   const branchWeights = [1, 1.2, 1.4, 1];
   const branches = [pillars.year, pillars.month, pillars.day, pillars.hour].map(getPillarBranch);
   const rootRaw = branches.reduce((sum, branch, branchIndex) => {
-    const hiddenStems = BRANCH_HIDDEN_STEMS[branch] || [];
-    const hiddenWeights = [1, 0.45, 0.2];
-    return sum + hiddenStems.reduce((hiddenSum, stem, stemIndex) => {
+    const hiddenStems = getWeightedHiddenStems(branch);
+    return sum + hiddenStems.reduce((hiddenSum, item) => {
+      const stem = item.stem;
       const relation = relationForElement(userElement, STEM_ELEMENTS_MAP[stem]);
-      return hiddenSum + (ROOT_SUPPORT[relation] ?? 0) * (hiddenWeights[stemIndex] || 0.1) * (branchWeights[branchIndex] || 1);
+      return hiddenSum + (ROOT_SUPPORT[relation] ?? 0) * item.weight * (branchWeights[branchIndex] || 1);
     }, 0);
   }, 0);
   const rootScore = Math.max(0, Math.min(30, 10 + rootRaw));
@@ -1087,9 +1110,9 @@ function analyzeBaziPreference(bazi: BaziOutput): BaziPreference {
   branches.forEach((branch) => {
     const element = BRANCH_ELEMENTS[branch];
     if (element) elementCounts.set(element, (elementCounts.get(element) || 0) + 1);
-    (BRANCH_HIDDEN_STEMS[branch] || []).forEach((stem, index) => {
+    getWeightedHiddenStems(branch).forEach(({ stem, weight }) => {
       const hiddenElement = STEM_ELEMENTS_MAP[stem];
-      elementCounts.set(hiddenElement, (elementCounts.get(hiddenElement) || 0) + ([0.55, 0.25, 0.1][index] || 0.05));
+      elementCounts.set(hiddenElement, (elementCounts.get(hiddenElement) || 0) + weight);
     });
   });
   const selfSupport = (elementCounts.get(userElement) || 0);
@@ -1178,26 +1201,6 @@ function calcBranchInteraction(userDayBranch: string, flowBranch: string) {
   return result;
 }
 
-function calcHiddenStemPreferenceBonus(userDayStem: HeavenlyStem, branch: string, preference: BaziPreference) {
-  const hiddenStems = BRANCH_HIDDEN_STEMS[branch];
-  if (!hiddenStems?.length) return 0;
-  const weights = [1, 0.45, 0.2];
-  const userElement = STEM_ELEMENTS_MAP[userDayStem];
-  return hiddenStems.reduce((sum, stem, index) => {
-    const relation = relationForElement(userElement, STEM_ELEMENTS_MAP[stem]);
-    const favorable = preference.favorableRelations.includes(relation);
-    const unfavorable = preference.unfavorableRelations.includes(relation);
-    const raw = preference.strengthLevel === 'balanced'
-      ? (ELEMENT_RELATION_WEIGHTS[relation] || 65) - 65
-      : favorable
-        ? 6
-        : unfavorable
-          ? -6
-          : 0;
-    return sum + raw * (weights[index] || 0.1);
-  }, 0);
-}
-
 function scaleBranchInteractionByPreference(
   branchBonus: Omit<FortuneScores, 'overall'>,
   userDayStem: HeavenlyStem,
@@ -1220,10 +1223,66 @@ function scaleBranchInteractionByPreference(
   };
 }
 
-function preferenceBaseWeight(relation: string, preference: BaziPreference) {
+function preferenceBaseWeight(relation: string, preference: BaziPreference, element?: FiveElement) {
+  const isFavorable = Boolean(element && preference.favorableElements.includes(element)) || preference.favorableRelations.includes(relation);
+  const isUnfavorable = Boolean(element && preference.unfavorableElements.includes(element)) || preference.unfavorableRelations.includes(relation);
+  const relationNudge: Record<string, number> = {
+    produced: 4,
+    same: 3,
+    produce: 1,
+    control: 0,
+    controlled: -2,
+  };
+  if (isFavorable) return Math.max(74, Math.min(90, 82 + (relationNudge[relation] || 0)));
+  if (isUnfavorable) return Math.max(42, Math.min(56, 50 - (relationNudge[relation] || 0)));
   if (preference.strengthLevel === 'balanced') return BALANCED_RELATION_BASE[relation] ?? 64;
-  if (['weak', 'veryWeak'].includes(preference.strengthLevel)) return WEAK_RELATION_BASE[relation] ?? 60;
-  return STRONG_RELATION_BASE[relation] ?? 60;
+  return 64 + Math.round((relationNudge[relation] || 0) * 0.5);
+}
+
+function scoreStemByPreference(userDayStem: HeavenlyStem, stem: HeavenlyStem, preference: BaziPreference) {
+  const element = STEM_ELEMENTS_MAP[stem];
+  const relation = relationForElement(STEM_ELEMENTS_MAP[userDayStem], element);
+  return preferenceBaseWeight(relation, preference, element);
+}
+
+function scoreBranchByPreference(userDayStem: HeavenlyStem, branch: string, preference: BaziPreference) {
+  const weightedHiddenStems = getWeightedHiddenStems(branch);
+  if (!weightedHiddenStems.length) {
+    const element = BRANCH_ELEMENTS[branch];
+    if (!element) return 64;
+    const relation = relationForElement(STEM_ELEMENTS_MAP[userDayStem], element);
+    return preferenceBaseWeight(relation, preference, element);
+  }
+  return weightedHiddenStems.reduce((sum, item) => (
+    sum + scoreStemByPreference(userDayStem, item.stem, preference) * item.weight
+  ), 0);
+}
+
+function flowBaseWeightByPreference(
+  userDayStem: HeavenlyStem,
+  flowStem: HeavenlyStem,
+  flowBranch: string,
+  preference: BaziPreference,
+  flowKind: FortuneFlowKind
+) {
+  const stemWeight = flowKind === 'monthly' ? 0.35 : 0.65;
+  const branchWeight = flowKind === 'monthly' ? 0.65 : 0.35;
+  return Math.round(
+    scoreStemByPreference(userDayStem, flowStem, preference) * stemWeight
+    + scoreBranchByPreference(userDayStem, flowBranch, preference) * branchWeight
+  );
+}
+
+function adjustHiddenTenGodsByPreference(userDayStem: HeavenlyStem, branch: string, preference: BaziPreference) {
+  const weightedHiddenStems = getWeightedHiddenStems(branch);
+  const result: Partial<FortuneScores> = {};
+  weightedHiddenStems.forEach(({ stem, weight }) => {
+    const adj = adjustTenGodByPreference(calculateTenGod(userDayStem, stem), preference);
+    (['career', 'love', 'wealth', 'health', 'social'] as Array<keyof Omit<FortuneScores, 'overall'>>).forEach((key) => {
+      result[key] = (result[key] || 0) + (adj[key] || 0) * weight * 0.55;
+    });
+  });
+  return result;
 }
 
 function adjustTenGodByPreference(tenGod: string, preference: BaziPreference) {
@@ -1251,19 +1310,26 @@ function calcFortuneByStemBranch(
   userDayStem: HeavenlyStem,
   userDayBranch: string,
   flowStem: HeavenlyStem,
-  flowBranch: string
+  flowBranch: string,
+  flowKind: FortuneFlowKind = 'daily'
 ): FortuneCalcResult {
   const relation = getElementRelation(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[flowStem]);
-  const baseWeight = ELEMENT_RELATION_WEIGHTS[relation] || 65;
+  const stemWeight = flowKind === 'monthly' ? 0.35 : 0.65;
+  const branchWeight = flowKind === 'monthly' ? 0.65 : 0.35;
+  const stemBaseWeight = ELEMENT_RELATION_WEIGHTS[relation] || 65;
+  const branchBaseWeight = getWeightedHiddenStems(flowBranch).reduce((sum, item) => {
+    const hiddenRelation = getElementRelation(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[item.stem]);
+    return sum + (ELEMENT_RELATION_WEIGHTS[hiddenRelation] || 65) * item.weight;
+  }, 0) || stemBaseWeight;
+  const baseWeight = Math.round(stemBaseWeight * stemWeight + branchBaseWeight * branchWeight);
   const tenGod = calculateTenGod(userDayStem, flowStem);
-  const hiddenBonus = calcHiddenStemBonus(userDayStem, flowBranch);
   const branchBonus = calcBranchInteraction(userDayBranch, flowBranch);
   const adj = TEN_GOD_ADJUSTMENTS[tenGod] || {};
-  const career = clampWeight(baseWeight + (adj.career || 0) + hiddenBonus + branchBonus.career);
-  const love = clampWeight(baseWeight + (adj.love || 0) + hiddenBonus + branchBonus.love);
-  const wealth = clampWeight(baseWeight + (adj.wealth || 0) + hiddenBonus + branchBonus.wealth);
-  const health = clampWeight(baseWeight + (adj.health || 0) + hiddenBonus + branchBonus.health);
-  const social = clampWeight(baseWeight + (adj.social || 0) + hiddenBonus + branchBonus.social);
+  const career = clampWeight(baseWeight + (adj.career || 0) + branchBonus.career);
+  const love = clampWeight(baseWeight + (adj.love || 0) + branchBonus.love);
+  const wealth = clampWeight(baseWeight + (adj.wealth || 0) + branchBonus.wealth);
+  const health = clampWeight(baseWeight + (adj.health || 0) + branchBonus.health);
+  const social = clampWeight(baseWeight + (adj.social || 0) + branchBonus.social);
   const overall = clampWeight((career + love + wealth + health + social) / 5);
   const scores = { overall, career, love, wealth, health, social };
   return {
@@ -1285,35 +1351,41 @@ function calcFortuneByStemBranchWithPreference(
   userDayBranch: string,
   flowStem: HeavenlyStem,
   flowBranch: string,
-  preference: BaziPreference
+  preference: BaziPreference,
+  flowKind: FortuneFlowKind = 'daily'
 ): FortuneCalcResult {
   const relation = relationForElement(STEM_ELEMENTS_MAP[userDayStem], STEM_ELEMENTS_MAP[flowStem]);
-  const baseWeight = preferenceBaseWeight(relation, preference);
+  const baseWeight = flowBaseWeightByPreference(userDayStem, flowStem, flowBranch, preference, flowKind);
   const tenGod = calculateTenGod(userDayStem, flowStem);
-  const hiddenBonus = calcHiddenStemPreferenceBonus(userDayStem, flowBranch, preference);
   const branchBonus = scaleBranchInteractionByPreference(
     calcBranchInteraction(userDayBranch, flowBranch),
     userDayStem,
     flowBranch,
     preference
   );
-  const adj = adjustTenGodByPreference(tenGod, preference);
-  const career = clampWeight(baseWeight + (adj.career || 0) + hiddenBonus + branchBonus.career);
-  const love = clampWeight(baseWeight + (adj.love || 0) + hiddenBonus + branchBonus.love);
-  const wealth = clampWeight(baseWeight + (adj.wealth || 0) + hiddenBonus + branchBonus.wealth);
-  const health = clampWeight(baseWeight + (adj.health || 0) + hiddenBonus + branchBonus.health);
-  const social = clampWeight(baseWeight + (adj.social || 0) + hiddenBonus + branchBonus.social);
+  const stemAdj = adjustTenGodByPreference(tenGod, preference);
+  const hiddenAdj = adjustHiddenTenGodsByPreference(userDayStem, flowBranch, preference);
+  const stemAdjWeight = flowKind === 'monthly' ? 0.55 : 0.85;
+  const hiddenAdjWeight = flowKind === 'monthly' ? 0.9 : 0.55;
+  const career = clampWeight(baseWeight + (stemAdj.career || 0) * stemAdjWeight + (hiddenAdj.career || 0) * hiddenAdjWeight + branchBonus.career);
+  const love = clampWeight(baseWeight + (stemAdj.love || 0) * stemAdjWeight + (hiddenAdj.love || 0) * hiddenAdjWeight + branchBonus.love);
+  const wealth = clampWeight(baseWeight + (stemAdj.wealth || 0) * stemAdjWeight + (hiddenAdj.wealth || 0) * hiddenAdjWeight + branchBonus.wealth);
+  const health = clampWeight(baseWeight + (stemAdj.health || 0) * stemAdjWeight + (hiddenAdj.health || 0) * hiddenAdjWeight + branchBonus.health);
+  const social = clampWeight(baseWeight + (stemAdj.social || 0) * stemAdjWeight + (hiddenAdj.social || 0) * hiddenAdjWeight + branchBonus.social);
   const overall = clampWeight((career + love + wealth + health + social) / 5);
   const scores = { overall, career, love, wealth, health, social };
   const relationLabel = RELATION_LABELS[relation] || relation;
   const isFavorable = preference.favorableTenGods.includes(tenGod) || preference.favorableRelations.includes(relation);
   const isUnfavorable = preference.unfavorableTenGods.includes(tenGod) || preference.unfavorableRelations.includes(relation);
+  const branchDetail = getWeightedHiddenStems(flowBranch)
+    .map(({ stem, weight }) => `${stem}${STEM_ELEMENTS_MAP[stem]}${Math.round(weight * 100)}%`)
+    .join('、');
   const preferenceMeta: FortunePreferenceMeta = {
     strengthLevel: strengthLabel(preference.strengthLevel),
     strengthScore: preference.strengthScore,
     favorableElements: preference.favorableElements,
     unfavorableElements: preference.unfavorableElements,
-    reason: `${preference.explanation} 本次${flowStem}${flowBranch}为${tenGod}（${relationLabel}），${isFavorable ? '属喜' : isUnfavorable ? '属忌' : '取中和'}。`,
+    reason: `${preference.explanation} 本次${flowStem}${flowBranch}以${flowKind === 'monthly' ? '地支' : '天干'}为主，天干${flowStem}为${tenGod}（${relationLabel}），地支${flowBranch}${branchDetail ? `藏${branchDetail}` : ''}，${isFavorable ? '主气属喜' : isUnfavorable ? '主气属忌' : '主气取中和'}。`,
   };
   return {
     tenGod,
@@ -1336,12 +1408,13 @@ function calcFortuneByStemBranchMode(
   flowStem: HeavenlyStem,
   flowBranch: string,
   mode: FortuneAlgorithmMode,
-  preference?: BaziPreference
+  preference?: BaziPreference,
+  flowKind: FortuneFlowKind = 'daily'
 ): FortuneCalcResult {
   if (mode === 'preference' && preference) {
-    return calcFortuneByStemBranchWithPreference(userDayStem, userDayBranch, flowStem, flowBranch, preference);
+    return calcFortuneByStemBranchWithPreference(userDayStem, userDayBranch, flowStem, flowBranch, preference, flowKind);
   }
-  return calcFortuneByStemBranch(userDayStem, userDayBranch, flowStem, flowBranch);
+  return calcFortuneByStemBranch(userDayStem, userDayBranch, flowStem, flowBranch, flowKind);
 }
 
 function getLuckyElement(userElement: FiveElement): FiveElement {
@@ -1397,7 +1470,8 @@ function fortuneFromDate(
   bazi: BaziOutput,
   date: Date,
   mode: FortuneAlgorithmMode = 'default',
-  preference?: BaziPreference
+  preference?: BaziPreference,
+  flowKind: FortuneFlowKind = 'daily'
 ) {
   const solar = Solar.fromYmd(date.getFullYear(), date.getMonth() + 1, date.getDate());
   const eightChar = solar.getLunar().getEightChar();
@@ -1405,7 +1479,7 @@ function fortuneFromDate(
   const dayBranch = eightChar.getDayZhi();
   const userDayStem = bazi.dayMaster as HeavenlyStem;
   const userDayBranch = bazi.fourPillars.day.branch;
-  const result = calcFortuneByStemBranchMode(userDayStem, userDayBranch, dayStem, dayBranch, mode, preference);
+  const result = calcFortuneByStemBranchMode(userDayStem, userDayBranch, dayStem, dayBranch, mode, preference, flowKind);
   const luckyElement = getLuckyElement(STEM_ELEMENTS_MAP[userDayStem]);
   return {
     date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
@@ -1479,7 +1553,8 @@ function buildYearMonthlyTrend(
       monthStem,
       monthBranch,
       mode,
-      preference
+      preference,
+      'monthly'
     );
     return {
       month,
@@ -1599,7 +1674,8 @@ async function buildMonthlyFortune(params: BaseParams) {
     monthStem,
     monthBranch,
     algorithmMode,
-    preference
+    preference,
+    'monthly'
   );
   const summary = generateMonthlySummary(monthly.tenGod, monthly.levels.overall);
   const calendar = buildMonthCalendar(bazi, target.year, target.month, algorithmMode, preference);
