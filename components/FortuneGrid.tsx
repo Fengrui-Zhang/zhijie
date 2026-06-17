@@ -1044,12 +1044,17 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
               </div>
               <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">›</button>
             </div>
-            <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end md:gap-4">
-              <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
-              <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
-              <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
-              <AiCalibrationButton aiCalibration={aiCalibration} />
-              <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
+            <div className="flex w-full flex-col items-center gap-2 text-sm sm:w-auto sm:items-end">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:justify-end">
+                <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
+                <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
+                <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+                <span className="text-stone-400">命主</span>
+                <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
+                <AiCalibrationButton aiCalibration={aiCalibration} />
+              </div>
             </div>
           </div>
 
