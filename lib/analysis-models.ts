@@ -1,4 +1,5 @@
 export const DEEPSEEK_PRO_MODEL = 'deepseek-v4-pro' as const;
+export const DEEPSEEK_FLASH_MODEL = 'deepseek-v4-flash' as const;
 
 export type AnalysisModel = typeof DEEPSEEK_PRO_MODEL;
 

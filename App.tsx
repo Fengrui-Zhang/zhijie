@@ -98,6 +98,10 @@ import ZiweiGrid from './components/ZiweiGrid';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import GenericTaibuGrid from './components/GenericTaibuGrid';
+import AlmanacWorkspace, {
+  type AlmanacSelectionInput,
+  type AlmanacSelectionResult,
+} from './components/AlmanacWorkspace';
 import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
 import MarkdownContent from './components/MarkdownContent';
@@ -119,6 +123,18 @@ const Spinner = () => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
 );
+
+const toDateOnlyString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDateOnlyString = (value: string) => {
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isFinite(parsed.getTime()) ? parsed : new Date();
+};
 const SendIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" /></svg>);
 const ReportIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25V6.75A2.25 2.25 0 0017.25 4.5H6.75A2.25 2.25 0 004.5 6.75v10.5A2.25 2.25 0 006.75 19.5h4.5m4.5-5.25v5.25m0 0l-2.25-2.25m2.25 2.25l2.25-2.25M8.25 9h7.5M8.25 12h4.5" /></svg>);
 const RefreshIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
@@ -1512,6 +1528,10 @@ const App: React.FC<AppProps> = ({
   const [professionalCaseOptions, setProfessionalCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseOptions, setFortuneCaseOptions] = useState<CaseItem[]>([]);
   const [fortuneCaseId, setFortuneCaseId] = useState<string>('');
+  const [almanacDate, setAlmanacDate] = useState(() => toDateOnlyString(new Date()));
+  const [almanacCaseId, setAlmanacCaseId] = useState('');
+  const [almanacSelectionResult, setAlmanacSelectionResult] = useState<AlmanacSelectionResult | null>(null);
+  const [almanacSelectionLoading, setAlmanacSelectionLoading] = useState(false);
   const autoFortuneChartKeyRef = useRef('');
   const [professionalCasesLoading, setProfessionalCasesLoading] = useState(false);
   const [professionalSelectedCaseId, setProfessionalSelectedCaseId] = useState<string | null>(null);
@@ -2263,7 +2283,7 @@ const App: React.FC<AppProps> = ({
   }, [hydrateCasesForModel, modelType]);
 
   useEffect(() => {
-    if (modelType !== ModelType.DAILY_FORTUNE && modelType !== ModelType.MONTHLY_FORTUNE) return;
+    if (modelType !== ModelType.DAILY_FORTUNE && modelType !== ModelType.MONTHLY_FORTUNE && modelType !== ModelType.ALMANAC) return;
     hydrateFortuneCaseOptions();
   }, [hydrateFortuneCaseOptions, modelType]);
 
@@ -2816,7 +2836,18 @@ const App: React.FC<AppProps> = ({
       }
       setChartData(effectiveChartData);
       setActiveChartParams(sessionChartParams);
-      setStep('chart');
+      if (loadedModelType === ModelType.ALMANAC) {
+        const selection = (effectiveChartData as any)?.selection;
+        setAlmanacSelectionResult(selection || null);
+        setAlmanacCaseId(typeof sessionChartParams.caseId === 'string' ? sessionChartParams.caseId : '');
+        const nextDate = selection?.selected?.[0]?.date || sessionChartParams.startDate || sessionChartParams.date;
+        if (typeof nextDate === 'string' && nextDate) {
+          setAlmanacDate(nextDate);
+        }
+        setStep('input');
+      } else {
+        setStep('chart');
+      }
       setError('');
       setCaseFormOpen(false);
       setEditingCaseId(null);
@@ -3603,6 +3634,9 @@ const App: React.FC<AppProps> = ({
     resetMessageVersions();
     clearChatSession();
     setError('');
+    setAlmanacSelectionResult(null);
+    setAlmanacSelectionLoading(false);
+    setAlmanacCaseId('');
     if (clearInputs) {
       setQuestion('');
       setBirthYear('');
@@ -5735,6 +5769,82 @@ const App: React.FC<AppProps> = ({
     }
   };
 
+  const loadAlmanacForDate = useCallback(async (dateValue: string) => {
+    const date = parseDateOnlyString(dateValue);
+    setLoading(true);
+    setError('');
+    try {
+      const params: BaseParams = {
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        day: date.getDate(),
+        hours: 9,
+        minute: 0,
+        sex: gender,
+        name: name || '择日',
+        born_year: birthYear ? parseInt(birthYear, 10) : undefined,
+      };
+      const resultData = await fetchAlmanac(params);
+      setChartData(resultData);
+      setStep('input');
+      setActiveChartParams(params as unknown as Record<string, unknown>);
+      setActiveSessionId(null);
+    } catch (err: any) {
+      setError(err.message || '黄历加载失败，请稍后重试。');
+    } finally {
+      setLoading(false);
+    }
+  }, [birthYear, gender, name]);
+
+  useEffect(() => {
+    if (workspaceView !== 'divination' || modelType !== ModelType.ALMANAC) return;
+    void loadAlmanacForDate(almanacDate);
+  }, [almanacDate, loadAlmanacForDate, modelType, workspaceView]);
+
+  const handleAlmanacDateChange = useCallback((dateValue: string) => {
+    if (!dateValue) return;
+    setAlmanacDate(dateValue);
+  }, []);
+
+  const handleRunAlmanacSelection = useCallback(async (input: AlmanacSelectionInput) => {
+    if (!input.matter.trim()) {
+      setError('请输入要择吉的事项');
+      return;
+    }
+    if (!isLoggedIn) {
+      setShowAuth(true);
+      setError('请先登录后再使用智能择吉');
+      return;
+    }
+    if (userQuota !== null && userQuota <= 0) {
+      setError('您的提问额度已用完');
+      return;
+    }
+    setAlmanacSelectionLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/almanac/select-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || '智能择吉失败，请稍后重试。');
+      }
+      const result = payload as AlmanacSelectionResult;
+      setAlmanacSelectionResult(result);
+      const firstDate = result.selected?.[0]?.date;
+      if (firstDate) setAlmanacDate(firstDate);
+      await fetchUserProfile();
+      await fetchSessions();
+    } catch (err: any) {
+      setError(err.message || '智能择吉失败，请稍后重试。');
+    } finally {
+      setAlmanacSelectionLoading(false);
+    }
+  }, [fetchSessions, fetchUserProfile, isLoggedIn, userQuota]);
+
   const toPersistedMessages = (messages: ChatMessage[]): PersistedChatMessage[] =>
     messages.map((msg) => ({
       role: msg.role,
@@ -6891,6 +7001,7 @@ const App: React.FC<AppProps> = ({
   // --- Render Helpers ---
   const isLifeReading = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI;
   const isFortuneReading = modelType === ModelType.DAILY_FORTUNE || modelType === ModelType.MONTHLY_FORTUNE;
+  const isAlmanacTool = modelType === ModelType.ALMANAC;
   // Only Bazi and Ziwei use location for True Solar Time
   const showLocation = modelType === ModelType.BAZI || modelType === ModelType.ZIWEI || modelType === ModelType.QIMEN;
   const showBornYear = modelType === ModelType.MEIHUA || modelType === ModelType.LIUYAO;
@@ -8965,8 +9076,8 @@ const App: React.FC<AppProps> = ({
 
         {/* Input Phase */}
         {step === 'input' && (
-          <div className={isFortuneReading ? 'space-y-4' : 'glass-panel rounded-[24px] p-5 md:p-7'}>
-            {!isFortuneReading && (
+          <div className={(isFortuneReading || isAlmanacTool) ? 'space-y-4' : 'glass-panel rounded-[24px] p-5 md:p-7'}>
+            {!isFortuneReading && !isAlmanacTool && (
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
               <div>
                 {!isCaseModel && (
@@ -9012,6 +9123,19 @@ const App: React.FC<AppProps> = ({
                   />
                 )}
               </div>
+            ) : isAlmanacTool ? (
+              <AlmanacWorkspace
+                data={chartData as GenericTaibuResponse | null}
+                selectedDate={almanacDate}
+                loading={loading}
+                onDateChange={handleAlmanacDateChange}
+                caseOptions={fortuneCaseOptions.map((item) => ({ id: item.id, title: item.title }))}
+                selectedCaseId={almanacCaseId}
+                onCaseChange={setAlmanacCaseId}
+                onRunSelection={handleRunAlmanacSelection}
+                selectionResult={almanacSelectionResult}
+                selectionLoading={almanacSelectionLoading}
+              />
             ) : isCaseModel ? (
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -9325,7 +9449,7 @@ const App: React.FC<AppProps> = ({
                 {showStandardTimeInput && (
                   <div>
                     <label className="block text-stone-700 font-bold mb-2">
-                      {isFortuneReading ? (modelType === ModelType.MONTHLY_FORTUNE ? '运势月份' : '运势日期') : modelType === ModelType.ALMANAC ? '择日日期' : '起盘时间'}
+                      {isFortuneReading ? (modelType === ModelType.MONTHLY_FORTUNE ? '运势月份' : '运势日期') : '起盘时间'}
                     </label>
                     {!isLifeReading && (
                       <div className="flex gap-2 mb-2">
