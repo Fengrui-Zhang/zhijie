@@ -24,6 +24,16 @@ type CandidateDay = {
   lunarMansion: string;
   lunarMansionLuck: string;
   directions: Record<string, unknown>;
+  hourlyFortune: Array<{
+    ganZhi: string;
+    tianShen: string;
+    tianShenType: string;
+    tianShenLuck: string;
+    chong: string;
+    sha: string;
+    suitable: string[];
+    avoid: string[];
+  }>;
   score: number;
 };
 
@@ -35,6 +45,12 @@ type SelectionResult = {
     score: number;
     reasons: string[];
     cautions: string[];
+    recommendedHours?: Array<{
+      ganZhi: string;
+      label: string;
+      reason: string;
+      caution?: string;
+    }>;
     suitable?: string[];
     avoid?: string[];
   }>;
@@ -99,6 +115,64 @@ const scoreCandidate = (candidate: Omit<CandidateDay, 'score'>, matter: string) 
   return Math.max(0, Math.min(100, score));
 };
 
+const SOFT_CAUTION_MAP: Array<[RegExp, string]> = [
+  [/凶神|游祸|天刑|黑道|白虎|朱雀|玄武|勾陈/, '当天仍有小干扰，重要流程按计划推进即可。'],
+  [/五虚|虚耗|五离/, '精力、预算和沟通要留有余量。'],
+  [/破财|耗财|劫财/, '涉及费用和合同金额时多核对一遍。'],
+  [/欺诈|被骗|骗局/, '合作对象和关键信息建议提前确认。'],
+  [/口舌|争|讼|纠纷/, '沟通时尽量说清边界，避免临时争执。'],
+  [/冲|煞/, '可避开冲突方位，时间安排不要太赶。'],
+  [/病|伤|灾/, '当天注意安全和身体状态，节奏稳一点。'],
+];
+
+const softenCaution = (value: unknown) => {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return '';
+  const matched = SOFT_CAUTION_MAP.find(([pattern]) => pattern.test(text));
+  if (matched) return matched[1];
+  return text
+    .replace(/[凶煞]/g, '小阻力')
+    .replace(/大忌/g, '不太建议')
+    .replace(/危险/g, '需要谨慎')
+    .replace(/灾/g, '波动')
+    .slice(0, 42);
+};
+
+const normalizeCautions = (value: unknown) => {
+  const normalized = asList(value).map(softenCaution).filter(Boolean);
+  return Array.from(new Set(normalized)).slice(0, 3);
+};
+
+const scoreHour = (
+  hour: CandidateDay['hourlyFortune'][number],
+  matter: string,
+) => {
+  const keywords = inferMatterKeywords(matter);
+  let score = 45;
+  if (hour.tianShenType === '黄道') score += 20;
+  if (hour.tianShenLuck === '吉') score += 12;
+  if (keywords.length > 0) {
+    if (textIncludesAny(hour.suitable, keywords)) score += 18;
+    if (textIncludesAny(hour.avoid, keywords)) score -= 22;
+  }
+  if (hour.avoid.includes('诸事不宜')) score -= 35;
+  return Math.max(0, Math.min(100, score));
+};
+
+const fallbackRecommendedHours = (candidate: CandidateDay | undefined, matter: string) => {
+  if (!candidate) return [];
+  return candidate.hourlyFortune
+    .map((hour) => ({ hour, score: scoreHour(hour, matter) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ hour }) => ({
+      ganZhi: hour.ganZhi,
+      label: `${hour.ganZhi}时`,
+      reason: hour.suitable.length ? `适合：${hour.suitable.slice(0, 3).join('、')}` : `${hour.tianShen || '此时'}相对稳妥`,
+      caution: normalizeCautions(hour.avoid).join('；'),
+    }));
+};
+
 const summarizeChart = async (date: Date, birthYear?: number): Promise<CandidateDay> => {
   const chart = await calculateTaibuChart({
     modelType: ModelType.ALMANAC,
@@ -135,6 +209,18 @@ const summarizeChart = async (date: Date, birthYear?: number): Promise<Candidate
     lunarMansion: String(inner.lunarMansion || ''),
     lunarMansionLuck: String(inner.lunarMansionLuck || ''),
     directions: (inner.directions && typeof inner.directions === 'object' ? inner.directions : {}) as Record<string, unknown>,
+    hourlyFortune: Array.isArray(inner.hourlyFortune)
+      ? inner.hourlyFortune.map((hour: any) => ({
+          ganZhi: String(hour.ganZhi || ''),
+          tianShen: String(hour.tianShen || ''),
+          tianShenType: String(hour.tianShenType || ''),
+          tianShenLuck: String(hour.tianShenLuck || ''),
+          chong: String(hour.chong || ''),
+          sha: String(hour.sha || ''),
+          suitable: asList(hour.suitable),
+          avoid: asList(hour.avoid),
+        }))
+      : [],
   };
   return {
     ...candidateWithoutScore,
@@ -168,9 +254,10 @@ const normalizeSelection = (selection: SelectionResult | null, candidates: Candi
       score: item.score,
       reasons: [
         `${item.tianShen || '值神'}${item.tianShenType ? `为${item.tianShenType}` : ''}`,
-        item.suitable.length ? `宜：${item.suitable.slice(0, 4).join('、')}` : '宜项较少，需谨慎取用',
+        item.suitable.length ? `宜：${item.suitable.slice(0, 4).join('、')}` : '宜项较少，建议搭配吉时使用',
       ],
-      cautions: item.avoid.length ? [`忌：${item.avoid.slice(0, 4).join('、')}`] : [],
+      cautions: item.avoid.length ? normalizeCautions(item.avoid.slice(0, 4).join('、')) : [],
+      recommendedHours: fallbackRecommendedHours(item, matter),
       suitable: item.suitable.slice(0, 8),
       avoid: item.avoid.slice(0, 8),
     }));
@@ -185,7 +272,15 @@ const normalizeSelection = (selection: SelectionResult | null, candidates: Candi
             label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : '推荐吉日',
             score: Math.max(0, Math.min(100, Number(item.score) || source?.score || 70)),
             reasons: asList(item.reasons).slice(0, 4),
-            cautions: asList(item.cautions).slice(0, 4),
+            cautions: normalizeCautions(item.cautions),
+            recommendedHours: Array.isArray(item.recommendedHours) && item.recommendedHours.length
+              ? item.recommendedHours.slice(0, 4).map((hour: any) => ({
+                  ganZhi: String(hour.ganZhi || ''),
+                  label: String(hour.label || hour.ganZhi || '吉时'),
+                  reason: String(hour.reason || '适合推进关键事项').slice(0, 60),
+                  caution: softenCaution(hour.caution),
+                }))
+              : fallbackRecommendedHours(source, matter),
             suitable: asList(item.suitable).length ? asList(item.suitable).slice(0, 8) : (source?.suitable.slice(0, 8) ?? []),
             avoid: asList(item.avoid).length ? asList(item.avoid).slice(0, 8) : (source?.avoid.slice(0, 8) ?? []),
           };
@@ -275,8 +370,10 @@ export async function POST(request: Request) {
   const prompt = [
     '你是专业择日顾问。请只基于候选黄历数据、用户事项和可选命主信息，选出最适合的 3-6 个日期。',
     '不要编造候选范围外的日期。不要长篇论述。',
+    '注意事项必须使用温和、生活化语言，不要直接输出吓人的神煞名称，不要说“凶”“灾”“欺诈”等刺激性词；如果有风险，只说“多核对合同/沟通留余量/避开冲突方位/节奏稳一点”。',
+    '每个推荐日期都要从 hourlyFortune 中选择 2-4 个适合该事项的吉时，写入 recommendedHours。推荐吉时也要结合命主信息。',
     '必须输出严格 JSON，不要 Markdown。格式：',
-    '{"summary":"一句总评","selected":[{"date":"YYYY-MM-DD","label":"优选吉日/可用吉日/备选日期","score":0-100,"reasons":["短理由"],"cautions":["短提醒"],"suitable":["宜项"],"avoid":["忌项"]}],"notes":["简短备注"]}',
+    '{"summary":"一句总评","selected":[{"date":"YYYY-MM-DD","label":"优选吉日/可用吉日/备选日期","score":0-100,"reasons":["短理由"],"cautions":["温和提醒"],"recommendedHours":[{"ganZhi":"甲子","label":"子时 23:00-01:00","reason":"适合...","caution":"温和提醒"}],"suitable":["宜项"],"avoid":["忌项"]}],"notes":["简短备注"]}',
     '',
     `用户事项：${matter}`,
     caseInfo ? `命主信息：${JSON.stringify(caseInfo)}` : '命主信息：未选择，按通用黄历择日。',

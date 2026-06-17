@@ -23,6 +23,12 @@ export type AlmanacSelectionResult = {
     score: number;
     reasons: string[];
     cautions: string[];
+    recommendedHours?: Array<{
+      ganZhi: string;
+      label: string;
+      reason: string;
+      caution?: string;
+    }>;
     suitable?: string[];
     avoid?: string[];
   }>;
@@ -77,6 +83,31 @@ const formatDateZh = (value: string) => {
 const weekdayZh = (value: string) => {
   const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
   return days[parseDate(value).getDay()];
+};
+
+const SHICHEN_RANGES: Record<string, string> = {
+  子: '23:00-01:00',
+  丑: '01:00-03:00',
+  寅: '03:00-05:00',
+  卯: '05:00-07:00',
+  辰: '07:00-09:00',
+  巳: '09:00-11:00',
+  午: '11:00-13:00',
+  未: '13:00-15:00',
+  申: '15:00-17:00',
+  酉: '17:00-19:00',
+  戌: '19:00-21:00',
+  亥: '21:00-23:00',
+};
+
+const formatHourRange = (ganZhi?: string) => {
+  const branch = typeof ganZhi === 'string' ? ganZhi.charAt(1) : '';
+  return SHICHEN_RANGES[branch] || '';
+};
+
+const gentleHourState = (hour: any) => {
+  if (hour?.tianShenType === '黄道' || hour?.tianShenLuck === '吉') return '顺';
+  return '慎';
 };
 
 const levelTone = (score: number) => {
@@ -176,9 +207,11 @@ const AlmanacWorkspace: React.FC<Props> = ({
   const jishen = asList(inner.jishen || inner.jiShen);
   const xiongsha = asList(inner.xiongsha || inner.xiongSha);
   const directions = inner.directions || {};
+  const hourlyFortune = Array.isArray(inner.hourlyFortune) ? inner.hourlyFortune : [];
   const [matter, setMatter] = useState('');
   const [startDate, setStartDate] = useState(selectedDate);
   const [endDate, setEndDate] = useState(addDays(selectedDate, 14));
+  const [activeRecommendation, setActiveRecommendation] = useState<AlmanacSelectionResult['selected'][number] | null>(null);
 
   const selectedDates = useMemo(
     () => new Set((selectionResult?.selected || []).map((item) => item.date)),
@@ -190,6 +223,18 @@ const AlmanacWorkspace: React.FC<Props> = ({
     setStartDate(selectedDate);
     setEndDate(addDays(selectedDate, days - 1));
   };
+
+  const openRecommendation = (item: AlmanacSelectionResult['selected'][number]) => {
+    setActiveRecommendation(item);
+    onDateChange(item.date);
+  };
+
+  const currentDateMatchesModal = Boolean(activeRecommendation && activeRecommendation.date === selectedDate);
+  const goodHours = hourlyFortune.filter((hour: any) => (
+    hour?.tianShenType === '黄道' ||
+    hour?.tianShenLuck === '吉' ||
+    asList(hour?.suitable).some((entry) => ['开市', '交易', '嫁娶', '入宅', '出行', '纳财', '祈福', '求嗣'].some((keyword) => entry.includes(keyword)))
+  ));
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -384,7 +429,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
                 <button
                   key={item.date}
                   type="button"
-                  onClick={() => onDateChange(item.date)}
+                  onClick={() => openRecommendation(item)}
                   className="rounded-2xl border border-stone-100 bg-white p-4 text-left shadow-sm transition hover:border-amber-200"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -402,8 +447,17 @@ const AlmanacWorkspace: React.FC<Props> = ({
                     </ul>
                   )}
                   {item.cautions.length > 0 && (
-                    <div className="mt-2 text-xs leading-5 text-rose-600">
+                    <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700">
                       {item.cautions.join('；')}
+                    </div>
+                  )}
+                  {item.recommendedHours && item.recommendedHours.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.recommendedHours.slice(0, 3).map((hour, index) => (
+                        <span key={`${hour.ganZhi}-${index}`} className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                          {hour.label || `${hour.ganZhi}时`}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </button>
@@ -417,6 +471,107 @@ const AlmanacWorkspace: React.FC<Props> = ({
           </div>
         )}
       </section>
+
+      {activeRecommendation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4 py-6 backdrop-blur-sm">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-auto rounded-[28px] border border-stone-100 bg-white p-5 shadow-2xl md:p-6">
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-2xl font-bold text-stone-900">{formatDateZh(activeRecommendation.date)}</div>
+                <div className="mt-1 text-sm text-stone-500">
+                  {weekdayZh(activeRecommendation.date)} · {activeRecommendation.label}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveRecommendation(null)}
+                className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm font-bold text-stone-500 transition hover:bg-stone-50"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/65 px-4 py-3 text-sm leading-7 text-amber-800">
+              {activeRecommendation.reasons.join('；')}
+              {activeRecommendation.cautions.length > 0 && (
+                <div className="mt-1 text-amber-700">提醒：{activeRecommendation.cautions.join('；')}</div>
+              )}
+            </div>
+
+            <div className="space-y-5">
+              <section>
+                <div className="mb-3 text-base font-bold text-stone-900">推荐吉时</div>
+                {activeRecommendation.recommendedHours && activeRecommendation.recommendedHours.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {activeRecommendation.recommendedHours.map((hour, index) => (
+                      <div key={`${hour.ganZhi}-${index}`} className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-lg font-bold text-emerald-800">{hour.label || `${hour.ganZhi}时`}</div>
+                          {hour.ganZhi && (
+                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-emerald-700">
+                              {hour.ganZhi}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-stone-700">{hour.reason}</div>
+                        {hour.caution && (
+                          <div className="mt-2 text-xs leading-5 text-amber-700">提醒：{hour.caution}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-6 text-center text-sm text-stone-500">
+                    暂无单独推荐吉时，可参考下方时辰简表。
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <div className="mb-3 text-base font-bold text-stone-900">十二时辰简表</div>
+                {!currentDateMatchesModal || loading ? (
+                  <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-6 text-center text-sm text-stone-500">
+                    正在加载当天时辰...
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {(goodHours.length ? goodHours : hourlyFortune).slice(0, 12).map((hour: any, index: number) => {
+                      const state = gentleHourState(hour);
+                      const favorable = state === '顺';
+                      const suitable = asList(hour?.suitable).slice(0, 3);
+                      return (
+                        <div
+                          key={`${hour?.ganZhi || index}-${index}`}
+                          className={`rounded-2xl border px-3 py-3 ${
+                            favorable
+                              ? 'border-emerald-100 bg-emerald-50/55'
+                              : 'border-stone-100 bg-stone-50/70'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-bold text-stone-800">
+                              {hour?.ganZhi || '—'}时
+                              {formatHourRange(hour?.ganZhi) && (
+                                <span className="ml-1 text-xs font-semibold text-stone-400">{formatHourRange(hour?.ganZhi)}</span>
+                              )}
+                            </div>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${favorable ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-stone-500'}`}>
+                              {state}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs leading-5 text-stone-600">
+                            {suitable.length ? `适合：${suitable.join('、')}` : '适合安排低风险事项'}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
