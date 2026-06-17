@@ -437,6 +437,77 @@ const RECOMPUTED_LABELS = new Set([
   '水溺煞',
 ]);
 
+const AUSPICIOUS_SHENSHA = new Set([
+  '天乙贵人',
+  '太极贵人',
+  '文昌',
+  '文昌贵人',
+  '国印',
+  '国印贵人',
+  '学堂',
+  '词馆',
+  '金舆',
+  '将星',
+  '天医',
+  '天赦',
+  '禄神',
+  '红鸾',
+  '天喜',
+  '福星',
+  '福星贵人',
+  '德秀贵人',
+  '天德贵人',
+  '月德贵人',
+  '天德合',
+  '月德合',
+]);
+
+const INAUSPICIOUS_SHENSHA = new Set([
+  '羊刃',
+  '劫煞',
+  '灾煞',
+  '亡神',
+  '天罗',
+  '地网',
+  '孤辰',
+  '寡宿',
+  '元辰',
+  '大耗',
+  '红艳煞',
+  '十恶大败',
+  '阴差阳错',
+  '孤鸾煞',
+  '勾煞',
+  '绞煞',
+  '勾绞煞',
+  '丧门',
+  '吊客',
+  '白虎',
+  '白虎煞',
+  '官符',
+  '官符煞',
+  '病符',
+  '病符煞',
+  '死符',
+  '死符煞',
+  '破碎',
+  '破碎煞',
+  '六厄',
+  '自缢煞',
+  '水溺煞',
+  '飞刃',
+  '血刃',
+  '流霞',
+  '披头',
+  '四废',
+]);
+
+export const getShenShaTone = (name: string): 'good' | 'bad' | 'neutral' => {
+  if (AUSPICIOUS_SHENSHA.has(name)) return 'good';
+  if (INAUSPICIOUS_SHENSHA.has(name)) return 'bad';
+  return 'neutral';
+};
+
 const matchSanHeRule = (
   sourceBranch: string,
   targetBranch: string,

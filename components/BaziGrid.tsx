@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Solar } from 'lunar-javascript';
 import { calculateBaziLiuRiData, calculateBaziLiuYueData } from 'taibu-core/bazi';
 import { BaziResponse } from '../types';
-import { normalizeZhijieShenSha, type BaziShenShaContext } from '../utils/baziShensha';
+import { getShenShaTone, normalizeZhijieShenSha, type BaziShenShaContext } from '../utils/baziShensha';
 import { getWuxingColor } from '../utils/wuxing';
 import MarkdownContent from './MarkdownContent';
 
@@ -355,10 +355,16 @@ const ShenShaList = ({ value, expanded }: { value?: string; expanded: boolean })
   const items = splitList(value);
   if (!items.length) return <span className="text-stone-400">—</span>;
   const visible = expanded ? items : items.slice(0, 3);
+  const toneClass = (item: string) => {
+    const tone = getShenShaTone(item);
+    if (tone === 'good') return 'text-emerald-700';
+    if (tone === 'bad') return 'text-red-600';
+    return 'text-stone-600';
+  };
   return (
     <div className="mx-auto flex max-w-full flex-col items-center gap-1 text-center">
       {visible.map((item, index) => (
-        <span key={`${item}-${index}`} className="max-w-full truncate text-[10px] font-medium leading-4 text-stone-600 md:text-xs">
+        <span key={`${item}-${index}`} className={`max-w-full truncate text-[10px] font-medium leading-4 md:text-xs ${toneClass(item)}`}>
           {item}
         </span>
       ))}
