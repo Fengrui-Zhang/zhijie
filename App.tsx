@@ -6956,6 +6956,218 @@ const App: React.FC<AppProps> = ({
     }
   };
 
+  const renderCaseAnalysisPanel = (showCaseActions = true) => {
+    if (!isCaseModel || !activeCase) return null;
+    return (
+      <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
+            {getCaseSexLabel(activeCase.chartParams) && (
+              <div className="mt-1 text-sm text-stone-500">{getCaseSexLabel(activeCase.chartParams)}</div>
+            )}
+          </div>
+          {showCaseActions && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={beginCaseEdit}
+                className="rounded-full border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:border-stone-300 hover:text-stone-800"
+              >
+                编辑命例
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCase}
+                className="rounded-full border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:border-red-300 hover:text-red-600"
+              >
+                删除命例
+              </button>
+            </div>
+          )}
+        </div>
+
+        {getCaseDisplayRelations(activeCase.id, activeCase.relations || []).length > 0 && (
+          <div className="space-y-2">
+            <div className="text-sm font-bold text-stone-700">关系标签</div>
+            <div className="flex flex-wrap gap-2">
+              {getCaseDisplayRelations(activeCase.id, activeCase.relations || []).map((relation) => (
+                <div key={relation.id} className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCaseRelationId((current) => current === relation.id ? null : relation.id)}
+                    className={`glass-chip rounded-full border px-3 py-1.5 text-xs transition ${
+                      selectedCaseRelationId === relation.id
+                        ? 'border-amber-200 bg-amber-50/70 text-amber-700'
+                        : 'border-white/60 text-stone-600 hover:text-stone-800'
+                    }`}
+                    title="点选后可编辑"
+                  >
+                    {relation.label}
+                  </button>
+                  {selectedCaseRelationId === relation.id && (
+                    <button
+                      type="button"
+                      onClick={() => openCaseRelationEditor(relation.id)}
+                      className="glass-chip flex h-8 w-8 items-center justify-center rounded-full border border-white/60 text-stone-600 hover:text-stone-800"
+                      title="修改关系标签"
+                    >
+                      <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3.5 13.8 3 17l3.2-.5 8.3-8.3-2.7-2.7-8.3 8.3Z" />
+                        <path d="m10.9 4.8 2.7 2.7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {supportsKnowledge && (
+          <KnowledgeToggleCard
+            useKnowledge={useKnowledge}
+            onToggle={() => setUseKnowledge((prev) => !prev)}
+            className=""
+          />
+        )}
+
+        <div className="glass-panel-soft rounded-[26px] border border-white/60 p-4 md:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-bold text-stone-700">初始化分析</div>
+              <div className="mt-1 text-xs text-stone-500">
+                命例级基线分析，后续新会话会默认读取这份上下文。
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {currentCaseInitialAnalysis && (
+                <button
+                  type="button"
+                  onClick={() => setShowInitialAnalysisModal(true)}
+                  className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600 hover:text-stone-800"
+                >
+                  查看初始化分析
+                </button>
+              )}
+              {!currentCaseInitialAnalysis && (
+                <button
+                  type="button"
+                  onClick={() => void handleRegenerateCaseInitialAnalysis()}
+                  disabled={initialAnalysisBusy || loading || isTyping}
+                  className={`rounded-full px-3 py-1.5 text-xs transition ${
+                    initialAnalysisBusy || loading || isTyping
+                      ? 'glass-chip text-stone-300 cursor-not-allowed'
+                      : 'glass-panel-dark text-amber-200 hover:brightness-105'
+                  }`}
+                >
+                  生成初始化分析
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">状态</div>
+              <div className="mt-2 text-base font-bold text-stone-700">{currentInitialAnalysisStatus}</div>
+            </div>
+            <div className="glass-panel rounded-[22px] border border-white/60 px-4 py-3">
+              <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-stone-400">更新时间</div>
+              <div className="mt-2 text-sm font-medium text-stone-600">
+                {currentCaseInitialAnalysis
+                  ? new Date(currentCaseInitialAnalysis.generatedAt).toLocaleString('zh-CN', { hour12: false })
+                  : '暂无'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
+          <textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder={modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
+            className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
+          />
+          <button
+            type="button"
+            onClick={handleStartCaseAnalysis}
+            disabled={loading || isTyping}
+            className="glass-cta mt-4 w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
+          >
+            {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-bold text-stone-700">历史分析会话</div>
+            <div className="text-xs text-stone-500">
+              {activeCase.sessions.length ? `共 ${activeCase.sessions.length} 条` : '暂无分析记录'}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {activeCase.sessions.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-stone-200 px-4 py-5 text-sm text-stone-400 text-center">
+                这个命例还没有分析记录。
+              </div>
+            )}
+            {activeCase.sessions.map((session) => (
+              <div
+                key={session.id}
+                onClick={() => {
+                  if (isLoggedIn) {
+                    handleLoadSession(session.id);
+                  } else {
+                    handleLoadGuestCaseSession(session.id);
+                  }
+                }}
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                  activeSessionId === session.id
+                    ? 'glass-panel-dark border-transparent text-amber-200'
+                    : 'glass-panel border-white/60 bg-white/70 text-stone-700 hover:bg-white/85'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold">{session.title}</div>
+                  <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
+                    {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (confirmCaseSessionDeleteId === session.id) {
+                      handleDeleteCaseSessionEntry(session.id);
+                      setConfirmCaseSessionDeleteId(null);
+                    } else {
+                      setConfirmCaseSessionDeleteId(session.id);
+                      setTimeout(() => setConfirmCaseSessionDeleteId((current) => (current === session.id ? null : current)), 3000);
+                    }
+                  }}
+                  className={`flex-shrink-0 rounded-lg p-1.5 transition-colors ${
+                    confirmCaseSessionDeleteId === session.id
+                      ? 'bg-red-50 text-red-500'
+                      : activeSessionId === session.id
+                        ? 'text-amber-100/75 hover:text-red-200'
+                        : 'text-stone-300 opacity-0 group-hover:opacity-100 hover:text-red-400'
+                  }`}
+                  title={confirmCaseSessionDeleteId === session.id ? '再次点击确认删除' : '删除'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+                    <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.31l.461 6.15A1.5 1.5 0 005.02 13h5.96a1.5 1.5 0 001.499-1.35l.46-6.15h.311a.75.75 0 000-1.5H11v-.75A1.75 1.75 0 009.25 1.5h-2.5A1.75 1.75 0 005 3.25zm1.5 0a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V4h-3v-.75z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
   }
@@ -9461,6 +9673,7 @@ const App: React.FC<AppProps> = ({
                       caseId={activeCase?.modelType === ModelType.BAZI ? activeCase.id : null}
                       initialAnalysisData={activeCase?.modelType === ModelType.BAZI ? activeCase.initialAnalysisData : null}
                       personalizationPrompt={buildPersonalizationPrompt(personalizationSettings)}
+                      aiPanel={renderCaseAnalysisPanel(false)}
                       onTabChange={setBaziResultTab}
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
                     />
@@ -9492,7 +9705,7 @@ const App: React.FC<AppProps> = ({
               )}
             </div>
 
-            {isCaseModel && activeCase && (
+            {isCaseModel && activeCase && modelType !== ModelType.BAZI && (
               <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -9619,7 +9832,7 @@ const App: React.FC<AppProps> = ({
                   <textarea
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    placeholder={modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
+                    placeholder={activeCase.modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
                     className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
                   />
                   <button

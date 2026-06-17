@@ -9,6 +9,7 @@ interface Props {
   caseId?: string | null;
   initialAnalysisData?: unknown;
   personalizationPrompt?: string;
+  aiPanel?: React.ReactNode;
   onTabChange?: (tab: BaziTab) => void;
   onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
 }
@@ -450,7 +451,7 @@ const ChipButton = ({
   </button>
 );
 
-const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, onTabChange, onAnalysisSaved }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info, start_info } = data;
   const dayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -684,18 +685,6 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             </div>
           </section>
 
-          <TenGodKnowledge locations={tenGodLocations} />
-        </div>
-      )}
-
-      {activeTab === 'ai' && (
-        <div className="space-y-5">
-          <section className="rounded-[28px] border border-white/60 bg-white/55 p-5 shadow-sm backdrop-blur-xl">
-            <div className="text-base font-bold text-stone-800">AI解读</div>
-            <div className="mt-1 text-sm leading-6 text-stone-500">
-              选择需要的专项解读后再发起分析。
-            </div>
-          </section>
           <AnalysisCard
             type="wuxing"
             title="AI专业五行分析"
@@ -716,6 +705,20 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
           />
+
+          <TenGodKnowledge locations={tenGodLocations} />
+        </div>
+      )}
+
+      {activeTab === 'ai' && (
+        <div className="space-y-5">
+          <section className="rounded-[28px] border border-white/60 bg-white/55 p-5 shadow-sm backdrop-blur-xl">
+            <div className="text-base font-bold text-stone-800">AI解读</div>
+            <div className="mt-1 text-sm leading-6 text-stone-500">
+              基于当前命例发起问答，后续对话会自动拼接命盘与初始化分析上下文。
+            </div>
+          </section>
+          {aiPanel}
         </div>
       )}
 
