@@ -8757,8 +8757,10 @@ const App: React.FC<AppProps> = ({
             {!isFortuneReading && (
             <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">{currentWorkspaceLabel}</div>
-                <div className="mt-1 text-2xl font-bold text-stone-800">{currentModuleLabel}</div>
+                {!isCaseModel && (
+                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">{currentWorkspaceLabel}</div>
+                )}
+                <div className={`${isCaseModel ? '' : 'mt-1 '}text-2xl font-bold text-stone-800`}>{currentModuleLabel}</div>
               </div>
             </div>
             )}
@@ -8799,7 +8801,7 @@ const App: React.FC<AppProps> = ({
                 )}
               </div>
             ) : isCaseModel ? (
-              <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
+              <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-stone-700">命例库</div>
