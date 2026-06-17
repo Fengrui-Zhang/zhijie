@@ -106,6 +106,7 @@ import LocationSelector from './components/LocationSelector';
 import LifeReadingForm from './components/LifeReadingForm';
 import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
+import { useBodyScrollLock } from './hooks/useBodyScrollLock';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
   ssr: false,
@@ -1709,7 +1710,6 @@ const App: React.FC<AppProps> = ({
     activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT;
   const recommendedModels = new Set([ModelType.QIMEN, ModelType.BAZI]);
   const isCaseModel = isCaseModelType(modelType) && !activeProfessionalFeature;
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -1812,6 +1812,19 @@ const App: React.FC<AppProps> = ({
   const [klineProgress, setKlineProgress] = useState(0);
   const [klineYearProgress, setKlineYearProgress] = useState(0);
   const [baziResultTab, setBaziResultTab] = useState<'basic' | 'professional' | 'ai' | 'notes'>('basic');
+  const hasBlockingOverlayOpen = Boolean(activeCompactPanel) ||
+    showAuth ||
+    showUserMenu ||
+    showAccountSettings ||
+    showChangePassword ||
+    showInitialAnalysisModal ||
+    showInitialAnalysisRegenerateConfirm ||
+    showRerunConfirm ||
+    compatRelationModalOpen ||
+    professionalModalOpen ||
+    klineModalOpen;
+
+  useBodyScrollLock(hasBlockingOverlayOpen);
 
   const registrationEnabled = siteSettings.registrationEnabled;
   const guestModeEnabled = siteSettings.guestModeEnabled;
@@ -2310,38 +2323,6 @@ const App: React.FC<AppProps> = ({
     const height = window.innerHeight;
     setProfessionalPos(clampProfessionalPos(width - 108, Math.round(height * 0.22)));
   }, [professionalPos]);
-
-  useEffect(() => {
-    const hasModalOpen =
-      showAuth ||
-      showAccountSettings ||
-      showChangePassword ||
-      showInitialAnalysisModal ||
-      showInitialAnalysisRegenerateConfirm ||
-      showRerunConfirm ||
-      compatRelationModalOpen ||
-      professionalModalOpen ||
-      klineModalOpen;
-    if (!hasModalOpen) return;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    const previousBodyOverflow = document.body.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      document.body.style.overflow = previousBodyOverflow;
-    };
-  }, [
-    klineModalOpen,
-    professionalModalOpen,
-    compatRelationModalOpen,
-    showAccountSettings,
-    showAuth,
-    showChangePassword,
-    showInitialAnalysisModal,
-    showInitialAnalysisRegenerateConfirm,
-    showRerunConfirm,
-  ]);
 
   // --- Session Persistence ---
   const fetchSessions = useCallback(async () => {

@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { GenericTaibuResponse } from '../types';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 type Props = {
   data: GenericTaibuResponse;
@@ -595,6 +596,7 @@ const ShareDialog = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
+  useBodyScrollLock(open);
   if (!open) return null;
   const text = [title, ...lines].filter(Boolean).join('\n');
   const handleCopy = async () => {
@@ -625,15 +627,16 @@ const ShareDialog = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/30 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_90px_rgba(28,25,23,0.22)]">
-        <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-stone-950/30 p-3 backdrop-blur-sm md:p-4">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-[0_30px_90px_rgba(28,25,23,0.22)] md:max-h-[calc(100dvh-2rem)]">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-stone-100 px-4 py-3 md:px-5 md:py-4">
           <div className="text-lg font-bold text-stone-800">分享摘要</div>
           <button type="button" onClick={onClose} className="rounded-full border border-stone-200 px-3 py-1 text-sm text-stone-500 hover:bg-stone-50">
             关闭
           </button>
         </div>
 
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-5">
         <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[24px] border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-5 shadow-sm">
             <div className="text-center">
@@ -683,8 +686,9 @@ const ShareDialog = ({
             ))}
           </div>
         </div>
+        </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="grid shrink-0 gap-2 border-t border-stone-100 px-4 py-3 sm:grid-cols-3 md:px-5">
           <button type="button" onClick={handleDownload} className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-700 transition hover:bg-stone-50">
             保存图片
           </button>

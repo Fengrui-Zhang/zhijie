@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface Props {
   onClose: () => void;
@@ -12,6 +13,7 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  useBodyScrollLock(true);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -33,11 +35,11 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 backdrop-blur-md px-4"
+      className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/42 px-4 py-4 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="glass-panel w-full max-w-sm rounded-[30px] border border-white/55 p-6 space-y-4 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
+        className="glass-panel max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto overscroll-contain rounded-[30px] border border-white/55 p-6 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">

@@ -5,6 +5,7 @@ import {
   DEFAULT_SITE_SETTINGS,
   type PublicSiteSettings,
 } from '@/lib/site-settings-defaults';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 interface UserRow {
   id: string;
@@ -63,6 +64,7 @@ export default function AdminPanel({ onBack }: Props) {
   const [plainPasswordCache, setPlainPasswordCache] = useState<Record<string, string>>({});
   const [revealPasswordId, setRevealPasswordId] = useState<string | null>(null);
   const [siteSettings, setSiteSettings] = useState<PublicSiteSettings>(DEFAULT_SITE_SETTINGS);
+  useBodyScrollLock(Boolean(detailUser));
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState('');
@@ -721,11 +723,11 @@ export default function AdminPanel({ onBack }: Props) {
 
       {detailUser && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/42 px-4 py-6 backdrop-blur-md"
+          className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/42 px-3 py-4 backdrop-blur-md md:px-4 md:py-6"
           onClick={() => { setDetailUser(null); setShowPasswordModal(false); setRevealPasswordId(null); }}
         >
           <div
-            className="glass-panel glass-scrollbar w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[30px] border border-white/60 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.24)]"
+            className="glass-panel glass-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-[30px] border border-white/60 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[90dvh] md:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">

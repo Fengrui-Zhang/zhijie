@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
 import { buildBirthPlaceText, findPlaceCoord } from '../utils/locations';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 type CalendarType = 'solar' | 'lunar' | 'pillars';
 type TimeInputMode = 'exact' | 'quick';
@@ -145,6 +146,7 @@ export default function LifeReadingForm({
   const placeText = buildBirthPlaceText(province, city, district);
   const coord = findPlaceCoord(district, city, province);
   const trueSolarDisabled = timeInputMode === 'quick';
+  useBodyScrollLock(timeOpen);
 
   const timeSummary = useMemo(() => {
     const option = HOUR_OPTIONS.find((item) => item.value === hour && minute === 0);
@@ -287,13 +289,13 @@ export default function LifeReadingForm({
       </div>
 
       {timeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4">
-          <div className="glass-panel w-full max-w-3xl overflow-hidden rounded-[30px] shadow-[0_30px_90px_rgba(0,0,0,0.24)]">
-            <div className="glass-panel-soft flex items-center justify-between border-b border-white/50 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/25 p-3 md:p-4">
+          <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[30px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[calc(100dvh-2rem)]">
+            <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-6 py-4">
               <div className="text-lg font-bold text-stone-900">出生时辰</div>
               <button type="button" onClick={() => setTimeOpen(false)} className="text-2xl leading-none text-stone-400 hover:text-stone-700">x</button>
             </div>
-            <div className="space-y-6 p-6">
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-5 md:p-6">
               <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
                 <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
                 <input
