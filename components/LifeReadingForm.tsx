@@ -289,13 +289,26 @@ export default function LifeReadingForm({
       </div>
 
       {timeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/25 p-3 md:p-4">
-          <div className="glass-panel flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[30px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[calc(100dvh-2rem)]">
-            <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-6 py-4">
+        <div
+          className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden overscroll-none bg-black/25 p-2 md:items-center md:p-4"
+          onClick={() => setTimeOpen(false)}
+        >
+          <div
+            className="glass-panel flex h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:h-auto md:max-h-[calc(100dvh-2rem)] md:rounded-[30px]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-4 py-3 md:px-6 md:py-4">
               <div className="text-lg font-bold text-stone-900">出生时辰</div>
-              <button type="button" onClick={() => setTimeOpen(false)} className="text-2xl leading-none text-stone-400 hover:text-stone-700">x</button>
+              <button
+                type="button"
+                onClick={() => setTimeOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-2xl leading-none text-stone-400 transition hover:bg-white/70 hover:text-stone-700"
+                aria-label="关闭出生时辰弹窗"
+              >
+                ×
+              </button>
             </div>
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-5 md:p-6">
+            <div className="min-h-0 flex-1 touch-pan-y space-y-5 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] md:space-y-6 md:p-6">
               <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
                 <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
                 <input
@@ -340,7 +353,7 @@ export default function LifeReadingForm({
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 border-t border-white/50 p-4">
+            <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-white/50 p-3 md:p-4">
               <button type="button" onClick={() => setTimeOpen(false)} className="glass-chip rounded-2xl border border-white/60 px-4 py-3 font-semibold text-stone-700">取消</button>
               <button type="button" onClick={() => setTimeOpen(false)} className="glass-cta rounded-2xl px-4 py-3 font-semibold text-amber-200">确定</button>
             </div>
