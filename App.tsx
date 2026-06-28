@@ -7438,6 +7438,22 @@ const App: React.FC<AppProps> = ({
     ], `${activeCase.title} AI解读提示词`);
   };
 
+  const buildKlinePromptCopyText = async () => {
+    if (modelType !== ModelType.BAZI || !chartData || !activeCase || activeCase.modelType !== ModelType.BAZI) return '';
+    const initializationAnalysis = await resolveKlineInitializationAnalysis(activeCase);
+    if (!initializationAnalysis) return '';
+    return buildPromptCopyText([
+      {
+        role: 'system',
+        content: applyPersonalizationToSystemInstruction(buildKlineSystemInstruction()),
+      },
+      {
+        role: 'user',
+        content: buildKlinePrompt(chartData as BaziResponse, initializationAnalysis),
+      },
+    ], `${activeCase.title} 人生K线提示词`);
+  };
+
   const PromptCopyButton = ({
     label = '复制AI提示词',
     copied,
@@ -11779,6 +11795,14 @@ const App: React.FC<AppProps> = ({
                   >
                     保存到本地
                   </button>
+                )}
+                {activeCase?.modelType === ModelType.BAZI && (
+                  <PromptCopyButton
+                    copied={copiedPromptKey === 'kline-prompt'}
+                    disabled={klineStatus === 'analyzing' || isKlineRunning}
+                    compact
+                    onClick={() => void buildKlinePromptCopyText().then((text) => handleCopyPromptText(text, 'kline-prompt'))}
+                  />
                 )}
                 {activeCase?.modelType === ModelType.BAZI && (
                   <button
