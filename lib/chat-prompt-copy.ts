@@ -43,18 +43,15 @@ export const formatPromptCopyMessages = (
   const finalMessages = options?.includeVisualInstruction === false
     ? messages
     : withVisualInstruction(messages);
+  const roleCounts: Partial<Record<PromptCopyMessage['role'], number>> = {};
   const blocks = finalMessages
-    .map((message, index) => {
+    .map((message) => {
       const label = ROLE_LABEL[message.role];
-      const suffix = message.role === 'system' ? '' : ` ${index + 1}`;
+      roleCounts[message.role] = (roleCounts[message.role] || 0) + 1;
+      const suffix = message.role === 'system' ? '' : ` ${roleCounts[message.role]}`;
       return `【${label}${suffix}】\n${message.content.trim()}`;
     })
     .filter(Boolean);
 
-  return [
-    options?.title ? `# ${options.title}` : '# AI提示词',
-    options?.note ? `\n${options.note.trim()}` : '',
-    '',
-    blocks.join('\n\n'),
-  ].join('\n').trim();
+  return blocks.join('\n\n').trim();
 };
