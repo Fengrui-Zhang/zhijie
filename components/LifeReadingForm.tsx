@@ -290,12 +290,14 @@ export default function LifeReadingForm({
 
       {timeOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden overscroll-none bg-black/25 p-2 md:items-center md:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-black/25 p-2 md:p-4"
           onClick={() => setTimeOpen(false)}
+          onTouchMove={(event) => event.preventDefault()}
         >
           <div
-            className="glass-panel flex h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:h-auto md:max-h-[calc(100dvh-2rem)] md:rounded-[30px]"
+            className="glass-panel flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[calc(100dvh-2rem)] md:rounded-[30px]"
             onClick={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
           >
             <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-4 py-3 md:px-6 md:py-4">
               <div className="text-lg font-bold text-stone-900">出生时辰</div>
@@ -308,7 +310,10 @@ export default function LifeReadingForm({
                 ×
               </button>
             </div>
-            <div className="min-h-0 flex-1 touch-pan-y space-y-5 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] md:space-y-6 md:p-6">
+            <div
+              className="min-h-0 flex-1 touch-pan-y space-y-5 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] md:space-y-6 md:p-6"
+              onTouchMove={(event) => event.stopPropagation()}
+            >
               <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
                 <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
                 <input

@@ -1,4 +1,5 @@
 import { ChatModel } from '../lib/analysis-models';
+import { formatPromptCopyMessages, type PromptCopyMessage } from '../lib/chat-prompt-copy';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -68,6 +69,12 @@ const parseKnowledgeSourcesHeader = (value: string | null): KnowledgeSourceSumma
 };
 
 let chatMessages: ChatMessage[] = [];
+
+const toPromptCopyMessages = (messages: ChatMessage[]): PromptCopyMessage[] =>
+  messages.map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
 
 export const startQimenChat = async (systemInstruction: string) => {
   chatMessages = [{ role: 'system', content: systemInstruction }];
@@ -223,4 +230,17 @@ export const sendMessageToDeepseekStream = async (
 
 export const clearChatSession = () => {
   chatMessages = [];
+};
+
+export const getCurrentChatPromptCopyText = (nextUserPrompt?: string) => {
+  const messages = toPromptCopyMessages(chatMessages);
+  const trimmed = nextUserPrompt?.trim();
+  if (trimmed) {
+    messages.push({ role: 'user', content: trimmed });
+  }
+  if (messages.length === 0) return '';
+  return formatPromptCopyMessages(messages, {
+    title: '完整AI对话提示词',
+    note: '以下内容包含本轮对话实际发送给模型的系统提示词、历史用户问题与AI回复。复制后可粘贴到其他 AI 软件继续询问。',
+  });
 };

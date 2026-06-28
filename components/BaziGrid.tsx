@@ -4,6 +4,11 @@ import { calculateBaziLiuRiData, calculateBaziLiuYueData } from 'taibu-core/bazi
 import { BaziResponse } from '../types';
 import { getShenShaTone, normalizeZhijieShenSha, type BaziShenShaContext } from '../utils/baziShensha';
 import { getWuxingColor } from '../utils/wuxing';
+import {
+  buildBaziBasicAnalysisSystemPrompt,
+  buildBaziBasicAnalysisUserPrompt,
+} from '../lib/bazi-basic-analysis-prompts';
+import { formatPromptCopyMessages } from '../lib/chat-prompt-copy';
 import MarkdownContent from './MarkdownContent';
 
 interface Props {
@@ -440,6 +445,7 @@ const AnalysisCard = ({
   const [content, setContent] = useState(savedContent || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   React.useEffect(() => {
     setContent(savedContent || '');
@@ -470,6 +476,30 @@ const AnalysisCard = ({
     }
   };
 
+  const copyPrompt = async () => {
+    const text = formatPromptCopyMessages([
+      {
+        role: 'system',
+        content: buildBaziBasicAnalysisSystemPrompt(type, personalizationPrompt || ''),
+      },
+      {
+        role: 'user',
+        content: buildBaziBasicAnalysisUserPrompt(chartText),
+      },
+    ], {
+      title: `${title} AI提示词`,
+      includeVisualInstruction: false,
+      note: '以下内容是该功能实际发送给模型的完整提示词，可复制到其他 AI 软件继续询问。',
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedPrompt(true);
+      window.setTimeout(() => setCopiedPrompt(false), 1400);
+    } catch {
+      setCopiedPrompt(false);
+    }
+  };
+
   return (
     <section className="rounded-[26px] border border-white/60 bg-white/55 p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -477,14 +507,24 @@ const AnalysisCard = ({
           <div className="text-base font-bold text-stone-800">{title}</div>
           <div className="mt-1 text-sm text-stone-500">{subtitle}</div>
         </div>
-        <button
-          type="button"
-          onClick={() => run(Boolean(content))}
-          disabled={loading}
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
-        >
-          {loading ? '分析中...' : content ? '重新分析（消耗1点）' : '开始分析（消耗1点）'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void copyPrompt()}
+            disabled={loading}
+            className="rounded-2xl border border-stone-200 bg-white/70 px-3 py-2 text-xs font-bold text-stone-500 transition hover:border-amber-200 hover:bg-white hover:text-stone-800 disabled:opacity-60"
+          >
+            {copiedPrompt ? '已复制' : '复制AI提示词'}
+          </button>
+          <button
+            type="button"
+            onClick={() => run(Boolean(content))}
+            disabled={loading}
+            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
+          >
+            {loading ? '分析中...' : content ? '重新分析（消耗1点）' : '开始分析（消耗1点）'}
+          </button>
+        </div>
       </div>
       {error && (
         <div className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">

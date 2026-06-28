@@ -54,6 +54,7 @@ import {
   DEFAULT_SITE_SETTINGS,
   type PublicSiteSettings,
 } from './lib/site-settings-defaults';
+import { formatPromptCopyMessages, type PromptCopyMessage } from './lib/chat-prompt-copy';
 import {
   buildZiweiAnalysisPrompt,
   buildZiweiSystemPrompt,
@@ -72,6 +73,7 @@ import {
   sendMessageToDeepseekStream,
   clearChatSession,
   restoreChatSession,
+  getCurrentChatPromptCopyText,
   type KnowledgeSourceSummary,
 } from './services/deepseekService';
 
@@ -1834,6 +1836,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
   const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null);
   const [editingUserMessageDraft, setEditingUserMessageDraft] = useState('');
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
@@ -3985,6 +3988,61 @@ const App: React.FC<AppProps> = ({
     setStandaloneSessionSelectValue('');
     setStandaloneSessionId(null);
     setActiveSessionId(null);
+  };
+
+  const buildStandaloneChatPromptCopyText = async () => {
+    const content = standaloneChatInput.trim();
+    const selectedCases = standaloneSelectedCaseIds
+      .map((id) => standaloneCaseOptions.find((item) => item.id === id))
+      .filter((item): item is CaseItem => Boolean(item));
+    const caseReferenceText = buildStandaloneCaseReferenceText(selectedCases);
+    const selectedSessionSummaries = savedSessions
+      .filter((item) => standaloneSelectedSessionIds.includes(item.id));
+    const selectedSessionDetails = await Promise.all(
+      selectedSessionSummaries.map(async (item) => {
+        try {
+          const res = await fetch(`/api/sessions/${item.id}`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          const messages: ChatMessage[] = (data.messages || []).map(
+            (m: { id: string; role: string; content: string; createdAt: string }) => ({
+              id: m.id,
+              role: m.role as 'user' | 'model',
+              content: m.content,
+              timestamp: new Date(m.createdAt),
+            })
+          );
+          return {
+            title: data.title || item.title,
+            modelType: data.modelType || item.modelType,
+            messages,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+    const sessionReferenceText = buildStandaloneSessionReferenceText(
+      selectedSessionDetails.filter((item): item is { title: string; modelType: string; messages: ChatMessage[] } => Boolean(item))
+    );
+    const standaloneSystemInstruction = applyPersonalizationToSystemInstruction([
+      '你是专业、克制、清晰的命理分析助手。回答时先说明依据，再给出可执行建议。不要展示内部推理过程。',
+      caseReferenceText,
+      sessionReferenceText,
+    ].filter(Boolean).join('\n\n'));
+    const nextMessages = content
+      ? [
+          ...standaloneChatMessages,
+          { id: 'copy-draft-user', role: 'user' as const, content, timestamp: new Date() },
+        ]
+      : standaloneChatMessages;
+    return buildPromptCopyText([
+      { role: 'system', content: standaloneSystemInstruction },
+      ...nextMessages.map((msg): PromptCopyMessage => ({
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msg.content,
+      })),
+    ], '新聊天AI提示词');
   };
 
   const handleStandaloneChatSubmit = async (event?: React.FormEvent) => {
@@ -7319,6 +7377,94 @@ const App: React.FC<AppProps> = ({
     }
   };
 
+  const handleCopyPromptText = async (text: string, key: string) => {
+    if (!text.trim()) return;
+    await handleCopyText(text);
+    setCopiedPromptKey(key);
+    window.setTimeout(() => {
+      setCopiedPromptKey((current) => (current === key ? null : current));
+    }, 1400);
+  };
+
+  const buildPromptCopyText = (
+    messages: PromptCopyMessage[],
+    title = 'AI提示词',
+  ) => formatPromptCopyMessages(messages, {
+    title,
+    note: '以下内容是本轮请求发送给模型的完整提示词，可复制到其他 AI 软件继续询问。',
+  });
+
+  const buildCurrentInitialPromptCopyText = () => {
+    if (!chartData) return '';
+    const bundle = buildInitialAnalysisBundle(
+      modelType,
+      chartData,
+      activeChartParams,
+      chatHistory
+    );
+    return buildPromptCopyText([
+      {
+        role: 'system',
+        content: applyPersonalizationToSystemInstruction(bundle.systemInstruction),
+      },
+      {
+        role: 'user',
+        content: bundle.prompt,
+      },
+    ], `${MODEL_LABELS[modelType] || '排盘'} AI解读提示词`);
+  };
+
+  const buildActiveCasePromptCopyText = () => {
+    if (!activeCase || !isCaseModelType(activeCase.modelType)) return '';
+    const chartParams = (activeCase.chartParams || {}) as Record<string, unknown>;
+    const trimmedQuestion = question.trim();
+    const bundle = buildLifeReadingAnalysisBundle(
+      activeCase.modelType,
+      activeCase.chartData as BaziResponse & ZiweiResponse,
+      trimmedQuestion
+    );
+    const systemInstruction = trimmedQuestion && currentCaseInitialAnalysis
+      ? appendInitialAnalysisContext(bundle.systemInstruction, currentCaseInitialAnalysis.content)
+      : bundle.systemInstruction;
+    return buildPromptCopyText([
+      {
+        role: 'system',
+        content: applyPersonalizationToSystemInstruction(systemInstruction),
+      },
+      {
+        role: 'user',
+        content: bundle.prompt,
+      },
+    ], `${activeCase.title} AI解读提示词`);
+  };
+
+  const PromptCopyButton = ({
+    label = '复制AI提示词',
+    copied,
+    disabled,
+    onClick,
+    compact = false,
+  }: {
+    label?: string;
+    copied: boolean;
+    disabled?: boolean;
+    onClick: () => void | Promise<void>;
+    compact?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={() => void onClick()}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full border border-stone-200 bg-white/70 font-semibold text-stone-500 shadow-sm transition hover:border-amber-200 hover:bg-white hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45 ${
+        compact ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
+      }`}
+      title={label}
+    >
+      <CopyIcon className="h-3.5 w-3.5" />
+      <span>{copied ? '已复制' : label}</span>
+    </button>
+  );
+
   const getMessageVersionLabel = (index: number) => {
     if (index === 0) return '初版';
     return `重生成 ${index}`;
@@ -7538,14 +7684,21 @@ const App: React.FC<AppProps> = ({
             placeholder={modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
             className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
           />
-          <button
-            type="button"
-            onClick={handleStartCaseAnalysis}
-            disabled={loading || isTyping}
-            className="glass-cta mt-4 w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
-          >
-            {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
-          </button>
+          <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <PromptCopyButton
+              copied={copiedPromptKey === 'case-analysis'}
+              disabled={loading || isTyping}
+              onClick={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
+            />
+            <button
+              type="button"
+              onClick={handleStartCaseAnalysis}
+              disabled={loading || isTyping}
+              className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
+            >
+              {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -8374,6 +8527,14 @@ const App: React.FC<AppProps> = ({
             className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400"
           />
           <button
+            type="button"
+            disabled={standaloneChatLoading}
+            onClick={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat'))}
+            className="hidden shrink-0 rounded-2xl border border-stone-200 bg-white/70 px-3 py-3 text-xs font-semibold text-stone-500 transition hover:border-amber-200 hover:bg-white hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45 sm:inline-flex"
+          >
+            {copiedPromptKey === 'standalone-chat' ? '已复制' : '复制AI提示词'}
+          </button>
+          <button
             type="submit"
             disabled={!standaloneChatInput.trim() || standaloneChatLoading}
             className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
@@ -8381,6 +8542,14 @@ const App: React.FC<AppProps> = ({
             发送
           </button>
         </div>
+        <button
+          type="button"
+          disabled={standaloneChatLoading}
+          onClick={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat-mobile'))}
+          className="mt-2 inline-flex w-full items-center justify-center rounded-2xl border border-stone-200 bg-white/68 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-white disabled:opacity-45 sm:hidden"
+        >
+          {copiedPromptKey === 'standalone-chat-mobile' ? '已复制' : '复制AI提示词'}
+        </button>
       </form>
     </div>
   );
@@ -10455,14 +10624,21 @@ const App: React.FC<AppProps> = ({
                     placeholder={activeCase.modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
                     className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
                   />
-                  <button
-                    type="button"
-                    onClick={handleStartCaseAnalysis}
-                    disabled={loading || isTyping}
-                    className="glass-cta mt-4 w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
-                  >
-                    {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
-                  </button>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+                    <PromptCopyButton
+                      copied={copiedPromptKey === 'case-analysis-inline'}
+                      disabled={loading || isTyping}
+                      onClick={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis-inline')}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleStartCaseAnalysis}
+                      disabled={loading || isTyping}
+                      className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
+                    >
+                      {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -10538,14 +10714,21 @@ const App: React.FC<AppProps> = ({
                   <div>
                     <div className="text-lg font-bold text-stone-800">AI 解读</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleRerunAnalysis()}
-                    disabled={loading || isTyping}
-                    className="glass-cta rounded-2xl px-5 py-3 text-sm font-bold text-amber-300 disabled:opacity-50"
-                  >
-                    {loading || isTyping ? <Spinner /> : '询问 AI 解读'}
-                  </button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <PromptCopyButton
+                      copied={copiedPromptKey === 'initial-analysis-card'}
+                      disabled={loading || isTyping}
+                      onClick={() => handleCopyPromptText(buildCurrentInitialPromptCopyText(), 'initial-analysis-card')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleRerunAnalysis()}
+                      disabled={loading || isTyping}
+                      className="glass-cta rounded-2xl px-5 py-3 text-sm font-bold text-amber-300 disabled:opacity-50"
+                    >
+                      {loading || isTyping ? <Spinner /> : '询问 AI 解读'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -10556,6 +10739,12 @@ const App: React.FC<AppProps> = ({
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : 'AI 解读'}</h3>
                  <div className="flex items-center gap-3">
+                   <PromptCopyButton
+                     copied={copiedPromptKey === 'chat-session'}
+                     disabled={isTyping || loading}
+                     compact
+                     onClick={() => handleCopyPromptText(getCurrentChatPromptCopyText(), 'chat-session')}
+                   />
                    <button
                      type="button"
                      onClick={handleRequestRerunAnalysis}

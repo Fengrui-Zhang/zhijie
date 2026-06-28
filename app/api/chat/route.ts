@@ -4,6 +4,7 @@ import {
   resolveChatModel,
 } from '../../../lib/analysis-models';
 import { prisma } from '../../../lib/prisma';
+import { VISUAL_RESPONSE_INSTRUCTION } from '../../../lib/chat-prompt-copy';
 import { formatKnowledgeContext, retrieveKnowledge, type RetrievedChunk } from '../../../utils/knowledge';
 
 type ChatMessage = {
@@ -25,13 +26,6 @@ type KnowledgeSourceSummary = {
   score: number;
   preview: string;
 };
-
-const VISUAL_RESPONSE_INSTRUCTION = [
-  '当用户的问题适合用图示总结时，可在自然语言结论之后附加一个 fenced code block，语言标记使用 chart-json。',
-  'chart-json 必须是严格 JSON，支持的 chartType 仅限 fortune_radar、fortune_trend、fortune_calendar、wuxing_energy、life_timeline、divination_verdict。',
-  '不要为了图表牺牲正文判断；没有明确评分、趋势或阶段信息时不要输出图表块。',
-  '图表块示例字段：{"chartType":"divination_verdict","title":"占断摘要","data":{"score":65,"question":"...","keyFactors":[{"factor":"..."}]}}。',
-].join('\n');
 
 const summarizeKnowledgeSources = (chunks: RetrievedChunk[]): KnowledgeSourceSummary[] =>
   chunks.slice(0, 6).map((chunk, index) => {
