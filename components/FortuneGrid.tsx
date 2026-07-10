@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -409,6 +409,42 @@ const AiCalibrationButton = ({ aiCalibration }: Pick<Props, 'aiCalibration'>) =>
     </button>
   );
 };
+
+const ResponsiveChartFrame = ({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}) => {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+
+    const updateReady = () => {
+      setReady(frame.clientWidth > 1 && frame.clientHeight > 1);
+    };
+    const animationFrame = window.requestAnimationFrame(updateReady);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateReady);
+    observer?.observe(frame);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      observer?.disconnect();
+    };
+  }, []);
+
+  return (
+    <div ref={frameRef} className={className}>
+      {ready ? children : null}
+    </div>
+  );
+};
+
+const INITIAL_CHART_DIMENSION = { width: 1, height: 1 } as const;
 
 const asList = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -872,8 +908,8 @@ const FortuneTrendChart = ({
           ))}
         </div>
       </div>
-      <div className="h-60 min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72 md:p-4">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveChartFrame className="h-60 min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72 md:p-4">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={INITIAL_CHART_DIMENSION}>
           <LineChart data={chartData} margin={{ top: 10, right: 10, left: -22, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#78716c' }} tickLine={false} axisLine={false} dy={8} minTickGap={12} />
@@ -906,7 +942,7 @@ const FortuneTrendChart = ({
             )}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </ResponsiveChartFrame>
     </div>
   );
 };
@@ -1261,8 +1297,8 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
           ))}
         </div>
       </div>
-      <div className="h-[clamp(220px,32vw,360px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-4">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveChartFrame className="h-[clamp(220px,32vw,360px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-4">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={INITIAL_CHART_DIMENSION}>
           <LineChart data={chartData} margin={{ top: 12, right: 12, left: -22, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis
@@ -1293,7 +1329,7 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
             ))}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </ResponsiveChartFrame>
     </div>
   );
 };
@@ -1360,8 +1396,8 @@ const YearlyMonthlyTrend = ({ trend, selectedMonth }: { trend: any[]; selectedMo
           ))}
         </div>
       </div>
-      <div className="h-[clamp(180px,22vw,260px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-3">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveChartFrame className="h-[clamp(180px,22vw,260px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-3">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={INITIAL_CHART_DIMENSION}>
           <LineChart data={chartData} margin={{ top: 10, right: 8, left: -24, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis
@@ -1401,7 +1437,7 @@ const YearlyMonthlyTrend = ({ trend, selectedMonth }: { trend: any[]; selectedMo
             )}
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </ResponsiveChartFrame>
     </div>
   );
 };
