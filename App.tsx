@@ -56,6 +56,16 @@ import {
 } from './lib/site-settings-defaults';
 import { formatPromptCopyMessages, type PromptCopyMessage } from './lib/chat-prompt-copy';
 import {
+  getCaseRoute,
+  MODEL_ROUTES,
+  navigateTo,
+  parseAppRoute,
+  SETTINGS_TAB_ROUTES,
+  type SettingsWorkspaceTab,
+  type WorkspaceView,
+  WORKSPACE_ROUTES,
+} from './lib/app-routes';
+import {
   buildZiweiAnalysisPrompt,
   buildZiweiSystemPrompt,
 } from './lib/ziwei-prompt';
@@ -76,6 +86,10 @@ import {
   getCurrentChatPromptCopyText,
   type KnowledgeSourceSummary,
 } from './services/deepseekService';
+import CaseRouteState from './components/CaseRouteState';
+import { AppNavigation, MobileBottomNavigation } from './components/AppNavigation';
+import WorkspaceViewport from './components/WorkspaceViewport';
+import { ChatWorkspace, RecordsWorkspace } from './components/WorkspacePanels';
 
 // Auth & Session Components
 import AuthForm from './components/AuthForm';
@@ -736,30 +750,6 @@ const MODEL_LABELS: Record<string, string> = {
   bazi_compatibility: '八字合盘',
 };
 
-const MODEL_ROUTES: Partial<Record<ModelType, string>> = {
-  [ModelType.BAZI]: '/bazi',
-  [ModelType.ZIWEI]: '/ziwei',
-  [ModelType.DAILY_FORTUNE]: '/daily',
-  [ModelType.MONTHLY_FORTUNE]: '/monthly',
-  [ModelType.QIMEN]: '/qimen',
-  [ModelType.LIUYAO]: '/liuyao',
-  [ModelType.MEIHUA]: '/meihua',
-  [ModelType.DALIUREN]: '/daliuren',
-  [ModelType.TAIYI]: '/taiyi',
-  [ModelType.XIAOLIUREN]: '/xiaoliuren',
-  [ModelType.ALMANAC]: '/almanac',
-};
-
-const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).reduce(
-  (acc, [model, route]) => {
-    if (route) acc[route] = model as ModelType;
-    return acc;
-  },
-  {} as Record<string, ModelType>
-);
-
-type WorkspaceView = 'home' | 'divination' | 'records' | 'chat' | 'settings';
-type SettingsWorkspaceTab = 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
 type MobileBottomNavItemId =
   | ModelType.BAZI
   | ModelType.ZIWEI
@@ -948,39 +938,6 @@ const buildPersonalizationPrompt = (settings: PersonalizationSettings) => {
   if (customInstructions) lines.push(`自定义指令：${customInstructions}`);
   return lines.length ? `【个性化偏好】\n${lines.join('\n')}` : '';
 };
-
-const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
-  home: '/',
-  records: '/records',
-  chat: '/chat',
-  settings: '/settings',
-};
-
-const SETTINGS_TAB_ROUTES: Record<SettingsWorkspaceTab, string> = {
-  profile: '/settings/profile',
-  general: '/settings/general',
-  personalization: '/settings/personalization',
-  charts: '/settings/charts',
-  knowledge: '/settings/knowledge',
-  help: '/settings/help',
-  security: '/settings/security',
-};
-
-const ROUTE_WORKSPACES: Record<string, WorkspaceView> = Object.entries(WORKSPACE_ROUTES).reduce(
-  (acc, [workspace, route]) => {
-    acc[route] = workspace as WorkspaceView;
-    return acc;
-  },
-  {} as Record<string, WorkspaceView>
-);
-
-const ROUTE_SETTINGS_TABS: Record<string, SettingsWorkspaceTab> = Object.entries(SETTINGS_TAB_ROUTES).reduce(
-  (acc, [tab, route]) => {
-    acc[route] = tab as SettingsWorkspaceTab;
-    return acc;
-  },
-  {} as Record<string, SettingsWorkspaceTab>
-);
 
 const SETTINGS_WORKSPACE_TABS: Array<{
   id: SettingsWorkspaceTab;
@@ -1590,12 +1547,14 @@ type AppProps = {
   initialModelType?: ModelType;
   initialWorkspace?: WorkspaceView;
   initialSettingsTab?: SettingsWorkspaceTab;
+  initialCaseId?: string;
 };
 
 const App: React.FC<AppProps> = ({
   initialModelType = ModelType.BAZI,
   initialWorkspace = 'divination',
   initialSettingsTab = 'profile',
+  initialCaseId,
 }) => {
   const { data: authSession, status: authStatus, update: updateSession } = useSession();
   const isLoggedIn = authStatus === 'authenticated';
@@ -1615,6 +1574,7 @@ const App: React.FC<AppProps> = ({
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [caseItems, setCaseItems] = useState<CaseItem[]>([]);
   const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
+  const [caseRouteStatus, setCaseRouteStatus] = useState<'idle' | 'loading' | 'not-found'>(initialCaseId ? 'loading' : 'idle');
   const [caseFormOpen, setCaseFormOpen] = useState(false);
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
   const [caseBusy, setCaseBusy] = useState(false);
@@ -1748,6 +1708,7 @@ const App: React.FC<AppProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const pendingCaseSessionScrollRef = useRef(false);
+  const initialCaseLoadKeyRef = useRef('');
   const pendingSectionScrollRef = useRef<'report' | 'case-form' | 'case-detail' | 'chat' | null>(null);
   const reportChartRef = useRef<HTMLDivElement>(null);
   const caseFormRef = useRef<HTMLDivElement>(null);
@@ -2242,14 +2203,24 @@ const App: React.FC<AppProps> = ({
     }
   }, [isLoggedIn, readGuestCases]);
 
-  const loadCaseDetail = useCallback(async (caseId: string) => {
-    if (!isCaseModel) return;
+  const loadCaseDetail = useCallback(async (
+    caseId: string,
+    options?: { expectedModelType?: ModelType; updateUrl?: boolean }
+  ) => {
+    const expectedModelType = options?.expectedModelType ?? modelType;
+    if (!isCaseModelType(expectedModelType)) return false;
+    setCaseRouteStatus('loading');
 
     if (!isLoggedIn) {
       const detail = getGuestCaseDetail(caseId);
-      if (!detail) return;
+      if (!detail || detail.modelType !== expectedModelType) {
+        setCaseRouteStatus('not-found');
+        return false;
+      }
       const storedSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
       clearChatSession();
+      setWorkspaceView('divination');
+      setModelType(expectedModelType);
       setHasSelectedModel(true);
       setActiveCase(detail);
       setChartData(detail.chartData);
@@ -2263,14 +2234,25 @@ const App: React.FC<AppProps> = ({
       setGuestFollowUpCount(nextFollowUpCount);
       localStorage.setItem('guestFollowUpCount', String(nextFollowUpCount));
       setStep('chart');
-      return;
+      setCaseRouteStatus('idle');
+      if (options?.updateUrl !== false) navigateTo(getCaseRoute(expectedModelType, caseId));
+      return true;
     }
 
     try {
       const res = await fetch(`/api/cases/${caseId}`);
-      if (!res.ok) return;
-      const data = await res.json();
+      if (!res.ok) {
+        setCaseRouteStatus('not-found');
+        return false;
+      }
+      const data = await res.json() as CaseDetail;
+      if (data.modelType !== expectedModelType) {
+        setCaseRouteStatus('not-found');
+        return false;
+      }
       clearChatSession();
+      setWorkspaceView('divination');
+      setModelType(expectedModelType);
       setHasSelectedModel(true);
       setActiveCase(data);
       setChartData(data.chartData);
@@ -2281,10 +2263,22 @@ const App: React.FC<AppProps> = ({
       setActiveSessionId(null);
       setSessionAnalysisModel(null);
       setStep('chart');
+      setCaseRouteStatus('idle');
+      if (options?.updateUrl !== false) navigateTo(getCaseRoute(expectedModelType, caseId));
+      return true;
     } catch {
-      // silently ignore
+      setCaseRouteStatus('not-found');
+      return false;
     }
-  }, [getGuestCaseDetail, isCaseModel, isLoggedIn, readGuestCaseSessions]);
+  }, [getGuestCaseDetail, isLoggedIn, modelType, readGuestCaseSessions]);
+
+  useEffect(() => {
+    if (!initialCaseId || authStatus === 'loading' || !isCaseModelType(initialModelType)) return;
+    const loadKey = `${authStatus}:${initialModelType}:${initialCaseId}`;
+    if (initialCaseLoadKeyRef.current === loadKey) return;
+    initialCaseLoadKeyRef.current = loadKey;
+    void loadCaseDetail(initialCaseId, { expectedModelType: initialModelType, updateUrl: false });
+  }, [authStatus, initialCaseId, initialModelType, loadCaseDetail]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1279px)');
@@ -2987,9 +2981,7 @@ const App: React.FC<AppProps> = ({
         setActiveChartParams({});
         setActiveCase(null);
         setStep('input');
-        if (typeof window !== 'undefined' && window.location.pathname !== '/chat') {
-          window.history.pushState(null, '', '/chat');
-        }
+        navigateTo('/chat');
         return;
       }
 
@@ -3015,10 +3007,10 @@ const App: React.FC<AppProps> = ({
       setHasSelectedModel(true);
       const loadedModelType = sessionProfessionalFeature ? ModelType.BAZI : (data.modelType as ModelType);
       setModelType(loadedModelType);
-      const loadedRoute = MODEL_ROUTES[loadedModelType];
-      if (loadedRoute && typeof window !== 'undefined' && window.location.pathname !== loadedRoute) {
-        window.history.pushState(null, '', loadedRoute);
-      }
+      const loadedRoute = matchedCase
+        ? getCaseRoute(loadedModelType, matchedCase.id)
+        : MODEL_ROUTES[loadedModelType];
+      if (loadedRoute) navigateTo(loadedRoute);
       setChartData(effectiveChartData);
       setActiveChartParams(sessionChartParams);
       if (loadedModelType === ModelType.ALMANAC) {
@@ -3120,9 +3112,7 @@ const App: React.FC<AppProps> = ({
         setWorkspaceView('chat');
         setProfessionalSelectedProject(null);
         setProfessionalModalOpen(false);
-        if (typeof window !== 'undefined' && window.location.pathname !== '/chat') {
-          window.history.pushState(null, '', '/chat');
-        }
+        navigateTo('/chat');
         void handleLoadSession(id);
         return;
       }
@@ -3133,9 +3123,7 @@ const App: React.FC<AppProps> = ({
       setProfessionalModalOpen(false);
       setModelType(nextModel);
       const nextRoute = MODEL_ROUTES[nextModel];
-      if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
-        window.history.pushState(null, '', nextRoute);
-      }
+      if (nextRoute) navigateTo(nextRoute);
     }
     void handleLoadSession(id);
   };
@@ -3154,10 +3142,10 @@ const App: React.FC<AppProps> = ({
     setHasSelectedModel(true);
     const loadedModelType = sessionProfessionalFeature ? ModelType.BAZI : (storedSession.modelType as ModelType);
     setModelType(loadedModelType);
-    const loadedRoute = MODEL_ROUTES[loadedModelType];
-    if (loadedRoute && typeof window !== 'undefined' && window.location.pathname !== loadedRoute) {
-      window.history.pushState(null, '', loadedRoute);
-    }
+    const loadedRoute = detail && !sessionProfessionalFeature
+      ? getCaseRoute(loadedModelType, detail.id)
+      : MODEL_ROUTES[loadedModelType];
+    if (loadedRoute) navigateTo(loadedRoute);
     setChartData(effectiveChartData);
     setActiveChartParams(storedSession.chartParams || {});
     setActiveSessionId(storedSession.id);
@@ -3861,49 +3849,52 @@ const App: React.FC<AppProps> = ({
   }, []);
 
   useEffect(() => {
-    const syncModelFromPath = () => {
+    const syncStateFromPath = () => {
       if (typeof window === 'undefined') return;
-      const routedSettingsTab = ROUTE_SETTINGS_TABS[window.location.pathname];
-      if (routedSettingsTab) {
+      const route = parseAppRoute(window.location.pathname);
+      if (!route) return;
+
+      setProfessionalSelectedProject(null);
+      setProfessionalModalOpen(false);
+
+      if (route.workspace === 'settings') {
+        if (workspaceView !== 'settings' || activeCase) clearViewState({ clearInputs: false });
         setWorkspaceView('settings');
-        setSettingsWorkspaceTab(routedSettingsTab === 'charts' || routedSettingsTab === 'knowledge' ? 'general' : routedSettingsTab);
-        setProfessionalSelectedProject(null);
-        setProfessionalModalOpen(false);
+        setSettingsWorkspaceTab(route.settingsTab === 'charts' || route.settingsTab === 'knowledge' ? 'general' : route.settingsTab);
+        setCaseRouteStatus('idle');
         return;
       }
-      const routedWorkspace = ROUTE_WORKSPACES[window.location.pathname];
-      if (routedWorkspace === 'settings') {
-        setWorkspaceView('settings');
-        setSettingsWorkspaceTab('profile');
-        setProfessionalSelectedProject(null);
-        setProfessionalModalOpen(false);
+
+      if (route.workspace !== 'divination') {
+        if (workspaceView === 'divination' || activeCase) clearViewState({ clearInputs: false });
+        setWorkspaceView(route.workspace);
+        setCaseRouteStatus('idle');
         return;
       }
-      if (routedWorkspace && routedWorkspace !== workspaceView) {
-        setWorkspaceView(routedWorkspace);
-        setProfessionalSelectedProject(null);
-        setProfessionalModalOpen(false);
-        return;
-      }
-      const routedModel = ROUTE_MODELS[window.location.pathname];
-      if (routedModel && routedModel !== modelType) {
-        setWorkspaceView('divination');
-        setHasSelectedModel(true);
-        setProfessionalSelectedProject(null);
-        setProfessionalModalOpen(false);
-        setModelType(routedModel);
-        autoFortuneChartKeyRef.current = '';
-        clearViewState();
-        if (![ModelType.QIMEN, ModelType.BAZI].includes(routedModel)) {
-          setUseKnowledge(false);
+
+      setWorkspaceView('divination');
+      setHasSelectedModel(true);
+      setModelType(route.modelType);
+      autoFortuneChartKeyRef.current = '';
+      if (route.caseId) {
+        if (activeCase?.id !== route.caseId || activeCase.modelType !== route.modelType) {
+          clearViewState({ clearInputs: false });
+          setCaseRouteStatus('loading');
+          void loadCaseDetail(route.caseId, { expectedModelType: route.modelType, updateUrl: false });
         }
-        setTimeMode(routedModel === ModelType.BAZI || routedModel === ModelType.ZIWEI ? 'custom' : 'now');
+      } else if (activeCase || modelType !== route.modelType || workspaceView !== 'divination') {
+        clearViewState();
+        setCaseRouteStatus('idle');
       }
+      if (![ModelType.QIMEN, ModelType.BAZI].includes(route.modelType)) {
+        setUseKnowledge(false);
+      }
+      setTimeMode(route.modelType === ModelType.BAZI || route.modelType === ModelType.ZIWEI ? 'custom' : 'now');
     };
 
-    window.addEventListener('popstate', syncModelFromPath);
-    return () => window.removeEventListener('popstate', syncModelFromPath);
-  }, [clearViewState, modelType, workspaceView]);
+    window.addEventListener('popstate', syncStateFromPath);
+    return () => window.removeEventListener('popstate', syncStateFromPath);
+  }, [activeCase, clearViewState, loadCaseDetail, modelType, workspaceView]);
 
   // --- Reset when model changes ---
   const handleModelChange = (type: ModelType) => {
@@ -3912,10 +3903,9 @@ const App: React.FC<AppProps> = ({
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
     setModelType(type);
+    setCaseRouteStatus('idle');
     const nextRoute = MODEL_ROUTES[type];
-    if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
-      window.history.pushState(null, '', nextRoute);
-    }
+    if (nextRoute) navigateTo(nextRoute);
     autoFortuneChartKeyRef.current = '';
     clearViewState();
     if (![ModelType.QIMEN, ModelType.BAZI].includes(type)) {
@@ -3931,27 +3921,36 @@ const App: React.FC<AppProps> = ({
 
   const navigateWorkspace = (view: Exclude<WorkspaceView, 'divination'>) => {
     setWorkspaceView(view);
+    setCaseRouteStatus('idle');
     if (view === 'settings') {
       setSettingsWorkspaceTab('profile');
     }
     setProfessionalSelectedProject(null);
     setProfessionalModalOpen(false);
     const nextRoute = WORKSPACE_ROUTES[view];
-    if (nextRoute && typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
-      window.history.pushState(null, '', nextRoute);
-    }
+    if (nextRoute) navigateTo(nextRoute);
   };
 
   const handleSettingsWorkspaceTabChange = (tab: SettingsWorkspaceTab) => {
     setSettingsWorkspaceTab(tab);
     const nextRoute = SETTINGS_TAB_ROUTES[tab];
-    if (typeof window !== 'undefined' && window.location.pathname !== nextRoute) {
-      window.history.pushState(null, '', nextRoute);
-    }
+    navigateTo(nextRoute);
   };
 
   const handleReset = () => {
+    const returnRoute = activeCase && isCaseModelType(activeCase.modelType)
+      ? MODEL_ROUTES[activeCase.modelType]
+      : undefined;
     clearViewState();
+    setCaseRouteStatus('idle');
+    if (returnRoute) navigateTo(returnRoute);
+  };
+
+  const handleBackToCaseLibrary = () => {
+    clearViewState({ clearInputs: false });
+    setCaseRouteStatus('idle');
+    const returnRoute = MODEL_ROUTES[modelType];
+    if (returnRoute) navigateTo(returnRoute);
   };
 
   const handleSelectStandaloneCaseReference = (nextId: string) => {
@@ -5001,6 +5000,7 @@ const App: React.FC<AppProps> = ({
 
   const handleDeleteCase = async () => {
     if (!activeCase) return;
+    const deletedCaseModel = activeCase.modelType;
 
     if (isLoggedIn) {
       const ok = await deleteCaseInDb(activeCase.id);
@@ -5023,6 +5023,9 @@ const App: React.FC<AppProps> = ({
     setGuestFollowUpCount(0);
     localStorage.setItem('guestFollowUpCount', '0');
     setStep('input');
+    setCaseRouteStatus('idle');
+    const returnRoute = MODEL_ROUTES[deletedCaseModel];
+    if (returnRoute) navigateTo(returnRoute);
   };
 
   const beginCaseEditFromLibrary = async (caseId: string) => {
@@ -5065,6 +5068,9 @@ const App: React.FC<AppProps> = ({
       setQuestion('');
       clearChatSession();
       setStep('input');
+      setCaseRouteStatus('idle');
+      const returnRoute = MODEL_ROUTES[modelType];
+      if (returnRoute) navigateTo(returnRoute);
     }
   };
 
@@ -5196,6 +5202,7 @@ const App: React.FC<AppProps> = ({
           : await fetchZiwei(chartParams);
 
       const nowIso = new Date().toISOString();
+      let savedCaseId = '';
 
       if (isLoggedIn) {
         const detail = editingCaseId
@@ -5214,8 +5221,10 @@ const App: React.FC<AppProps> = ({
 
         await hydrateCasesForModel(modelType);
         setActiveCase(detail);
+        savedCaseId = detail.id;
       } else {
         const caseId = editingCaseId || `guest-case-${Date.now()}`;
+        savedCaseId = caseId;
         if (editingCaseId && !shouldReuseExistingChart) {
           clearGuestCaseSessions(caseId);
         }
@@ -5254,6 +5263,8 @@ const App: React.FC<AppProps> = ({
       setCaseFormOpen(false);
       setEditingCaseId(null);
       setKnowledgeHint(null);
+      setCaseRouteStatus('idle');
+      if (savedCaseId) navigateTo(getCaseRoute(modelType, savedCaseId));
       requestSectionScroll('report');
     } catch (err: any) {
       setError(err.message || '排盘失败，请稍后重试');
@@ -6929,9 +6940,7 @@ const App: React.FC<AppProps> = ({
     setStep('input');
     setChatHistory([]);
     clearChatSession();
-    if (typeof window !== 'undefined' && window.location.pathname !== '/daily') {
-      window.history.pushState(null, '', '/daily');
-    }
+    navigateTo('/daily');
   };
 
   const handleFortuneSuggestedAsk = async (message: string) => {
@@ -7521,6 +7530,16 @@ const App: React.FC<AppProps> = ({
   const homePrimaryPillars = homePrimaryCase
     ? getCasePillarsPreview(homePrimaryCase.modelType, homePrimaryCase.chartData)
     : '';
+  const mobileBottomNavigationItems = appPreferences.mobileBottomNav.map((id) => {
+    const option = MOBILE_BOTTOM_NAV_OPTIONS.find((item) => item.id === id);
+    const isWorkspace = id === 'records' || id === 'chat';
+    return {
+      id,
+      label: option?.label || '入口',
+      onClick: () => (isWorkspace ? navigateWorkspace(id) : handleModelChange(id as ModelType)),
+      active: isWorkspace ? workspaceView === id : modelType === id && workspaceView === 'divination',
+    };
+  });
   const openHomeCaseCreate = (type: ModelType.BAZI | ModelType.ZIWEI) => {
     handleModelChange(type);
     beginCaseCreate();
@@ -7528,7 +7547,7 @@ const App: React.FC<AppProps> = ({
   const openHomePrimaryCase = () => {
     if (!homePrimaryCase) return;
     handleModelChange(homePrimaryCase.modelType as ModelType);
-    void loadCaseDetail(homePrimaryCase.id);
+    void loadCaseDetail(homePrimaryCase.id, { expectedModelType: homePrimaryCase.modelType as ModelType });
   };
   const openHomeDaily = () => {
     if (!homeBaziCase) {
@@ -7876,218 +7895,6 @@ const App: React.FC<AppProps> = ({
     );
   }
 
-  const renderModuleNavigation = (mobile = false) => (
-    <nav
-      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-97px)] w-[236px]'} glass-panel-soft flex flex-col rounded-2xl border border-stone-100/80 p-4 shadow-sm`}
-      aria-label="功能导航"
-    >
-      <div className="mb-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-stone-400">功能</div>
-        <div className="mt-1 text-lg font-bold text-stone-800">元分 · 智解</div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          navigateWorkspace('home');
-          if (mobile) setActiveCompactPanel(null);
-        }}
-        className={`mb-4 flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-          workspaceView === 'home'
-            ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-            : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-        }`}
-      >
-        <span>首页</span><span>›</span>
-      </button>
-
-      <div className={`${mobile ? 'grid gap-3 md:grid-cols-3' : 'min-h-0 flex-1 overflow-y-auto pr-1 space-y-4'}`}>
-        <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">常用任务</div>
-          {[
-            [ModelType.BAZI, '四柱八字'],
-            [ModelType.ZIWEI, '紫微斗数'],
-            [ModelType.DAILY_FORTUNE, '每日运势'],
-            [ModelType.MONTHLY_FORTUNE, '每月运势'],
-          ].map(([type, label]) => {
-            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => {
-                  handleModelChange(type as ModelType);
-                  if (mobile) setActiveCompactPanel(null);
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-                }`}
-              >
-                <span>{label}</span>
-                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="space-y-2">
-          <button type="button" onClick={() => setProfessionalNavOpen((current) => !current)} className="flex w-full items-center justify-between px-2 text-xs font-bold tracking-[0.18em] text-stone-400">
-            <span>专业工具</span><span>{professionalNavOpen ? '−' : '+'}</span>
-          </button>
-          {professionalNavOpen && (
-          <div className="space-y-2">
-          {[
-            [ModelType.QIMEN, '奇门遁甲'],
-            [ModelType.LIUYAO, '六爻纳甲'],
-            [ModelType.MEIHUA, '梅花易数'],
-            [ModelType.DALIUREN, '大六壬'],
-            [ModelType.TAIYI, '太乙神数'],
-            [ModelType.XIAOLIUREN, '小六壬'],
-          ].map(([type, label]) => {
-            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => {
-                  handleModelChange(type as ModelType);
-                  if (mobile) setActiveCompactPanel(null);
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-                }`}
-              >
-                <span>{label}</span>
-                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
-              </button>
-            );
-          })}
-          </div>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">择日工具</div>
-          {[
-            [ModelType.ALMANAC, '黄历/择日'],
-          ].map(([type, label]) => {
-            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => {
-                  handleModelChange(type as ModelType);
-                  if (mobile) setActiveCompactPanel(null);
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-                }`}
-              >
-                <span>{label}</span>
-                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {professionalNavOpen && <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">进阶功能</div>
-          {[
-            [PROFESSIONAL_FEATURE_JOINT, '八字+紫微联合分析'],
-            [PROFESSIONAL_FEATURE_BAZI_COMPAT, '八字合盘'],
-          ].map(([feature, label]) => {
-            const selected = professionalSelectedProject === feature;
-            return (
-              <button
-                key={feature}
-                type="button"
-                onClick={() => {
-                  openProfessionalFeature(feature);
-                  if (mobile) setActiveCompactPanel(null);
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-                }`}
-              >
-                <span>{label}</span>
-                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
-              </button>
-            );
-          })}
-        </div>}
-
-        <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">工作区</div>
-          {[
-            ['records', '分析记录'],
-            ['chat', '问智解'],
-            ['settings', '设置'],
-          ].map(([view, label]) => {
-            const selected = workspaceView === view;
-            return (
-              <button
-                key={view}
-                type="button"
-                onClick={() => {
-                  navigateWorkspace(view as Exclude<WorkspaceView, 'divination'>);
-                  if (mobile) setActiveCompactPanel(null);
-                }}
-                className={`flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
-                    : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
-                }`}
-              >
-                <span>{label}</span>
-                <span className={selected ? 'text-amber-200' : 'text-stone-300'}>›</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </nav>
-  );
-
-  const renderMobileBottomNav = () => (
-    <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-2xl border border-stone-100 bg-white/86 p-2 shadow-lg shadow-stone-900/10 backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
-      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${appPreferences.mobileBottomNav.length + 1}, minmax(0, 1fr))` }}>
-        {[
-          ...appPreferences.mobileBottomNav.map((id) => {
-            const option = MOBILE_BOTTOM_NAV_OPTIONS.find((item) => item.id === id);
-            const isWorkspace = id === 'records' || id === 'chat';
-            return {
-              id,
-              label: option?.label || '入口',
-              action: () => (isWorkspace ? navigateWorkspace(id) : handleModelChange(id as ModelType)),
-              active: isWorkspace ? workspaceView === id : modelType === id && workspaceView === 'divination',
-            };
-          }),
-          { id: 'more-bottom', label: '更多', action: () => setActiveCompactPanel((current) => (current === 'more' ? null : 'more')), active: activeCompactPanel === 'more' },
-        ].map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={item.action}
-            className={`rounded-2xl px-2 py-2 text-xs font-bold transition ${
-              item.active ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'
-            }`}
-          >
-            <span className="block">{item.label}</span>
-          </button>
-        ))}
-      </div>
-    </nav>
-  );
-
   const getRecordCategory = (item: SessionItem): 'life' | 'forecast' | 'fortune' | 'tool' | 'chat' => {
     if (item.modelType === 'chat') return 'chat';
     if ([ModelType.BAZI, ModelType.ZIWEI].includes(item.modelType as ModelType)) return 'life';
@@ -8198,7 +8005,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const renderRecordsWorkspace = () => (
-    <div className="glass-panel rounded-2xl p-5 md:p-7">
+    <RecordsWorkspace>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
@@ -8409,7 +8216,7 @@ const App: React.FC<AppProps> = ({
 
         </div>
       )}
-    </div>
+    </RecordsWorkspace>
   );
 
   const standaloneSelectedCases = standaloneSelectedCaseIds
@@ -8424,7 +8231,7 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderChatWorkspace = () => (
-    <div className="glass-panel flex h-[calc(100vh-128px)] min-h-[620px] flex-col overflow-hidden rounded-[32px]">
+    <ChatWorkspace>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
         <div className="flex items-center gap-2">
           <div className="text-2xl font-bold text-stone-800">问智解</div>
@@ -8651,7 +8458,7 @@ const App: React.FC<AppProps> = ({
         </button>
         <AiCostHint quota={userQuota} className="mt-2 block text-right" />
       </form>
-    </div>
+    </ChatWorkspace>
   );
 
   const renderSettingsWorkspace = () => (
@@ -9078,7 +8885,7 @@ const App: React.FC<AppProps> = ({
                         type="button"
                         onClick={() => {
                           handleModelChange(item.modelType as ModelType);
-                          setTimeout(() => void loadCaseDetail(item.id), 80);
+                          setTimeout(() => void loadCaseDetail(item.id, { expectedModelType: item.modelType as ModelType }), 80);
                         }}
                         className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-white/70"
                       >
@@ -9776,7 +9583,18 @@ const App: React.FC<AppProps> = ({
                     关闭
                   </button>
                 </div>
-                {renderModuleNavigation(true)}
+                <AppNavigation
+                  mobile
+                  workspaceView={workspaceView}
+                  modelType={modelType}
+                  professionalSelectedProject={professionalSelectedProject}
+                  professionalOpen={professionalNavOpen}
+                  onToggleProfessional={() => setProfessionalNavOpen((current) => !current)}
+                  onModelChange={handleModelChange}
+                  onProfessionalFeature={openProfessionalFeature}
+                  onWorkspaceChange={navigateWorkspace}
+                  onMobileClose={() => setActiveCompactPanel(null)}
+                />
               </div>
             )}
           </div>
@@ -9819,11 +9637,24 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
-      {renderMobileBottomNav()}
+      <MobileBottomNavigation
+        items={mobileBottomNavigationItems}
+        moreActive={activeCompactPanel === 'more'}
+        onMore={() => setActiveCompactPanel((current) => (current === 'more' ? null : 'more'))}
+      />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         <div className="hidden xl:block fixed left-3 top-[85px] z-10">
-          {renderModuleNavigation(false)}
+          <AppNavigation
+            workspaceView={workspaceView}
+            modelType={modelType}
+            professionalSelectedProject={professionalSelectedProject}
+            professionalOpen={professionalNavOpen}
+            onToggleProfessional={() => setProfessionalNavOpen((current) => !current)}
+            onModelChange={handleModelChange}
+            onProfessionalFeature={openProfessionalFeature}
+            onWorkspaceChange={navigateWorkspace}
+          />
         </div>
 
         {isLoggedIn && workspaceView === 'divination' && (
@@ -9840,14 +9671,11 @@ const App: React.FC<AppProps> = ({
           </div>
         )}
 
-      <main
-        className={`flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300 xl:pl-[260px] ${
-          isLoggedIn && workspaceView === 'divination'
-            ? persistentHistoryCollapsed ? '2xl:pr-[72px]' : '2xl:pr-[320px]'
-            : ''
-        }`}
+      <WorkspaceViewport
+        isLoggedIn={isLoggedIn}
+        workspaceView={workspaceView}
+        historyCollapsed={persistentHistoryCollapsed}
       >
-        <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
         {workspaceView === 'home' && (
           <HomeWorkspace
             isLoggedIn={isLoggedIn}
@@ -9968,6 +9796,8 @@ const App: React.FC<AppProps> = ({
                 selectionLoading={almanacSelectionLoading}
                 userQuota={userQuota}
               />
+            ) : isCaseModel && caseRouteStatus !== 'idle' ? (
+              <CaseRouteState status={caseRouteStatus} onBack={handleBackToCaseLibrary} />
             ) : isCaseModel ? (
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -11149,8 +10979,7 @@ const App: React.FC<AppProps> = ({
         )}
           </>
         )}
-        </div>
-      </main>
+      </WorkspaceViewport>
       </div>{/* end flex wrapper */}
 
       {showInitialAnalysisModal && currentCaseInitialAnalysis && (
