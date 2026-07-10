@@ -19,11 +19,11 @@ export const DEFAULT_WELCOME_INTRO = [
   '专业优化 AI 提示词，提问更简单，回答更精准。',
 ].join('\n');
 
-const LEGACY_WELCOME_QUOTA_LINE = '新注册用户默认 15 次提问额度；访客可体验基础功能。';
+const NON_ESSENTIAL_QUOTA_COPY_PATTERN = /免费|额度|不扣点|扣\s*\d*\s*点|剩余\s*\d*\s*点/;
 
-const sanitizeWelcomeIntro = (value: string) => value
+const sanitizePublicCopy = (value: string) => value
   .split('\n')
-  .filter((line) => line.trim() !== LEGACY_WELCOME_QUOTA_LINE)
+  .filter((line) => !NON_ESSENTIAL_QUOTA_COPY_PATTERN.test(line))
   .join('\n')
   .trim();
 
@@ -44,7 +44,7 @@ export const normalizeAnnouncementItems = (value: unknown): string[] => {
 
   return value
     .map((item) => (typeof item === 'string' ? item.trim() : ''))
-    .filter(Boolean);
+    .filter((item) => Boolean(item) && !NON_ESSENTIAL_QUOTA_COPY_PATTERN.test(item));
 };
 
 export const normalizePublicSiteSettings = (value: unknown): PublicSiteSettings => {
@@ -60,12 +60,12 @@ export const normalizePublicSiteSettings = (value: unknown): PublicSiteSettings 
     ? source.announcementUpdatedAt.trim()
     : DEFAULT_SITE_SETTINGS.announcementUpdatedAt;
   const announcementContent = typeof source.announcementContent === 'string'
-    ? source.announcementContent.trim()
+    ? sanitizePublicCopy(source.announcementContent)
     : DEFAULT_SITE_SETTINGS.announcementContent;
   const welcomeIntroSource = typeof source.welcomeIntro === 'string' && source.welcomeIntro.trim()
     ? source.welcomeIntro.trim()
     : DEFAULT_SITE_SETTINGS.welcomeIntro;
-  const welcomeIntro = sanitizeWelcomeIntro(welcomeIntroSource) || DEFAULT_SITE_SETTINGS.welcomeIntro;
+  const welcomeIntro = sanitizePublicCopy(welcomeIntroSource) || DEFAULT_SITE_SETTINGS.welcomeIntro;
   const registrationClosedContact = typeof source.registrationClosedContact === 'string' && source.registrationClosedContact.trim()
     ? source.registrationClosedContact.trim()
     : DEFAULT_SITE_SETTINGS.registrationClosedContact;
