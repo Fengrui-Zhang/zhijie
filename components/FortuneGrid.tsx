@@ -961,7 +961,7 @@ const AskPanel = ({
           disabled={!draft.trim() || !onAsk || isAsking}
           className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-300 disabled:opacity-50 md:px-5 md:py-3"
         >
-          问 AI
+          提问 · 1点
         </button>
       </div>
       <div className="mt-4 md:mt-5">
@@ -1037,30 +1037,34 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] xl:gap-6">
-        <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white/75 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 p-3 md:gap-4 md:p-6">
-            <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">‹</button>
-              <div>
-                <div className="text-center text-2xl font-bold text-stone-900 sm:text-left">{formatDateZh(currentDate)}</div>
-                <div className="mt-1 text-sm text-stone-500">农历 {almanac.lunarDate || '—'}</div>
-              </div>
-              <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">›</button>
-            </div>
-            <div className="flex w-full flex-col items-center gap-2 text-sm sm:w-auto sm:items-end">
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:justify-end">
-                <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
-                <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
-                <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
-                <span className="text-stone-400">命主</span>
-                <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
-                <AiCalibrationButton aiCalibration={aiCalibration} />
-              </div>
-            </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-100 bg-white/78 p-4 shadow-sm md:gap-4 md:p-6">
+        <div className="flex flex-1 items-center justify-center gap-2 sm:justify-start md:gap-3">
+          <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, -1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">‹</button>
+          <div>
+            <div className="text-center text-2xl font-bold text-stone-900 sm:text-left">{formatDateZh(currentDate)}</div>
+            <div className="mt-1 text-sm text-stone-500">农历 {almanac.lunarDate || '—'}</div>
           </div>
+          <button type="button" onClick={() => onDateChange?.(shiftDate(currentDate, 1))} className="rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-stone-500 hover:bg-stone-50 md:px-3 md:py-2">›</button>
+        </div>
+        <div className="flex w-full flex-col items-center gap-2 text-sm sm:w-auto sm:items-end">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:justify-end">
+            <div className="text-stone-500">流日：<span className="font-bold text-amber-600">{fortune.dayStem}{fortune.dayBranch}</span></div>
+            <div className="text-stone-500">主神：<span className="font-bold text-stone-800">{fortune.tenGod || '—'}</span></div>
+            <div className={`min-w-[58px] shrink-0 whitespace-nowrap rounded-full bg-stone-50 px-3 py-1 text-center font-bold ${levelTone(fortune.overall || '平')}`}>{fortune.overall || '平'}</div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+            <span className="text-stone-400">命主</span>
+            <CaseSelector caseOptions={caseOptions} selectedCaseId={selectedCaseId} onCaseChange={onCaseChange} />
+            <AiCalibrationButton aiCalibration={aiCalibration} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:gap-6">
+        <details className="order-2 overflow-hidden rounded-2xl border border-stone-100 bg-white/75 shadow-sm">
+          <summary className="cursor-pointer list-none px-4 py-4 text-base font-bold text-stone-800 marker:hidden md:px-6">
+            <span className="flex items-center justify-between">黄历详情 <span className="text-sm font-normal text-stone-400">宜忌、神煞与十二时辰</span></span>
+          </summary>
 
           <div className="space-y-4 p-3 md:space-y-6 md:p-6">
             <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -1131,11 +1135,11 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
               </div>
             )}
           </div>
-        </div>
+        </details>
 
-        <div className="space-y-4 md:space-y-6">
-          <FortuneTrendChart trend={fortune.trend || []} selectedDate={fortune.date} />
-          <div className="rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
+        <div className="order-1 flex flex-col gap-4 md:gap-6">
+          <div className="order-2"><FortuneTrendChart trend={fortune.trend || []} selectedDate={fortune.date} /></div>
+          <div className="order-1 rounded-2xl border border-stone-100 bg-white/75 p-4 shadow-sm md:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 md:mb-6">
               <div>
                 <div className="text-base font-bold text-stone-800 md:text-lg">运势分析</div>
@@ -1182,7 +1186,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
       </div>
 
       <AskPanel
-        title="问 AI"
+        title="问智解 · 成功后扣1点"
         dateText={formatDateZh(currentDate)}
         onAsk={onAsk}
         isAsking={isAsking}
@@ -1540,7 +1544,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
       </div>
 
       <AskPanel
-        title="问 AI"
+        title="问智解 · 成功后扣1点"
         dateText={`${monthDate.getFullYear()}年${monthDate.getMonth() + 1}月`}
         onAsk={onAsk}
         isAsking={isAsking}

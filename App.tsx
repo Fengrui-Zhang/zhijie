@@ -116,6 +116,7 @@ import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 import { useBodyScrollLock } from './hooks/useBodyScrollLock';
 import { useDialogFocus } from './hooks/useDialogFocus';
 import AiCostHint from './components/AiCostHint';
+import HomeWorkspace from './components/HomeWorkspace';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
   ssr: false,
@@ -757,7 +758,7 @@ const ROUTE_MODELS: Record<string, ModelType> = Object.entries(MODEL_ROUTES).red
   {} as Record<string, ModelType>
 );
 
-type WorkspaceView = 'divination' | 'records' | 'chat' | 'settings';
+type WorkspaceView = 'home' | 'divination' | 'records' | 'chat' | 'settings';
 type SettingsWorkspaceTab = 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
 type MobileBottomNavItemId =
   | ModelType.BAZI
@@ -807,16 +808,16 @@ const PERSONALIZATION_STORAGE_KEY = 'zhijie:personalization-settings:v1';
 const APP_PREFERENCES_STORAGE_KEY = 'zhijie:app-preferences:v1';
 
 const MOBILE_BOTTOM_NAV_OPTIONS: Array<{ id: MobileBottomNavItemId; label: string }> = [
-  { id: ModelType.BAZI, label: '八字' },
+  { id: ModelType.BAZI, label: '命盘' },
   { id: ModelType.ZIWEI, label: '紫微' },
-  { id: ModelType.DAILY_FORTUNE, label: '日运' },
+  { id: ModelType.DAILY_FORTUNE, label: '今日' },
   { id: ModelType.MONTHLY_FORTUNE, label: '月运' },
   { id: ModelType.QIMEN, label: '奇门' },
   { id: ModelType.LIUYAO, label: '六爻' },
   { id: ModelType.MEIHUA, label: '梅花' },
   { id: ModelType.ALMANAC, label: '择日' },
-  { id: 'records', label: '记录' },
-  { id: 'chat', label: '聊天' },
+  { id: 'records', label: '分析记录' },
+  { id: 'chat', label: '问智解' },
 ];
 
 const DEFAULT_APP_PREFERENCES: AppPreferenceSettings = {
@@ -949,6 +950,7 @@ const buildPersonalizationPrompt = (settings: PersonalizationSettings) => {
 };
 
 const WORKSPACE_ROUTES: Record<Exclude<WorkspaceView, 'divination'>, string> = {
+  home: '/',
   records: '/records',
   chat: '/chat',
   settings: '/settings',
@@ -1622,6 +1624,7 @@ const App: React.FC<AppProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [desktopHistoryOpen, setDesktopHistoryOpen] = useState(false);
   const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'more' | null>(null);
+  const [professionalNavOpen, setProfessionalNavOpen] = useState(false);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const analysisModel = DEFAULT_ANALYSIS_MODEL;
   const [activeChartParams, setActiveChartParams] = useState<Record<string, unknown>>({});
@@ -1720,6 +1723,7 @@ const App: React.FC<AppProps> = ({
   const [standaloneChatLoading, setStandaloneChatLoading] = useState(false);
   const [standaloneChatError, setStandaloneChatError] = useState('');
   const [standaloneChatUseKnowledge, setStandaloneChatUseKnowledge] = useState(true);
+  const [standaloneContextOpen, setStandaloneContextOpen] = useState(false);
   const [standaloneChatKnowledgeBoard, setStandaloneChatKnowledgeBoard] = useState<'bazi' | 'qimen'>('bazi');
   const [standaloneSessionId, setStandaloneSessionId] = useState<string | null>(null);
   const [standaloneCaseOptions, setStandaloneCaseOptions] = useState<CaseItem[]>([]);
@@ -7510,6 +7514,30 @@ const App: React.FC<AppProps> = ({
   const fortuneCalibrationCached = Boolean(
     getStoredWuxingCalibration(caseItems.find((item) => item.id === fortuneCaseId)?.initialAnalysisData)
   );
+  const homeBaziCase = caseItems.find((item) => item.modelType === ModelType.BAZI);
+  const homePrimaryCase = caseItems.find((item) => item.id === appPreferences.defaultCaseId)
+    || homeBaziCase
+    || caseItems[0];
+  const homePrimaryPillars = homePrimaryCase
+    ? getCasePillarsPreview(homePrimaryCase.modelType, homePrimaryCase.chartData)
+    : '';
+  const openHomeCaseCreate = (type: ModelType.BAZI | ModelType.ZIWEI) => {
+    handleModelChange(type);
+    beginCaseCreate();
+  };
+  const openHomePrimaryCase = () => {
+    if (!homePrimaryCase) return;
+    handleModelChange(homePrimaryCase.modelType as ModelType);
+    void loadCaseDetail(homePrimaryCase.id);
+  };
+  const openHomeDaily = () => {
+    if (!homeBaziCase) {
+      openHomeCaseCreate(ModelType.BAZI);
+      return;
+    }
+    handleModelChange(ModelType.DAILY_FORTUNE);
+    setFortuneCaseId(homeBaziCase.id);
+  };
   const currentModuleLabel =
     professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
@@ -7816,7 +7844,7 @@ const App: React.FC<AppProps> = ({
     );
   }
 
-  if (showWelcome && !isLoggedIn) {
+  if (showWelcome && !isLoggedIn && workspaceView !== 'home') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-stone-100 to-amber-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 max-w-sm w-full text-center space-y-5">
@@ -7858,16 +7886,31 @@ const App: React.FC<AppProps> = ({
         <div className="mt-1 text-lg font-bold text-stone-800">元分 · 智解</div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => {
+          navigateWorkspace('home');
+          if (mobile) setActiveCompactPanel(null);
+        }}
+        className={`mb-4 flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition ${
+          workspaceView === 'home'
+            ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+            : 'border-stone-100 bg-white/60 text-stone-700 hover:bg-white hover:text-stone-900'
+        }`}
+      >
+        <span>首页</span><span>›</span>
+      </button>
+
       <div className={`${mobile ? 'grid gap-3 md:grid-cols-3' : 'min-h-0 flex-1 overflow-y-auto pr-1 space-y-4'}`}>
         <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">命理运势</div>
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">常用任务</div>
           {[
             [ModelType.BAZI, '四柱八字'],
             [ModelType.ZIWEI, '紫微斗数'],
             [ModelType.DAILY_FORTUNE, '每日运势'],
             [ModelType.MONTHLY_FORTUNE, '每月运势'],
           ].map(([type, label]) => {
-            const selected = modelType === type && !professionalSelectedProject;
+            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
             return (
               <button
                 key={type}
@@ -7890,7 +7933,11 @@ const App: React.FC<AppProps> = ({
         </div>
 
         <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">占卜预测</div>
+          <button type="button" onClick={() => setProfessionalNavOpen((current) => !current)} className="flex w-full items-center justify-between px-2 text-xs font-bold tracking-[0.18em] text-stone-400">
+            <span>专业工具</span><span>{professionalNavOpen ? '−' : '+'}</span>
+          </button>
+          {professionalNavOpen && (
+          <div className="space-y-2">
           {[
             [ModelType.QIMEN, '奇门遁甲'],
             [ModelType.LIUYAO, '六爻纳甲'],
@@ -7899,7 +7946,7 @@ const App: React.FC<AppProps> = ({
             [ModelType.TAIYI, '太乙神数'],
             [ModelType.XIAOLIUREN, '小六壬'],
           ].map(([type, label]) => {
-            const selected = modelType === type && !professionalSelectedProject;
+            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
             return (
               <button
                 key={type}
@@ -7919,6 +7966,8 @@ const App: React.FC<AppProps> = ({
               </button>
             );
           })}
+          </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -7926,7 +7975,7 @@ const App: React.FC<AppProps> = ({
           {[
             [ModelType.ALMANAC, '黄历/择日'],
           ].map(([type, label]) => {
-            const selected = modelType === type && !professionalSelectedProject;
+            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
             return (
               <button
                 key={type}
@@ -7948,7 +7997,7 @@ const App: React.FC<AppProps> = ({
           })}
         </div>
 
-        <div className="space-y-2">
+        {professionalNavOpen && <div className="space-y-2">
           <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">进阶功能</div>
           {[
             [PROFESSIONAL_FEATURE_JOINT, '八字+紫微联合分析'],
@@ -7974,13 +8023,13 @@ const App: React.FC<AppProps> = ({
               </button>
             );
           })}
-        </div>
+        </div>}
 
         <div className="space-y-2">
-          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">个人工作区</div>
+          <div className="px-2 text-xs font-bold tracking-[0.18em] text-stone-400">工作区</div>
           {[
-            ['records', '命理记录'],
-            ['chat', '新聊天'],
+            ['records', '分析记录'],
+            ['chat', '问智解'],
             ['settings', '设置'],
           ].map(([view, label]) => {
             const selected = workspaceView === view;
@@ -8053,7 +8102,7 @@ const App: React.FC<AppProps> = ({
     { key: 'forecast', label: '占卜', description: '奇门、六爻等' },
     { key: 'fortune', label: '运势', description: '日运、月运' },
     { key: 'tool', label: '择日', description: '黄历择日' },
-    { key: 'chat', label: '聊天', description: '独立问答' },
+    { key: 'chat', label: '问答', description: '独立问答' },
   ];
 
   const getRecordTime = (item: SessionItem) => {
@@ -8153,7 +8202,7 @@ const App: React.FC<AppProps> = ({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100 pb-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">个人工作区</div>
-          <div className="mt-1 text-2xl font-bold text-stone-800">命理记录</div>
+          <div className="mt-1 text-2xl font-bold text-stone-800">分析记录</div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button
@@ -8378,22 +8427,34 @@ const App: React.FC<AppProps> = ({
     <div className="glass-panel flex h-[calc(100vh-128px)] min-h-[620px] flex-col overflow-hidden rounded-[32px]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
         <div className="flex items-center gap-2">
-          <div className="text-2xl font-bold text-stone-800">新聊天</div>
+          <div className="text-2xl font-bold text-stone-800">问智解</div>
           <button
             type="button"
             onClick={handleNewStandaloneChat}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/70 text-lg font-semibold leading-none text-stone-600 transition hover:bg-white hover:text-stone-900"
-            aria-label="新建聊天"
-            title="新建聊天"
+            aria-label="新建问答"
+            title="新建问答"
           >
             +
           </button>
         </div>
-        <div className="grid w-full grid-cols-4 items-center gap-1.5 sm:w-auto sm:flex sm:flex-wrap sm:justify-end sm:gap-2">
+        <button
+          type="button"
+          onClick={() => setStandaloneContextOpen((current) => !current)}
+          aria-expanded={standaloneContextOpen}
+          className="rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 text-sm font-semibold text-stone-600 transition hover:bg-white hover:text-stone-900"
+        >
+          添加上下文{standaloneSelectedCases.length + standaloneSelectedSessions.length > 0 ? ` · ${standaloneSelectedCases.length + standaloneSelectedSessions.length}` : ''}
+        </button>
+      </div>
+      {standaloneContextOpen && (
+        <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
           <select
             value={standaloneCaseSelectValue}
             onChange={(event) => handleSelectStandaloneCaseReference(event.target.value)}
-            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45 sm:min-w-[96px] sm:px-3 sm:text-xs"
+            className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45"
             disabled={standaloneAvailableCaseOptions.length === 0}
           >
             <option value="">{standaloneAvailableCaseOptions.length ? '引用命例' : '暂无命例'}</option>
@@ -8403,10 +8464,13 @@ const App: React.FC<AppProps> = ({
               </option>
             ))}
           </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用历史会话</span>
           <select
             value={standaloneSessionSelectValue}
             onChange={(event) => handleSelectStandaloneSessionReference(event.target.value)}
-            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45 sm:min-w-[96px] sm:px-3 sm:text-xs"
+            className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45"
             disabled={standaloneAvailableSessionOptions.length === 0}
           >
             <option value="">{standaloneAvailableSessionOptions.length ? '引用会话' : '暂无会话'}</option>
@@ -8416,30 +8480,34 @@ const App: React.FC<AppProps> = ({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={standaloneChatUseKnowledge}
-            onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
-            className={`min-w-0 rounded-full border px-2 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:text-xs ${
-              standaloneChatUseKnowledge
-                ? 'border-amber-200 bg-amber-50 text-amber-700'
-                : 'border-stone-200 bg-white/60 text-stone-500'
-            }`}
-          >
-            古籍{standaloneChatUseKnowledge ? '开' : '关'}
-          </button>
-          <select
-            value={standaloneChatKnowledgeBoard}
-            onChange={(event) => setStandaloneChatKnowledgeBoard(event.target.value as 'bazi' | 'qimen')}
-            disabled={!standaloneChatUseKnowledge}
-            className="min-w-0 rounded-full border border-stone-200 bg-white/70 px-2 py-1.5 text-center text-[11px] font-semibold text-stone-600 outline-none disabled:opacity-45 sm:px-3 sm:text-xs"
-          >
-            <option value="bazi">四柱</option>
-            <option value="qimen">奇门</option>
-          </select>
+          </label>
+          <div>
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">参考资料</span>
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={standaloneChatUseKnowledge}
+                onClick={() => setStandaloneChatUseKnowledge((current) => !current)}
+                className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  standaloneChatUseKnowledge ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-stone-200 bg-white/70 text-stone-500'
+                }`}
+              >
+                {standaloneChatUseKnowledge ? '已启用' : '未启用'}
+              </button>
+              <select
+                value={standaloneChatKnowledgeBoard}
+                onChange={(event) => setStandaloneChatKnowledgeBoard(event.target.value as 'bazi' | 'qimen')}
+                disabled={!standaloneChatUseKnowledge}
+                className="min-w-0 rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45"
+              >
+                <option value="bazi">四柱资料</option>
+                <option value="qimen">奇门资料</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
       {(standaloneSelectedCases.length > 0 || standaloneSelectedSessions.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-100/80 bg-white/42 px-6 py-3 md:px-8">
           <span className="text-xs font-semibold text-stone-400">已引用</span>
@@ -8483,7 +8551,7 @@ const App: React.FC<AppProps> = ({
       <div className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto px-4 py-5 md:px-8">
         {standaloneChatMessages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-xl font-bold text-stone-700">新聊天</div>
+            <div className="text-xl font-bold text-stone-700">问智解</div>
             <div className="mt-7 grid w-full max-w-3xl gap-2 md:grid-cols-2">
               {[
                 '结合最近运势，今天适合推进什么？',
@@ -9780,6 +9848,28 @@ const App: React.FC<AppProps> = ({
         }`}
       >
         <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
+        {workspaceView === 'home' && (
+          <HomeWorkspace
+            isLoggedIn={isLoggedIn}
+            quota={userQuota}
+            primaryCase={homePrimaryCase ? {
+              id: homePrimaryCase.id,
+              title: homePrimaryCase.title,
+              summary: homePrimaryCase.modelType === ModelType.BAZI ? '四柱八字' : '紫微斗数',
+              detail: homePrimaryPillars ? `四柱：${homePrimaryPillars}` : '命盘已保存',
+            } : undefined}
+            hasBaziCase={Boolean(homeBaziCase)}
+            onLogin={() => setShowAuth(true)}
+            onOpenCase={openHomePrimaryCase}
+            onCreateBazi={() => openHomeCaseCreate(ModelType.BAZI)}
+            onCreateZiwei={() => openHomeCaseCreate(ModelType.ZIWEI)}
+            onOpenDaily={openHomeDaily}
+            onOpenDivination={(type) => handleModelChange(type as ModelType)}
+            onOpenAlmanac={() => handleModelChange(ModelType.ALMANAC)}
+            onOpenChat={() => navigateWorkspace('chat')}
+            onOpenRecords={() => navigateWorkspace('records')}
+          />
+        )}
         {workspaceView === 'records' && renderRecordsWorkspace()}
         {workspaceView === 'chat' && renderChatWorkspace()}
         {workspaceView === 'settings' && renderSettingsWorkspace()}
@@ -9913,17 +10003,8 @@ const App: React.FC<AppProps> = ({
                         ? `真太阳时 · ${params.province}${params.city}`
                         : '';
                       return (
-                        <div
+                        <article
                           key={item.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => loadCaseDetail(item.id)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              loadCaseDetail(item.id);
-                            }
-                          }}
                           className={`text-left rounded-[24px] border px-4 py-3.5 transition ${
                             activeCase?.id === item.id
                               ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.22)]'
@@ -9931,7 +10012,7 @@ const App: React.FC<AppProps> = ({
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div>
+                            <button type="button" onClick={() => loadCaseDetail(item.id)} className="min-w-0 flex-1 text-left">
                               <div className="text-base font-bold">{item.title}</div>
                               {sexLabel && (
                                 <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-500'}`}>
@@ -9946,7 +10027,7 @@ const App: React.FC<AppProps> = ({
                               <div className={`mt-1 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
                                 {datetimeText}
                               </div>
-                            </div>
+                            </button>
                             <div className="flex shrink-0 flex-col items-end gap-2">
                               <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
                                 activeCase?.id === item.id
@@ -10012,7 +10093,7 @@ const App: React.FC<AppProps> = ({
                               {solarText}
                             </div>
                           )}
-                        </div>
+                        </article>
                       );
                     })}
                   </div>

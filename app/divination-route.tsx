@@ -3,7 +3,7 @@ import { ModelType } from '../types';
 
 type DivinationRouteProps = {
   modelType?: ModelType;
-  workspace?: 'divination' | 'records' | 'chat' | 'settings';
+  workspace?: 'home' | 'divination' | 'records' | 'chat' | 'settings';
   settingsTab?: 'profile' | 'general' | 'personalization' | 'charts' | 'knowledge' | 'help' | 'security';
 };
 
