@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import type { GenericTaibuResponse } from '../types';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import DialogPortal, { DialogBody } from './DialogPortal';
 
 export type AlmanacCaseOption = {
   id: string;
@@ -233,7 +233,6 @@ const AlmanacWorkspace: React.FC<Props> = ({
   };
 
   const currentDateMatchesModal = Boolean(activeRecommendation && activeRecommendation.date === selectedDate);
-  useBodyScrollLock(Boolean(activeRecommendation));
   const goodHours = hourlyFortune.filter((hour: any) => (
     hour?.tianShenType === '黄道' ||
     hour?.tianShenLuck === '吉' ||
@@ -480,8 +479,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
       </section>
 
       {activeRecommendation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-stone-950/35 px-3 py-4 backdrop-blur-sm md:px-4 md:py-6">
-          <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[28px] border border-stone-100 bg-white shadow-2xl md:max-h-[88dvh]">
+        <DialogPortal open onClose={() => setActiveRecommendation(null)} ariaLabel="择日详情" mobileFill panelClassName="max-w-3xl bg-white">
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-stone-100 px-5 py-4 md:px-6">
               <div>
                 <div className="text-2xl font-bold text-stone-900">{formatDateZh(activeRecommendation.date)}</div>
@@ -498,7 +496,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 md:px-6">
+            <DialogBody className="px-5 py-5 md:px-6">
               <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/65 px-4 py-3 text-sm leading-7 text-amber-800">
                 {activeRecommendation.reasons.join('；')}
                 {activeRecommendation.cautions.length > 0 && (
@@ -577,9 +575,8 @@ const AlmanacWorkspace: React.FC<Props> = ({
                 )}
               </section>
               </div>
-            </div>
-          </div>
-        </div>
+            </DialogBody>
+        </DialogPortal>
       )}
     </div>
   );

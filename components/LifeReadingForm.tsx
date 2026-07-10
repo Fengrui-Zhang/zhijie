@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
 import { buildBirthPlaceText, findPlaceCoord } from '../utils/locations';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { useDialogFocus } from '../hooks/useDialogFocus';
+import DialogPortal, { DialogBody } from './DialogPortal';
 
 type CalendarType = 'solar' | 'lunar' | 'pillars';
 type TimeInputMode = 'exact' | 'quick';
@@ -46,6 +45,7 @@ interface Props {
   setCity: (value: string) => void;
   district: string;
   setDistrict: (value: string) => void;
+  inDialog?: boolean;
 }
 
 const HOUR_OPTIONS = [
@@ -140,6 +140,7 @@ export default function LifeReadingForm({
   setCity,
   district,
   setDistrict,
+  inDialog = false,
 }: Props) {
   const [timeOpen, setTimeOpen] = useState(false);
   const dayCount = calendarType === 'solar' ? daysInSolarMonth(year, month) : 30;
@@ -147,8 +148,6 @@ export default function LifeReadingForm({
   const placeText = buildBirthPlaceText(province, city, district);
   const coord = findPlaceCoord(district, city, province);
   const trueSolarDisabled = timeInputMode === 'quick';
-  useBodyScrollLock(timeOpen);
-  const timeDialogRef = useDialogFocus<HTMLDivElement>(timeOpen, () => setTimeOpen(false));
 
   const timeSummary = useMemo(() => {
     const option = HOUR_OPTIONS.find((item) => item.value === hour && minute === 0);
@@ -161,13 +160,13 @@ export default function LifeReadingForm({
   };
 
   return (
-    <div className="mx-auto max-w-4xl rounded-2xl border border-stone-100 bg-white/70 p-5 shadow-sm backdrop-blur-md md:p-6">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-5">
+    <div className={inDialog ? 'mx-auto w-full max-w-4xl' : 'mx-auto max-w-4xl rounded-2xl border border-stone-100 bg-white/70 p-5 shadow-sm backdrop-blur-md md:p-6'}>
+      {!inDialog && <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-5">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">出生信息</div>
           <h2 className="mt-1 text-2xl font-bold text-stone-900">{modelLabel}排盘</h2>
         </div>
-      </div>
+      </div>}
 
       <div className="space-y-5">
         <div>
@@ -290,88 +289,75 @@ export default function LifeReadingForm({
         )}
       </div>
 
-      {timeOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden overscroll-none bg-black/25 p-2 md:p-4"
-          onClick={() => setTimeOpen(false)}
-          onTouchMove={(event) => event.preventDefault()}
-        >
-          <div
-            ref={timeDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="birth-time-dialog-title"
-            tabIndex={-1}
-            className="glass-panel flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[calc(100dvh-2rem)] md:rounded-[30px]"
-            onClick={(event) => event.stopPropagation()}
-            onTouchMove={(event) => event.stopPropagation()}
+      <DialogPortal
+        open={timeOpen}
+        onClose={() => setTimeOpen(false)}
+        labelledBy="birth-time-dialog-title"
+        mobileFill
+        layerClassName="z-[70]"
+        panelClassName="max-w-3xl"
+      >
+        <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-4 py-3 md:px-6 md:py-4">
+          <div id="birth-time-dialog-title" className="text-lg font-bold text-stone-900">出生时辰</div>
+          <button
+            type="button"
+            onClick={() => setTimeOpen(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-2xl leading-none text-stone-400 transition hover:bg-white/70 hover:text-stone-700"
+            aria-label="关闭出生时辰弹窗"
           >
-            <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-4 py-3 md:px-6 md:py-4">
-              <div id="birth-time-dialog-title" className="text-lg font-bold text-stone-900">出生时辰</div>
-              <button
-                type="button"
-                onClick={() => setTimeOpen(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-2xl leading-none text-stone-400 transition hover:bg-white/70 hover:text-stone-700"
-                aria-label="关闭出生时辰弹窗"
-              >
-                ×
-              </button>
+            ×
+          </button>
+        </div>
+        <DialogBody className="space-y-5 p-4 md:space-y-6 md:p-6">
+          <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
+            <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
+            <input
+              type="time"
+              value={`${pad2(hour)}:${pad2(minute)}`}
+              onChange={(event) => {
+                const [h, m] = event.target.value.split(':').map(Number);
+                setHour(h);
+                setMinute(m);
+                setTimeInputMode('exact');
+              }}
+              className="glass-input w-full rounded-2xl p-3 text-center font-mono text-lg outline-none"
+            />
+          </div>
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <label className="text-xs font-bold text-stone-500">快捷选择时辰</label>
+              <span className="text-right text-xs text-stone-400">快捷选择会关闭真太阳时</span>
             </div>
-            <div
-              className="min-h-0 flex-1 touch-pan-y space-y-5 overflow-y-auto overscroll-contain p-4 [-webkit-overflow-scrolling:touch] md:space-y-6 md:p-6"
-              onTouchMove={(event) => event.stopPropagation()}
-            >
-              <div className="glass-panel-soft rounded-[24px] border border-white/60 p-4">
-                <label className="mb-2 block text-xs font-bold text-stone-500">精确时间</label>
-                <input
-                  type="time"
-                  value={`${pad2(hour)}:${pad2(minute)}`}
-                  onChange={(event) => {
-                    const [h, m] = event.target.value.split(':').map(Number);
-                    setHour(h);
-                    setMinute(m);
-                    setTimeInputMode('exact');
-                  }}
-                  className="glass-input w-full rounded-2xl p-3 text-center font-mono text-lg outline-none"
-                />
-              </div>
-              <div>
-                <div className="mb-3 flex items-center justify-between">
-                  <label className="text-xs font-bold text-stone-500">快捷选择时辰</label>
-                  <span className="text-xs text-stone-400">快捷选择会关闭真太阳时</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                  {HOUR_OPTIONS.map((item) => {
-                    const selected = timeInputMode === 'quick' && hour === item.value && minute === 0;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setHour(item.value);
-                          setMinute(0);
-                          setTimeInputMode('quick');
-                          setUseTrueSolar(false);
-                        }}
-                        className={`rounded-2xl border px-2 py-3 text-center transition ${
-                          selected ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75'
-                        }`}
-                      >
-                        <div className="font-bold">{item.name}</div>
-                        <div className={`text-xs ${selected ? 'text-white/75' : 'text-stone-400'}`}>{item.time}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-white/50 p-3 md:p-4">
-              <button type="button" onClick={() => setTimeOpen(false)} className="glass-chip rounded-2xl border border-white/60 px-4 py-3 font-semibold text-stone-700">取消</button>
-              <button type="button" onClick={() => setTimeOpen(false)} className="glass-cta rounded-2xl px-4 py-3 font-semibold text-amber-200">确定</button>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {HOUR_OPTIONS.map((item) => {
+                const selected = timeInputMode === 'quick' && hour === item.value && minute === 0;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => {
+                      setHour(item.value);
+                      setMinute(0);
+                      setTimeInputMode('quick');
+                      setUseTrueSolar(false);
+                    }}
+                    className={`rounded-2xl border px-2 py-3 text-center transition ${
+                      selected ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75'
+                    }`}
+                  >
+                    <div className="font-bold">{item.name}</div>
+                    <div className={`text-xs ${selected ? 'text-white/75' : 'text-stone-400'}`}>{item.time}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+        </DialogBody>
+        <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-white/50 bg-white/75 p-3 md:p-4">
+          <button type="button" onClick={() => setTimeOpen(false)} className="glass-chip rounded-2xl border border-white/60 px-4 py-3 font-semibold text-stone-700">取消</button>
+          <button type="button" onClick={() => setTimeOpen(false)} className="glass-cta rounded-2xl px-4 py-3 font-semibold text-amber-200">确定</button>
         </div>
-      )}
+      </DialogPortal>
     </div>
   );
 }

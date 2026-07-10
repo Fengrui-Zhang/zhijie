@@ -11,6 +11,8 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+const dialogStack: symbol[] = [];
+
 export function useDialogFocus<T extends HTMLElement>(open: boolean, onClose: () => void) {
   const dialogRef = useRef<T>(null);
   const closeRef = useRef(onClose);
@@ -24,6 +26,8 @@ export function useDialogFocus<T extends HTMLElement>(open: boolean, onClose: ()
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
     if (!dialog) return;
+    const dialogToken = Symbol('dialog');
+    dialogStack.push(dialogToken);
 
     const focusables = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
       .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
@@ -31,6 +35,7 @@ export function useDialogFocus<T extends HTMLElement>(open: boolean, onClose: ()
     window.requestAnimationFrame(() => initialTarget.focus());
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (dialogStack[dialogStack.length - 1] !== dialogToken) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current();
@@ -57,6 +62,8 @@ export function useDialogFocus<T extends HTMLElement>(open: boolean, onClose: ()
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      const stackIndex = dialogStack.lastIndexOf(dialogToken);
+      if (stackIndex !== -1) dialogStack.splice(stackIndex, 1);
       previouslyFocused?.focus();
     };
   }, [open]);

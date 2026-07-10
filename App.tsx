@@ -90,6 +90,7 @@ import CaseRouteState from './components/CaseRouteState';
 import { AppNavigation, MobileBottomNavigation } from './components/AppNavigation';
 import WorkspaceViewport from './components/WorkspaceViewport';
 import { ChatWorkspace, RecordsWorkspace } from './components/WorkspacePanels';
+import DialogPortal, { DialogBody } from './components/DialogPortal';
 
 // Auth & Session Components
 import AuthForm from './components/AuthForm';
@@ -1709,9 +1710,8 @@ const App: React.FC<AppProps> = ({
   const shouldAutoScrollRef = useRef(true);
   const pendingCaseSessionScrollRef = useRef(false);
   const initialCaseLoadKeyRef = useRef('');
-  const pendingSectionScrollRef = useRef<'report' | 'case-form' | 'case-detail' | 'chat' | null>(null);
+  const pendingSectionScrollRef = useRef<'report' | 'case-detail' | 'chat' | null>(null);
   const reportChartRef = useRef<HTMLDivElement>(null);
-  const caseFormRef = useRef<HTMLDivElement>(null);
   const caseDetailRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1877,7 +1877,7 @@ const App: React.FC<AppProps> = ({
     shouldAutoScrollRef.current = distanceFromBottom < 96;
   }, []);
 
-  const requestSectionScroll = useCallback((target: 'report' | 'case-form' | 'case-detail' | 'chat') => {
+  const requestSectionScroll = useCallback((target: 'report' | 'case-detail' | 'chat') => {
     pendingSectionScrollRef.current = target;
   }, []);
 
@@ -1915,11 +1915,9 @@ const App: React.FC<AppProps> = ({
     const target = (
       targetKey === 'report'
         ? reportChartRef.current
-        : targetKey === 'case-form'
-          ? caseFormRef.current
-          : targetKey === 'case-detail'
-            ? caseDetailRef.current
-            : chatPanelRef.current
+        : targetKey === 'case-detail'
+          ? caseDetailRef.current
+          : chatPanelRef.current
     );
     if (!target) return;
 
@@ -4223,7 +4221,6 @@ const App: React.FC<AppProps> = ({
     setCaseFormOpen(true);
     resetCaseFormInputs();
     setError('');
-    requestSectionScroll('case-form');
   };
 
   const beginCaseEdit = () => {
@@ -4233,7 +4230,14 @@ const App: React.FC<AppProps> = ({
     applyCaseChartParamsToForm(activeCase.chartParams);
     setError('');
     setStep('input');
-    requestSectionScroll('case-form');
+  };
+
+  const closeCaseForm = () => {
+    if (loading || caseBusy) return;
+    setCaseFormOpen(false);
+    setEditingCaseId(null);
+    resetCaseFormInputs();
+    setError('');
   };
 
   const refreshGuestActiveCase = useCallback((caseId: string) => {
@@ -5044,7 +5048,6 @@ const App: React.FC<AppProps> = ({
     applyCaseChartParamsToForm(detail.chartParams);
     setError('');
     setStep('input');
-    requestSectionScroll('case-form');
   };
 
   const handleDeleteCaseFromLibrary = async (caseId: string) => {
@@ -9929,74 +9932,6 @@ const App: React.FC<AppProps> = ({
                   </div>
                 )}
 
-                {caseFormOpen && (
-                  <div ref={caseFormRef} className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6 space-y-5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-base font-bold text-stone-700">
-                          {editingCaseId ? '编辑命例' : '新增命例'}
-                        </div>
-                        <div className="text-xs text-stone-500">
-                          支持公历、农历、四柱排盘；精确时间可选择真太阳时，快捷时辰不使用真太阳时。
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCaseFormOpen(false);
-                          setEditingCaseId(null);
-                          resetCaseFormInputs();
-                        }}
-                        className="text-sm text-stone-500 underline hover:text-stone-800"
-                      >
-                        取消
-                      </button>
-                    </div>
-
-                    <LifeReadingForm
-                      modelLabel={modelType === ModelType.BAZI ? '八字' : '紫微'}
-                      name={name}
-                      setName={setName}
-                      gender={gender}
-                      setGender={setGender}
-                      calendarType={lifeCalendarType}
-                      setCalendarType={setLifeCalendarType}
-                      year={lifeYear}
-                      setYear={setLifeYear}
-                      month={lifeMonth}
-                      setMonth={setLifeMonth}
-                      day={lifeDay}
-                      setDay={setLifeDay}
-                      hour={lifeHour}
-                      setHour={setLifeHour}
-                      minute={lifeMinute}
-                      setMinute={setLifeMinute}
-                      timeInputMode={lifeTimeInputMode}
-                      setTimeInputMode={setLifeTimeInputMode}
-                      useTrueSolar={lifeUseTrueSolar}
-                      setUseTrueSolar={setLifeUseTrueSolar}
-                      isLeapMonth={lifeIsLeapMonth}
-                      setIsLeapMonth={setLifeIsLeapMonth}
-                      pillars={lifePillars}
-                      setPillars={setLifePillars}
-                      province={province}
-                      setProvince={setProvince}
-                      city={city}
-                      setCity={setCity}
-                      district={district}
-                      setDistrict={setDistrict}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={handleSaveCase}
-                      disabled={loading || caseBusy}
-                      className="glass-cta w-full hover:brightness-105 text-amber-300 font-bold py-4 rounded-2xl flex justify-center items-center gap-2 transition"
-                    >
-                      {loading || caseBusy ? <Spinner /> : '排盘并保存命例'}
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
@@ -10981,6 +10916,94 @@ const App: React.FC<AppProps> = ({
         )}
       </WorkspaceViewport>
       </div>{/* end flex wrapper */}
+
+      <DialogPortal
+        open={caseFormOpen && isCaseModel}
+        onClose={closeCaseForm}
+        labelledBy="case-form-dialog-title"
+        mobileFill
+        layerClassName="z-[60]"
+        panelClassName="max-w-4xl"
+      >
+        <div className="glass-panel-soft flex shrink-0 items-start justify-between gap-3 border-b border-white/50 px-4 py-4 md:px-6 md:py-5">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">出生信息</div>
+            <div id="case-form-dialog-title" className="mt-1 text-xl font-bold text-stone-800 md:text-2xl">
+              {editingCaseId ? '编辑' : '新增'}{modelType === ModelType.BAZI ? '八字' : '紫微'}命例
+            </div>
+            <div className="mt-1 text-xs leading-5 text-stone-500">
+              支持公历、农历与四柱输入；精确时间可按出生地校准。
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeCaseForm}
+            aria-label="关闭命例窗口"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl leading-none text-stone-400 transition hover:bg-white/70 hover:text-stone-700"
+          >
+            ×
+          </button>
+        </div>
+        <DialogBody className="px-4 py-5 md:px-6 md:py-6">
+          {error && (
+            <div className="mb-4 rounded-2xl border border-red-200/80 bg-red-50/85 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          <LifeReadingForm
+            inDialog
+            modelLabel={modelType === ModelType.BAZI ? '八字' : '紫微'}
+            name={name}
+            setName={setName}
+            gender={gender}
+            setGender={setGender}
+            calendarType={lifeCalendarType}
+            setCalendarType={setLifeCalendarType}
+            year={lifeYear}
+            setYear={setLifeYear}
+            month={lifeMonth}
+            setMonth={setLifeMonth}
+            day={lifeDay}
+            setDay={setLifeDay}
+            hour={lifeHour}
+            setHour={setLifeHour}
+            minute={lifeMinute}
+            setMinute={setLifeMinute}
+            timeInputMode={lifeTimeInputMode}
+            setTimeInputMode={setLifeTimeInputMode}
+            useTrueSolar={lifeUseTrueSolar}
+            setUseTrueSolar={setLifeUseTrueSolar}
+            isLeapMonth={lifeIsLeapMonth}
+            setIsLeapMonth={setLifeIsLeapMonth}
+            pillars={lifePillars}
+            setPillars={setLifePillars}
+            province={province}
+            setProvince={setProvince}
+            city={city}
+            setCity={setCity}
+            district={district}
+            setDistrict={setDistrict}
+          />
+        </DialogBody>
+        <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-white/50 bg-white/78 p-3 md:flex md:justify-end md:p-4">
+          <button
+            type="button"
+            onClick={closeCaseForm}
+            disabled={loading || caseBusy}
+            className="glass-chip rounded-2xl border border-white/60 px-5 py-3 font-semibold text-stone-700 disabled:opacity-50"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveCase}
+            disabled={loading || caseBusy}
+            className="glass-cta flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-bold text-amber-300 transition hover:brightness-105 disabled:opacity-50 md:min-w-48"
+          >
+            {loading || caseBusy ? <Spinner /> : '排盘并保存'}
+          </button>
+        </div>
+      </DialogPortal>
 
       {showInitialAnalysisModal && currentCaseInitialAnalysis && (
         <div

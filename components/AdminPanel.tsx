@@ -5,7 +5,7 @@ import {
   DEFAULT_SITE_SETTINGS,
   type PublicSiteSettings,
 } from '@/lib/site-settings-defaults';
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
+import DialogPortal, { DialogBody } from './DialogPortal';
 
 interface UserRow {
   id: string;
@@ -64,7 +64,6 @@ export default function AdminPanel({ onBack }: Props) {
   const [plainPasswordCache, setPlainPasswordCache] = useState<Record<string, string>>({});
   const [revealPasswordId, setRevealPasswordId] = useState<string | null>(null);
   const [siteSettings, setSiteSettings] = useState<PublicSiteSettings>(DEFAULT_SITE_SETTINGS);
-  useBodyScrollLock(Boolean(detailUser));
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState('');
@@ -753,15 +752,15 @@ export default function AdminPanel({ onBack }: Props) {
       </main>
 
       {detailUser && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden bg-black/42 px-3 py-4 backdrop-blur-md md:px-4 md:py-6"
-          onClick={() => { setDetailUser(null); setShowPasswordModal(false); setRevealPasswordId(null); }}
+        <DialogPortal
+          open
+          onClose={() => { setDetailUser(null); setShowPasswordModal(false); setRevealPasswordId(null); }}
+          ariaLabel="用户详情"
+          mobileFill
+          layerClassName="z-[60]"
+          panelClassName="max-w-2xl"
         >
-          <div
-            className="glass-panel glass-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-[30px] border border-white/60 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[90dvh] md:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
+            <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-5 py-4 md:px-6">
               <h3 className="text-sm font-bold text-stone-800">用户详情</h3>
               <div className="flex gap-2">
                 {detailUser.role !== 'admin' && (
@@ -776,6 +775,8 @@ export default function AdminPanel({ onBack }: Props) {
                 <button type="button" onClick={() => { setDetailUser(null); setRevealPasswordId(null); }} className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-500 hover:text-stone-700">关闭</button>
               </div>
             </div>
+
+            <DialogBody className="p-5 md:p-6">
 
             <div className="mb-6 grid gap-3 text-sm md:grid-cols-2">
               <div className="glass-panel-soft rounded-[22px] border border-white/60 px-4 py-3"><span className="text-stone-400">邮箱</span><span className="ml-2">{detailUser.email}</span></div>
@@ -901,8 +902,8 @@ export default function AdminPanel({ onBack }: Props) {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+            </DialogBody>
+        </DialogPortal>
       )}
     </div>
   );
