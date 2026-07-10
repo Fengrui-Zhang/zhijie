@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface Props {
   onClose: () => void;
@@ -14,6 +15,7 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
   const [error, setError] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   useBodyScrollLock(true);
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -39,11 +41,16 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-settings-title"
+        tabIndex={-1}
         className="glass-panel max-h-[calc(100dvh-2rem)] w-full max-w-sm space-y-4 overflow-y-auto overscroll-contain rounded-[30px] border border-white/55 p-6 shadow-[0_28px_80px_rgba(0,0,0,0.22)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-stone-800">账号设置</h3>
+          <h3 id="account-settings-title" className="text-sm font-bold text-stone-800">账号设置</h3>
           <button type="button" onClick={onClose} className="glass-chip rounded-full px-3 py-1.5 text-sm text-stone-500 hover:text-stone-700 hover:bg-white/70 transition">关闭</button>
         </div>
 

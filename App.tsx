@@ -114,6 +114,8 @@ import LifeReadingForm from './components/LifeReadingForm';
 import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 import { useBodyScrollLock } from './hooks/useBodyScrollLock';
+import { useDialogFocus } from './hooks/useDialogFocus';
+import AiCostHint from './components/AiCostHint';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
   ssr: false,
@@ -1618,6 +1620,7 @@ const App: React.FC<AppProps> = ({
   const [editingCaseRelationId, setEditingCaseRelationId] = useState<string | null>(null);
   const [caseRelationEditDraft, setCaseRelationEditDraft] = useState<EditableCaseRelationDraft>({ labelAToB: '', labelBToA: '' });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [desktopHistoryOpen, setDesktopHistoryOpen] = useState(false);
   const [activeCompactPanel, setActiveCompactPanel] = useState<'history' | 'more' | null>(null);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const analysisModel = DEFAULT_ANALYSIS_MODEL;
@@ -1859,6 +1862,7 @@ const App: React.FC<AppProps> = ({
   const [klineYearProgress, setKlineYearProgress] = useState(0);
   const [baziResultTab, setBaziResultTab] = useState<'basic' | 'professional' | 'ai' | 'notes'>('basic');
   const hasBlockingOverlayOpen = Boolean(activeCompactPanel) ||
+    desktopHistoryOpen ||
     showAuth ||
     showUserMenu ||
     showAccountSettings ||
@@ -1871,6 +1875,8 @@ const App: React.FC<AppProps> = ({
     klineModalOpen;
 
   useBodyScrollLock(hasBlockingOverlayOpen);
+  const compactPanelDialogRef = useDialogFocus<HTMLDivElement>(Boolean(activeCompactPanel), () => setActiveCompactPanel(null));
+  const desktopHistoryDialogRef = useDialogFocus<HTMLDivElement>(desktopHistoryOpen, () => setDesktopHistoryOpen(false));
 
   const registrationEnabled = siteSettings.registrationEnabled;
   const guestModeEnabled = siteSettings.guestModeEnabled;
@@ -2296,14 +2302,6 @@ const App: React.FC<AppProps> = ({
     mediaQuery.addListener(handleChange);
     return () => mediaQuery.removeListener(handleChange);
   }, []);
-
-  useEffect(() => {
-    if (!activeCompactPanel) return;
-    document.body.classList.add('overflow-hidden');
-    return () => {
-      document.body.classList.remove('overflow-hidden');
-    };
-  }, [activeCompactPanel]);
 
   useEffect(() => {
     if (modelType !== ModelType.BAZI || !activeCase || activeCase.modelType !== ModelType.BAZI) {
@@ -7508,10 +7506,10 @@ const App: React.FC<AppProps> = ({
   const showSolarTimeReminder = showLocation && customDate && isNearShiChenBoundary(customDate);
 
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
-  const desktopHistoryOffset = sidebarCollapsed ? DESKTOP_PANEL_COLLAPSED_OFFSET : DESKTOP_PANEL_EXPANDED_OFFSET;
-  const desktopNavOffset = !isCompactLayout ? 292 : 0;
-  const desktopWorkPaddingLeft = desktopNavOffset;
-  const desktopWorkPaddingRight = isLoggedIn && !isCompactLayout && workspaceView === 'divination' ? desktopHistoryOffset : 0;
+  const persistentHistoryCollapsed = sidebarCollapsed || savedSessions.length === 0;
+  const fortuneCalibrationCached = Boolean(
+    getStoredWuxingCalibration(caseItems.find((item) => item.id === fortuneCaseId)?.initialAnalysisData)
+  );
   const currentModuleLabel =
     professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
@@ -7651,6 +7649,7 @@ const App: React.FC<AppProps> = ({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <AiCostHint quota={userQuota} cached={Boolean(currentCaseInitialAnalysis)} />
               {currentCaseInitialAnalysis && (
                 <button
                   type="button"
@@ -7712,8 +7711,9 @@ const App: React.FC<AppProps> = ({
               disabled={loading || isTyping}
               className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
             >
-              {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+              {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
             </button>
+            <AiCostHint quota={userQuota} className="sm:col-start-2 sm:text-right" />
           </div>
         </div>
 
@@ -7785,6 +7785,21 @@ const App: React.FC<AppProps> = ({
     );
   };
 
+  if (authStatus === 'loading') {
+    return (
+      <div className="app-shell min-h-screen bg-stone-50 text-stone-800 font-serif" aria-busy="true" aria-label="正在载入元分智解">
+        <header className="glass-topbar h-[61px] border-b border-amber-500/40" />
+        <div className="mx-auto grid w-full max-w-[1500px] gap-6 px-4 py-6 xl:grid-cols-[236px_minmax(0,1fr)]">
+          <div className="hidden h-[calc(100vh-110px)] animate-pulse rounded-2xl bg-white/65 xl:block" />
+          <div className="space-y-5">
+            <div className="h-16 animate-pulse rounded-2xl bg-white/70" />
+            <div className="h-64 animate-pulse rounded-[28px] bg-white/70" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (showAdminPanel && isLoggedIn && userRole === 'admin') {
     return <AdminPanel onBack={() => setShowAdminPanel(false)} />;
   }
@@ -7835,7 +7850,7 @@ const App: React.FC<AppProps> = ({
 
   const renderModuleNavigation = (mobile = false) => (
     <nav
-      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-112px)] w-[260px]'} glass-panel-soft flex flex-col rounded-2xl border border-stone-100/80 p-4 shadow-sm`}
+      className={`${mobile ? 'mb-4' : 'h-[calc(100vh-97px)] w-[236px]'} glass-panel-soft flex flex-col rounded-2xl border border-stone-100/80 p-4 shadow-sm`}
       aria-label="功能导航"
     >
       <div className="mb-4">
@@ -7994,7 +8009,7 @@ const App: React.FC<AppProps> = ({
   );
 
   const renderMobileBottomNav = () => (
-    <nav className="fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-stone-100 bg-white/86 p-2 shadow-lg shadow-stone-900/10 backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
+    <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-2xl border border-stone-100 bg-white/86 p-2 shadow-lg shadow-stone-900/10 backdrop-blur-xl xl:hidden" aria-label="移动端主导航">
       <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${appPreferences.mobileBottomNav.length + 1}, minmax(0, 1fr))` }}>
         {[
           ...appPreferences.mobileBottomNav.map((id) => {
@@ -8212,7 +8227,7 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
-      {sessionsLoading || authStatus === 'loading' ? (
+      {sessionsLoading ? (
         <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
           正在读取记录...
         </div>
@@ -8527,7 +8542,7 @@ const App: React.FC<AppProps> = ({
           {standaloneChatError}
         </div>
       )}
-      <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/60 p-4 backdrop-blur-xl">
+      <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-xl xl:pb-4">
         <div className="mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
           <textarea
             value={standaloneChatInput}
@@ -8555,7 +8570,7 @@ const App: React.FC<AppProps> = ({
             disabled={!standaloneChatInput.trim() || standaloneChatLoading}
             className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            发送
+            发送 · 1点
           </button>
         </div>
         <button
@@ -8566,6 +8581,7 @@ const App: React.FC<AppProps> = ({
         >
           {copiedPromptKey === 'standalone-chat-mobile' ? '已复制' : '复制AI提示词'}
         </button>
+        <AiCostHint quota={userQuota} className="mt-2 block text-right" />
       </form>
     </div>
   );
@@ -9587,13 +9603,22 @@ const App: React.FC<AppProps> = ({
             <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
+            {isLoggedIn && workspaceView === 'divination' && (
+              <button
+                type="button"
+                onClick={() => setDesktopHistoryOpen(true)}
+                className="hidden rounded-full border border-stone-600/60 px-3 py-1.5 text-xs text-stone-200 transition hover:border-stone-400 hover:text-white xl:inline-flex 2xl:hidden"
+              >
+                分析记录
+              </button>
+            )}
             {isLoggedIn ? (
               <button
                 type="button"
                 onClick={() => setShowUserMenu(true)}
                 className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
               >
-                {authSession?.user?.name || '用户'}
+                {authSession?.user?.name || '用户'}{typeof userQuota === 'number' ? ` · ${userQuota}点` : ''}
               </button>
             ) : (
               <button
@@ -9636,17 +9661,21 @@ const App: React.FC<AppProps> = ({
         />
       )}
 
-      {isCompactLayout && (
+      {isCompactLayout && activeCompactPanel && (
         <div
-          className={`xl:hidden fixed inset-x-0 top-[73px] bottom-0 z-30 ${activeCompactPanel ? 'pointer-events-auto' : 'pointer-events-none'}`}
-          aria-hidden={!activeCompactPanel}
+          className="xl:hidden fixed inset-x-0 top-[61px] bottom-0 z-30"
         >
           <div
-            className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${activeCompactPanel ? 'opacity-100' : 'opacity-0'}`}
+            className="absolute inset-0 bg-black/30"
             onClick={() => setActiveCompactPanel(null)}
           />
           <div
-            className={`absolute inset-y-0 right-0 w-[82vw] max-w-[340px] transform transition-transform duration-300 ease-out ${activeCompactPanel ? 'translate-x-0' : 'translate-x-full'}`}
+            ref={compactPanelDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={activeCompactPanel === 'history' ? '历史记录' : '更多功能'}
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 w-[82vw] max-w-[340px]"
           >
             {activeCompactPanel === 'history' ? (
               <SessionSidebar
@@ -9686,34 +9715,69 @@ const App: React.FC<AppProps> = ({
         </div>
       )}
 
+      {desktopHistoryOpen && (
+        <div className="fixed inset-0 z-40 hidden xl:block 2xl:hidden">
+          <button
+            type="button"
+            aria-label="关闭分析记录"
+            className="absolute inset-0 h-full w-full bg-black/30"
+            onClick={() => setDesktopHistoryOpen(false)}
+          />
+          <div
+            ref={desktopHistoryDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="分析记录"
+            tabIndex={-1}
+            className="absolute inset-y-0 right-0 w-[320px] bg-white/92 p-3 shadow-[0_28px_80px_rgba(28,25,23,0.24)] backdrop-blur-2xl"
+          >
+            <SessionSidebar
+              sessions={savedSessions}
+              activeSessionId={activeSessionId}
+              onSelect={(id) => {
+                setDesktopHistoryOpen(false);
+                handleLoadSession(id);
+              }}
+              onDelete={handleDeleteSession}
+              onNewSession={() => {
+                setDesktopHistoryOpen(false);
+                handleReset();
+              }}
+              collapsed={false}
+              onToggle={() => setDesktopHistoryOpen(false)}
+              mobile
+            />
+          </div>
+        </div>
+      )}
+
       {renderMobileBottomNav()}
 
       <div className="flex flex-1 overflow-hidden min-h-0">
-        <div className="hidden xl:block fixed left-3 top-[106px] z-10">
+        <div className="hidden xl:block fixed left-3 top-[85px] z-10">
           {renderModuleNavigation(false)}
         </div>
 
         {isLoggedIn && workspaceView === 'divination' && (
-          <div className="hidden xl:block fixed right-3 top-[106px] z-10">
+          <div className="hidden 2xl:block fixed right-3 top-[85px] z-10">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
               onSelect={handleLoadSession}
               onDelete={handleDeleteSession}
               onNewSession={handleReset}
-              collapsed={sidebarCollapsed}
+              collapsed={persistentHistoryCollapsed}
               onToggle={() => setSidebarCollapsed(prev => !prev)}
             />
           </div>
         )}
 
       <main
-        className="flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300"
-        style={
-          desktopWorkPaddingLeft || desktopWorkPaddingRight
-            ? { paddingLeft: desktopWorkPaddingLeft, paddingRight: desktopWorkPaddingRight }
-            : undefined
-        }
+        className={`flex-1 min-h-0 overflow-y-auto transition-[padding] duration-300 xl:pl-[260px] ${
+          isLoggedIn && workspaceView === 'divination'
+            ? persistentHistoryCollapsed ? '2xl:pr-[72px]' : '2xl:pr-[320px]'
+            : ''
+        }`}
       >
         <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
         {workspaceView === 'records' && renderRecordsWorkspace()}
@@ -9792,6 +9856,9 @@ const App: React.FC<AppProps> = ({
                       loading: fortuneAiCalibrationLoading,
                       disabled: !isLoggedIn,
                       disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
+                      costHint: fortuneCalibrationCached
+                        ? '读取已保存结果 · 不扣点'
+                        : `成功后扣1点${typeof userQuota === 'number' ? ` · 剩余${userQuota}点` : ''}`,
                       onToggle: handleFortuneAiCalibrationToggle,
                     } : undefined}
                   />
@@ -9809,6 +9876,7 @@ const App: React.FC<AppProps> = ({
                 onRunSelection={handleRunAlmanacSelection}
                 selectionResult={almanacSelectionResult}
                 selectionLoading={almanacSelectionLoading}
+                userQuota={userQuota}
               />
             ) : isCaseModel ? (
               <div className="space-y-6 animate-fade-in">
@@ -10474,6 +10542,7 @@ const App: React.FC<AppProps> = ({
                       aiPanel={renderCaseAnalysisPanel(false)}
                       onTabChange={setBaziResultTab}
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
+                      userQuota={userQuota}
                     />
                   )}
                   {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
@@ -10494,6 +10563,9 @@ const App: React.FC<AppProps> = ({
                         loading: fortuneAiCalibrationLoading,
                         disabled: !isLoggedIn,
                         disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
+                        costHint: fortuneCalibrationCached
+                          ? '读取已保存结果 · 不扣点'
+                          : `成功后扣1点${typeof userQuota === 'number' ? ` · 剩余${userQuota}点` : ''}`,
                         onToggle: handleFortuneAiCalibrationToggle,
                       } : undefined}
                     />
@@ -10591,6 +10663,7 @@ const App: React.FC<AppProps> = ({
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                      <AiCostHint quota={userQuota} cached={Boolean(currentCaseInitialAnalysis)} />
                       {currentCaseInitialAnalysis && (
                         <button
                           type="button"
@@ -10652,8 +10725,9 @@ const App: React.FC<AppProps> = ({
                       disabled={loading || isTyping}
                       className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
                     >
-                      {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析' : '开始分析')}
+                      {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
                     </button>
+                    <AiCostHint quota={userQuota} className="sm:col-start-2 sm:text-right" />
                   </div>
                 </div>
 
@@ -10978,7 +11052,7 @@ const App: React.FC<AppProps> = ({
                  {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">正在分析...</div>}
                  <div ref={chatEndRef} />
                </div>
-               <div className="glass-panel-soft p-4 border-t border-white/50 flex gap-2">
+               <div className="glass-panel-soft p-4 border-t border-white/50 flex flex-wrap gap-2">
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
@@ -10986,6 +11060,7 @@ const App: React.FC<AppProps> = ({
                    className="glass-input flex-1 rounded-2xl px-4 py-2"
                  />
                  <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="glass-cta text-amber-300 p-3 rounded-2xl hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100 transition"><SendIcon /></button>
+                 <AiCostHint quota={userQuota} className="w-full text-right" />
               </div>
             </div>
             )}

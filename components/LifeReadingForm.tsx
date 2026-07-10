@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
 import { buildBirthPlaceText, findPlaceCoord } from '../utils/locations';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 type CalendarType = 'solar' | 'lunar' | 'pillars';
 type TimeInputMode = 'exact' | 'quick';
@@ -147,6 +148,7 @@ export default function LifeReadingForm({
   const coord = findPlaceCoord(district, city, province);
   const trueSolarDisabled = timeInputMode === 'quick';
   useBodyScrollLock(timeOpen);
+  const timeDialogRef = useDialogFocus<HTMLDivElement>(timeOpen, () => setTimeOpen(false));
 
   const timeSummary = useMemo(() => {
     const option = HOUR_OPTIONS.find((item) => item.value === hour && minute === 0);
@@ -295,12 +297,17 @@ export default function LifeReadingForm({
           onTouchMove={(event) => event.preventDefault()}
         >
           <div
+            ref={timeDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="birth-time-dialog-title"
+            tabIndex={-1}
             className="glass-panel flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:max-h-[calc(100dvh-2rem)] md:rounded-[30px]"
             onClick={(event) => event.stopPropagation()}
             onTouchMove={(event) => event.stopPropagation()}
           >
             <div className="glass-panel-soft flex shrink-0 items-center justify-between border-b border-white/50 px-4 py-3 md:px-6 md:py-4">
-              <div className="text-lg font-bold text-stone-900">出生时辰</div>
+              <div id="birth-time-dialog-title" className="text-lg font-bold text-stone-900">出生时辰</div>
               <button
                 type="button"
                 onClick={() => setTimeOpen(false)}

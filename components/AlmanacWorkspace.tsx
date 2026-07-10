@@ -48,6 +48,7 @@ type Props = {
   onRunSelection: (input: AlmanacSelectionInput) => Promise<void>;
   selectionResult: AlmanacSelectionResult | null;
   selectionLoading?: boolean;
+  userQuota?: number | null;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -200,6 +201,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
   onRunSelection,
   selectionResult,
   selectionLoading,
+  userQuota,
 }) => {
   const { root, inner } = getAlmanacPayload(data);
   const dayInfo = root.dayInfo || {};
@@ -390,8 +392,11 @@ const AlmanacWorkspace: React.FC<Props> = ({
             onClick={() => onRunSelection({ matter, startDate, endDate, caseId: selectedCaseId })}
             className="ml-auto rounded-full bg-stone-900 px-5 py-2 text-sm font-bold text-amber-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {selectionLoading ? '筛选中...' : '智能择吉'}
+            {selectionLoading ? '筛选中...' : '智能择吉 · 1点'}
           </button>
+          <span className="w-full text-right text-[11px] text-stone-400">
+            成功后扣1点{typeof userQuota === 'number' ? ` · 剩余${userQuota}点` : ''}
+          </span>
         </div>
 
         <div className="mt-5 rounded-2xl border border-stone-100 bg-stone-50/60 p-3">

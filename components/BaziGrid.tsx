@@ -10,6 +10,7 @@ import {
 } from '../lib/bazi-basic-analysis-prompts';
 import { formatPromptCopyMessages } from '../lib/chat-prompt-copy';
 import MarkdownContent from './MarkdownContent';
+import AiCostHint from './AiCostHint';
 
 interface Props {
   data: BaziResponse;
@@ -19,6 +20,7 @@ interface Props {
   aiPanel?: React.ReactNode;
   onTabChange?: (tab: BaziTab) => void;
   onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
+  userQuota?: number | null;
 }
 
 const splitList = (value?: string | string[]) => {
@@ -432,6 +434,7 @@ const AnalysisCard = ({
   savedContent,
   personalizationPrompt,
   onSaved,
+  userQuota,
 }: {
   type: AnalysisType;
   title: string;
@@ -441,6 +444,7 @@ const AnalysisCard = ({
   savedContent?: string;
   personalizationPrompt?: string;
   onSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
+  userQuota?: number | null;
 }) => {
   const [content, setContent] = useState(savedContent || '');
   const [loading, setLoading] = useState(false);
@@ -508,6 +512,7 @@ const AnalysisCard = ({
           <div className="mt-1 text-sm text-stone-500">{subtitle}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <AiCostHint quota={userQuota} cached={Boolean(content)} className="w-full text-right" />
           <button
             type="button"
             onClick={() => void copyPrompt()}
@@ -522,7 +527,7 @@ const AnalysisCard = ({
             disabled={loading}
             className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
           >
-            {loading ? '分析中...' : content ? '重新分析（消耗1点）' : '开始分析（消耗1点）'}
+            {loading ? '分析中...' : content ? '重新分析 · 1点' : '开始分析 · 1点'}
           </button>
         </div>
       </div>
@@ -645,7 +650,7 @@ const CaseNotes = ({ storageKey }: { storageKey: string }) => {
   );
 };
 
-const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved, userQuota }) => {
   const { base_info, bazi_info, dayun_info, detail_info } = data;
   const rawDayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -969,6 +974,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             savedContent={savedWuxingAnalysis}
             personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
+            userQuota={userQuota}
           />
           <AnalysisCard
             type="personality"
@@ -979,6 +985,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             savedContent={savedPersonalityAnalysis}
             personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
+            userQuota={userQuota}
           />
 
           <TenGodKnowledge locations={tenGodLocations} />

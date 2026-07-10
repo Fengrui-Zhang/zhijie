@@ -28,6 +28,7 @@ type Props = {
     loading?: boolean;
     disabled?: boolean;
     disabledReason?: string;
+    costHint?: string;
     onToggle: () => void;
   };
 };
@@ -391,19 +392,22 @@ const AiCalibrationButton = ({ aiCalibration }: Pick<Props, 'aiCalibration'>) =>
       ? 'AI校准已启用'
       : 'AI校准';
   return (
-    <button
-      type="button"
-      onClick={aiCalibration.onToggle}
-      disabled={Boolean(aiCalibration.loading || aiCalibration.disabled)}
-      title={aiCalibration.disabledReason}
-      className={`rounded-2xl border px-3 py-2 text-sm font-bold transition ${
-        aiCalibration.enabled
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-          : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
-      } disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      {label}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={aiCalibration.onToggle}
+        disabled={Boolean(aiCalibration.loading || aiCalibration.disabled)}
+        title={aiCalibration.disabledReason}
+        className={`rounded-2xl border px-3 py-2 text-sm font-bold transition ${
+          aiCalibration.enabled
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+        } disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        {label}
+      </button>
+      {aiCalibration.costHint && <span className="text-[11px] text-stone-400">{aiCalibration.costHint}</span>}
+    </div>
   );
 };
 
@@ -872,8 +876,8 @@ const FortuneTrendChart = ({
           ))}
         </div>
       </div>
-      <div className="h-60 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72 md:p-4">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-60 min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:h-72 md:p-4">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={chartData} margin={{ top: 10, right: 10, left: -22, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#78716c' }} tickLine={false} axisLine={false} dy={8} minTickGap={12} />
@@ -1257,8 +1261,8 @@ const MonthlyTrend = ({ calendar }: { calendar: any[] }) => {
           ))}
         </div>
       </div>
-      <div className="h-[clamp(220px,32vw,360px)] w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-4">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[clamp(220px,32vw,360px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-4">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={chartData} margin={{ top: 12, right: 12, left: -22, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis
@@ -1356,8 +1360,8 @@ const YearlyMonthlyTrend = ({ trend, selectedMonth }: { trend: any[]; selectedMo
           ))}
         </div>
       </div>
-      <div className="h-[clamp(180px,22vw,260px)] w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-3">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[clamp(180px,22vw,260px)] min-w-0 w-full rounded-2xl border border-stone-100 bg-stone-50/30 p-2 md:p-3">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={chartData} margin={{ top: 10, right: 8, left: -24, bottom: 2 }}>
             <CartesianGrid stroke="#e7e5e4" strokeDasharray="2 2" vertical={false} opacity={0.55} />
             <XAxis
