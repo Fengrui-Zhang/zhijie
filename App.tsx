@@ -33,7 +33,11 @@ import {
   type CaseRelationItem,
 } from './lib/case-relations';
 import { deriveInitialAnalysisFromSession } from './lib/initial-analysis';
-import { getStoredWuxingCalibration, type WuxingCalibration } from './lib/bazi-wuxing-calibration';
+import {
+  attachWuxingCalibration,
+  getStoredWuxingCalibration,
+  type WuxingCalibration,
+} from './lib/bazi-wuxing-calibration';
 import {
   appendCaseSpecialTag,
   BAZI_COMPATIBILITY_SESSION_TYPE,
@@ -130,7 +134,6 @@ import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 import { useBodyScrollLock } from './hooks/useBodyScrollLock';
 import { useDialogFocus } from './hooks/useDialogFocus';
-import AiCostHint from './components/AiCostHint';
 import HomeWorkspace from './components/HomeWorkspace';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
@@ -225,7 +228,6 @@ const DISCLAIMER_TEXT = 'AI 命理分析仅供娱乐，请大家切勿过分当�
 const GUEST_CASES_STORAGE_KEY = 'guest-divination-cases:v1';
 const GUEST_CASE_SESSIONS_STORAGE_KEY = 'guest-divination-case-sessions:v1';
 const GUEST_CASE_RELATIONS_STORAGE_KEY = 'guest-divination-case-relations:v1';
-const GUEST_FORTUNE_LIMIT = 1;
 const DESKTOP_PANEL_EXPANDED_OFFSET = 320;
 const DESKTOP_PANEL_COLLAPSED_OFFSET = 72;
 const KLINE_CHAT_MODEL: ChatModel = DEFAULT_REASONING_MODEL;
@@ -799,16 +801,16 @@ const PERSONALIZATION_STORAGE_KEY = 'zhijie:personalization-settings:v1';
 const APP_PREFERENCES_STORAGE_KEY = 'zhijie:app-preferences:v1';
 
 const MOBILE_BOTTOM_NAV_OPTIONS: Array<{ id: MobileBottomNavItemId; label: string }> = [
-  { id: ModelType.BAZI, label: '命盘' },
+  { id: ModelType.BAZI, label: '八字' },
   { id: ModelType.ZIWEI, label: '紫微' },
-  { id: ModelType.DAILY_FORTUNE, label: '今日' },
+  { id: ModelType.DAILY_FORTUNE, label: '日运' },
   { id: ModelType.MONTHLY_FORTUNE, label: '月运' },
   { id: ModelType.QIMEN, label: '奇门' },
   { id: ModelType.LIUYAO, label: '六爻' },
   { id: ModelType.MEIHUA, label: '梅花' },
   { id: ModelType.ALMANAC, label: '择日' },
-  { id: 'records', label: '分析记录' },
-  { id: 'chat', label: '问智解' },
+  { id: 'records', label: '记录' },
+  { id: 'chat', label: '问AI' },
 ];
 
 const DEFAULT_APP_PREFERENCES: AppPreferenceSettings = {
@@ -1565,7 +1567,6 @@ const App: React.FC<AppProps> = ({
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [showInitialAnalysisModal, setShowInitialAnalysisModal] = useState(false);
   const [userQuota, setUserQuota] = useState<number | null>(null);
-  const [guestFortuneCount, setGuestFortuneCount] = useState(0);
   const [guestFollowUpCount, setGuestFollowUpCount] = useState(0);
   const [siteSettings, setSiteSettings] = useState<PublicSiteSettings>(DEFAULT_SITE_SETTINGS);
 
@@ -2421,7 +2422,6 @@ const App: React.FC<AppProps> = ({
   }, [authStatus]);
 
   useEffect(() => {
-    setGuestFortuneCount(parseInt(localStorage.getItem('guestFortuneCount') || '0', 10));
     setGuestFollowUpCount(parseInt(localStorage.getItem('guestFollowUpCount') || '0', 10));
   }, []);
 
@@ -6802,16 +6802,24 @@ const App: React.FC<AppProps> = ({
     }
 
     const existingCase = fortuneCaseOptions.find((item) => item.id === caseId);
-    const existingCalibration = getStoredWuxingCalibration(existingCase?.initialAnalysisData);
-    if (existingCalibration) return existingCalibration;
+    const existingInitialAnalysisData = existingCase?.initialAnalysisData;
+    const reusableInitialAnalysisData = attachWuxingCalibration(existingInitialAnalysisData);
+    const existingCalibration = getStoredWuxingCalibration(reusableInitialAnalysisData);
+    if (existingCalibration) {
+      if (reusableInitialAnalysisData !== existingInitialAnalysisData) {
+        syncFortuneCaseInitialAnalysis(caseId, reusableInitialAnalysisData);
+      }
+      return existingCalibration;
+    }
 
     setFortuneAiCalibrationLoading(true);
     setError('');
     try {
       const detail = await fetchLoggedCaseDetail(caseId);
-      const detailCalibration = getStoredWuxingCalibration(detail?.initialAnalysisData);
-      if (detail?.initialAnalysisData && detailCalibration) {
-        syncFortuneCaseInitialAnalysis(caseId, detail.initialAnalysisData);
+      const detailInitialAnalysisData = attachWuxingCalibration(detail?.initialAnalysisData);
+      const detailCalibration = getStoredWuxingCalibration(detailInitialAnalysisData);
+      if (detailInitialAnalysisData && detailCalibration) {
+        syncFortuneCaseInitialAnalysis(caseId, detailInitialAnalysisData);
         return detailCalibration;
       }
 
@@ -7484,8 +7492,10 @@ const App: React.FC<AppProps> = ({
 
   const userRole = (authSession?.user as Record<string, unknown> | undefined)?.role as string | undefined;
   const persistentHistoryCollapsed = sidebarCollapsed || savedSessions.length === 0;
+  const selectedFortuneCase = fortuneCaseOptions.find((item) => item.id === fortuneCaseId)
+    || caseItems.find((item) => item.id === fortuneCaseId);
   const fortuneCalibrationCached = Boolean(
-    getStoredWuxingCalibration(caseItems.find((item) => item.id === fortuneCaseId)?.initialAnalysisData)
+    getStoredWuxingCalibration(selectedFortuneCase?.initialAnalysisData)
   );
   const homeBaziCase = caseItems.find((item) => item.modelType === ModelType.BAZI);
   const homePrimaryCase = caseItems.find((item) => item.id === appPreferences.defaultCaseId)
@@ -7660,7 +7670,6 @@ const App: React.FC<AppProps> = ({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <AiCostHint quota={userQuota} cached={Boolean(currentCaseInitialAnalysis)} />
               {currentCaseInitialAnalysis && (
                 <button
                   type="button"
@@ -7681,7 +7690,7 @@ const App: React.FC<AppProps> = ({
                       : 'glass-panel-dark text-amber-200 hover:brightness-105'
                   }`}
                 >
-                  生成初始化分析
+                  生成初始化分析 · 1点
                 </button>
               )}
             </div>
@@ -7724,7 +7733,6 @@ const App: React.FC<AppProps> = ({
             >
               {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
             </button>
-            <AiCostHint quota={userQuota} className="sm:col-start-2 sm:text-right" />
           </div>
         </div>
 
@@ -8339,7 +8347,6 @@ const App: React.FC<AppProps> = ({
         >
           {copiedPromptKey === 'standalone-chat-mobile' ? '已复制' : '复制AI提示词'}
         </button>
-        <AiCostHint quota={userQuota} className="mt-2 block text-right" />
       </form>
     </ChatWorkspace>
   );
@@ -9562,7 +9569,6 @@ const App: React.FC<AppProps> = ({
         {workspaceView === 'home' && (
           <HomeWorkspace
             isLoggedIn={isLoggedIn}
-            quota={userQuota}
             primaryCase={homePrimaryCase ? {
               id: homePrimaryCase.id,
               title: homePrimaryCase.title,
@@ -9586,18 +9592,6 @@ const App: React.FC<AppProps> = ({
         {workspaceView === 'settings' && renderSettingsWorkspace()}
         {workspaceView === 'divination' && (
           <>
-        {!isLoggedIn && guestModeEnabled && step === 'input' && (
-          <div className="glass-banner bg-amber-50/70 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 mb-4 flex items-center gap-2">
-            <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次</span>
-            <button
-              type="button"
-              onClick={() => setShowAuth(true)}
-              className="underline font-medium hover:text-amber-900 ml-auto"
-            >
-              登录获取更多额度
-            </button>
-          </div>
-        )}
         {isLoggedIn && userQuota !== null && userQuota <= 0 && step === 'input' && (
           <div className="glass-banner bg-red-50/70 border border-red-200/80 text-red-700 text-xs rounded-2xl px-4 py-3 mb-4">
             您的提问额度已用完，暂不能请求 AI 解读。
@@ -9657,9 +9651,7 @@ const App: React.FC<AppProps> = ({
                       loading: fortuneAiCalibrationLoading,
                       disabled: !isLoggedIn,
                       disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
-                      costHint: fortuneCalibrationCached
-                        ? '读取已保存结果 · 不扣点'
-                        : `成功后扣1点${typeof userQuota === 'number' ? ` · 剩余${userQuota}点` : ''}`,
+                      cached: fortuneCalibrationCached,
                       onToggle: handleFortuneAiCalibrationToggle,
                     } : undefined}
                   />
@@ -9677,7 +9669,6 @@ const App: React.FC<AppProps> = ({
                 onRunSelection={handleRunAlmanacSelection}
                 selectionResult={almanacSelectionResult}
                 selectionLoading={almanacSelectionLoading}
-                userQuota={userQuota}
               />
             ) : isCaseModel && caseRouteStatus !== 'idle' ? (
               <CaseRouteState status={caseRouteStatus} onBack={handleBackToCaseLibrary} />
@@ -10170,18 +10161,6 @@ const App: React.FC<AppProps> = ({
         {/* Result Phase */}
         {step === 'chart' && chartData && (
           <div className="animate-fade-in space-y-6">
-            {!isLoggedIn && guestModeEnabled && (
-              <div className="glass-banner bg-amber-50/72 border border-amber-200/80 text-amber-800 text-xs rounded-2xl px-4 py-3 flex items-center gap-2">
-                <span>访客模式：AI 解读剩余 {Math.max(0, GUEST_FORTUNE_LIMIT - guestFortuneCount)}/{GUEST_FORTUNE_LIMIT} 次 · 追问本轮 {Math.max(0, 1 - guestFollowUpCount)}/1 次</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAuth(true)}
-                  className="underline font-medium hover:text-amber-900 ml-auto"
-                >
-                  登录获取更多额度
-                </button>
-              </div>
-            )}
             <div ref={reportChartRef} className="space-y-4">
               <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
                  <span className="font-bold text-stone-700">
@@ -10268,7 +10247,6 @@ const App: React.FC<AppProps> = ({
                       aiPanel={renderCaseAnalysisPanel(false)}
                       onTabChange={setBaziResultTab}
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
-                      userQuota={userQuota}
                     />
                   )}
                   {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
@@ -10289,9 +10267,7 @@ const App: React.FC<AppProps> = ({
                         loading: fortuneAiCalibrationLoading,
                         disabled: !isLoggedIn,
                         disabledReason: !isLoggedIn ? '登录并保存命例后可使用 AI 校准' : undefined,
-                        costHint: fortuneCalibrationCached
-                          ? '读取已保存结果 · 不扣点'
-                          : `成功后扣1点${typeof userQuota === 'number' ? ` · 剩余${userQuota}点` : ''}`,
+                        cached: fortuneCalibrationCached,
                         onToggle: handleFortuneAiCalibrationToggle,
                       } : undefined}
                     />
@@ -10389,7 +10365,6 @@ const App: React.FC<AppProps> = ({
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <AiCostHint quota={userQuota} cached={Boolean(currentCaseInitialAnalysis)} />
                       {currentCaseInitialAnalysis && (
                         <button
                           type="button"
@@ -10410,7 +10385,7 @@ const App: React.FC<AppProps> = ({
                               : 'glass-panel-dark text-amber-200 hover:brightness-105'
                           }`}
                         >
-                          生成初始化分析
+                          生成初始化分析 · 1点
                         </button>
                       )}
                     </div>
@@ -10453,7 +10428,6 @@ const App: React.FC<AppProps> = ({
                     >
                       {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
                     </button>
-                    <AiCostHint quota={userQuota} className="sm:col-start-2 sm:text-right" />
                   </div>
                 </div>
 
@@ -10785,8 +10759,15 @@ const App: React.FC<AppProps> = ({
                    placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && !guestModeEnabled) ? "需要登录后才能使用" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
                    className="glass-input flex-1 rounded-2xl px-4 py-2"
                  />
-                 <button onClick={handleSendMessage} disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)} className="glass-cta text-amber-300 p-3 rounded-2xl hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100 transition"><SendIcon /></button>
-                 <AiCostHint quota={userQuota} className="w-full text-right" />
+                 <button
+                   onClick={handleSendMessage}
+                   disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)}
+                   className="glass-cta flex items-center gap-1.5 rounded-2xl p-3 text-amber-300 transition hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100"
+                   aria-label="发送 · 1点"
+                 >
+                   <SendIcon />
+                   <span className="text-xs font-semibold">1点</span>
+                 </button>
               </div>
             </div>
             )}

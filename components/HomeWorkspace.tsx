@@ -9,7 +9,6 @@ type PrimaryCase = {
 
 type Props = {
   isLoggedIn: boolean;
-  quota: number | null;
   primaryCase?: PrimaryCase;
   hasBaziCase: boolean;
   onLogin: () => void;
@@ -37,7 +36,6 @@ const TaskIcon = ({ name }: { name: IconName }) => {
 
 export default function HomeWorkspace({
   isLoggedIn,
-  quota,
   primaryCase,
   hasBaziCase,
   onLogin,
@@ -52,7 +50,7 @@ export default function HomeWorkspace({
 }: Props) {
   const [divinationOpen, setDivinationOpen] = useState(false);
   const tasks = [
-    { key: 'chart', title: '建立命盘', description: '输入出生信息，免费生成八字或紫微命盘', action: onCreateBazi },
+    { key: 'chart', title: '建立命盘', description: '输入出生信息，生成八字或紫微命盘', action: onCreateBazi },
     { key: 'sun', title: '看看今天', description: hasBaziCase ? '查看今天的运势与重要提示' : '建立八字命盘后查看个性化日运', action: onOpenDaily },
     { key: 'divination', title: '我要占测', description: '选择合适的方法，针对具体事情起盘判断', action: () => setDivinationOpen((current) => !current) },
     { key: 'calendar', title: '挑选吉日', description: '选择良辰吉日，查看适合事项与时辰', action: onOpenAlmanac },
@@ -66,12 +64,9 @@ export default function HomeWorkspace({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-stone-900 md:text-5xl">今天想从哪里开始？</h2>
-            <p className="mt-3 text-sm leading-7 text-stone-500 md:text-base">排盘免费，只有请求解读时才会消耗额度。</p>
           </div>
           {!isLoggedIn ? (
             <button type="button" onClick={onLogin} className="glass-panel-dark rounded-2xl px-5 py-2.5 text-sm font-bold text-amber-200">登录 / 注册</button>
-          ) : typeof quota === 'number' ? (
-            <div className="text-sm font-semibold text-stone-500">当前额度 <span className="text-lg text-amber-700">{quota}</span> 点</div>
           ) : null}
         </div>
 
@@ -88,7 +83,7 @@ export default function HomeWorkspace({
           <div className="mt-7 border-y border-stone-100 py-5">
             <div className="text-base font-bold text-stone-800">三步开始使用</div>
             <div className="mt-3 grid gap-3 text-sm text-stone-500 sm:grid-cols-3">
-              <span>1. 输入出生信息</span><span>2. 免费生成命盘</span><span>3. 按需请求解读</span>
+              <span>1. 输入出生信息</span><span>2. 生成命盘</span><span>3. 按需请求解读</span>
             </div>
           </div>
         )}

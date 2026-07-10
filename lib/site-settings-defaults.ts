@@ -17,8 +17,15 @@ export const DEFAULT_WELCOME_INTRO = [
   '排盘流程完整清晰，减少人工换算误差。',
   '参考四柱八字与奇门遁甲古籍资料，断卦有依据，判断更可靠。',
   '专业优化 AI 提示词，提问更简单，回答更精准。',
-  '新注册用户默认 15 次提问额度；访客可体验基础功能。',
 ].join('\n');
+
+const LEGACY_WELCOME_QUOTA_LINE = '新注册用户默认 15 次提问额度；访客可体验基础功能。';
+
+const sanitizeWelcomeIntro = (value: string) => value
+  .split('\n')
+  .filter((line) => line.trim() !== LEGACY_WELCOME_QUOTA_LINE)
+  .join('\n')
+  .trim();
 
 export const DEFAULT_SITE_SETTINGS: PublicSiteSettings = {
   announcementTitle: updates.title || '站点公告',
@@ -55,9 +62,10 @@ export const normalizePublicSiteSettings = (value: unknown): PublicSiteSettings 
   const announcementContent = typeof source.announcementContent === 'string'
     ? source.announcementContent.trim()
     : DEFAULT_SITE_SETTINGS.announcementContent;
-  const welcomeIntro = typeof source.welcomeIntro === 'string' && source.welcomeIntro.trim()
+  const welcomeIntroSource = typeof source.welcomeIntro === 'string' && source.welcomeIntro.trim()
     ? source.welcomeIntro.trim()
     : DEFAULT_SITE_SETTINGS.welcomeIntro;
+  const welcomeIntro = sanitizeWelcomeIntro(welcomeIntroSource) || DEFAULT_SITE_SETTINGS.welcomeIntro;
   const registrationClosedContact = typeof source.registrationClosedContact === 'string' && source.registrationClosedContact.trim()
     ? source.registrationClosedContact.trim()
     : DEFAULT_SITE_SETTINGS.registrationClosedContact;

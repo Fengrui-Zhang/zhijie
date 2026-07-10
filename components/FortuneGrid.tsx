@@ -26,9 +26,9 @@ type Props = {
   aiCalibration?: {
     enabled: boolean;
     loading?: boolean;
+    cached?: boolean;
     disabled?: boolean;
     disabledReason?: string;
-    costHint?: string;
     onToggle: () => void;
   };
 };
@@ -390,24 +390,23 @@ const AiCalibrationButton = ({ aiCalibration }: Pick<Props, 'aiCalibration'>) =>
     ? '校准中'
     : aiCalibration.enabled
       ? 'AI校准已启用'
-      : 'AI校准';
+      : aiCalibration.cached
+        ? '启用校准'
+        : 'AI校准 · 1点';
   return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        onClick={aiCalibration.onToggle}
-        disabled={Boolean(aiCalibration.loading || aiCalibration.disabled)}
-        title={aiCalibration.disabledReason}
-        className={`rounded-2xl border px-3 py-2 text-sm font-bold transition ${
-          aiCalibration.enabled
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-            : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
-        } disabled:cursor-not-allowed disabled:opacity-50`}
-      >
-        {label}
-      </button>
-      {aiCalibration.costHint && <span className="text-[11px] text-stone-400">{aiCalibration.costHint}</span>}
-    </div>
+    <button
+      type="button"
+      onClick={aiCalibration.onToggle}
+      disabled={Boolean(aiCalibration.loading || aiCalibration.disabled)}
+      title={aiCalibration.disabledReason}
+      className={`rounded-2xl border px-3 py-2 text-sm font-bold transition ${
+        aiCalibration.enabled
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+          : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
+      } disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {label}
+    </button>
   );
 };
 
@@ -1183,7 +1182,7 @@ const DailyView = ({ data, onDateChange, onAsk, isAsking, caseOptions, selectedC
       </div>
 
       <AskPanel
-        title="问智解 · 成功后扣1点"
+        title="问智解"
         dateText={formatDateZh(currentDate)}
         onAsk={onAsk}
         isAsking={isAsking}
@@ -1541,7 +1540,7 @@ const MonthlyView = ({ data, onDateChange, onOpenDailyDate, onAsk, isAsking, cas
       </div>
 
       <AskPanel
-        title="问智解 · 成功后扣1点"
+        title="问智解"
         dateText={`${monthDate.getFullYear()}年${monthDate.getMonth() + 1}月`}
         onAsk={onAsk}
         isAsking={isAsking}

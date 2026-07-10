@@ -10,7 +10,6 @@ import {
 } from '../lib/bazi-basic-analysis-prompts';
 import { formatPromptCopyMessages } from '../lib/chat-prompt-copy';
 import MarkdownContent from './MarkdownContent';
-import AiCostHint from './AiCostHint';
 
 interface Props {
   data: BaziResponse;
@@ -20,7 +19,6 @@ interface Props {
   aiPanel?: React.ReactNode;
   onTabChange?: (tab: BaziTab) => void;
   onAnalysisSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
-  userQuota?: number | null;
 }
 
 const splitList = (value?: string | string[]) => {
@@ -434,7 +432,6 @@ const AnalysisCard = ({
   savedContent,
   personalizationPrompt,
   onSaved,
-  userQuota,
 }: {
   type: AnalysisType;
   title: string;
@@ -444,7 +441,6 @@ const AnalysisCard = ({
   savedContent?: string;
   personalizationPrompt?: string;
   onSaved?: (nextInitialAnalysisData: unknown) => void | Promise<void>;
-  userQuota?: number | null;
 }) => {
   const [content, setContent] = useState(savedContent || '');
   const [loading, setLoading] = useState(false);
@@ -512,7 +508,6 @@ const AnalysisCard = ({
           <div className="mt-1 text-sm text-stone-500">{subtitle}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AiCostHint quota={userQuota} cached={Boolean(content)} className="w-full text-right" />
           <button
             type="button"
             onClick={() => void copyPrompt()}
@@ -650,7 +645,7 @@ const CaseNotes = ({ storageKey }: { storageKey: string }) => {
   );
 };
 
-const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved, userQuota }) => {
+const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personalizationPrompt, aiPanel, onTabChange, onAnalysisSaved }) => {
   const { base_info, bazi_info, dayun_info, detail_info } = data;
   const rawDayunList = dayun_info.list || [];
   const [activeTab, setActiveTab] = useState<BaziTab>('basic');
@@ -974,7 +969,6 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             savedContent={savedWuxingAnalysis}
             personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
-            userQuota={userQuota}
           />
           <AnalysisCard
             type="personality"
@@ -985,7 +979,6 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
             savedContent={savedPersonalityAnalysis}
             personalizationPrompt={personalizationPrompt}
             onSaved={onAnalysisSaved}
-            userQuota={userQuota}
           />
 
           <TenGodKnowledge locations={tenGodLocations} />
