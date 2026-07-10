@@ -73,10 +73,9 @@ function groupByDate(sessions: SessionItem[]) {
   const yesterday = new Date(today.getTime() - 86400000);
   const weekAgo = new Date(today.getTime() - 7 * 86400000);
 
-  const ordered = sessions.slice().sort((a, b) => {
-    if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
-    return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
-  });
+  const ordered = sessions.slice().sort(
+    (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+  );
 
   for (const s of ordered) {
     const d = new Date(s.createdAt);
@@ -200,8 +199,6 @@ export default function SessionSidebar({
                     <div className="truncate text-sm leading-snug font-medium">{item.title}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-stone-400">
                       <span>{MODEL_LABELS[item.modelType] || item.modelType}</span>
-                      {item.isPinned && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">置顶</span>}
-                      {item.isArchived && <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-500">归档</span>}
                     </div>
                   </div>
                   <button
