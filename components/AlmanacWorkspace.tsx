@@ -205,6 +205,9 @@ const AlmanacWorkspace: React.FC<Props> = ({
 }) => {
   const { root, inner } = getAlmanacPayload(data);
   const dayInfo = root.dayInfo || {};
+  const dayGanZhi = String(
+    (dayInfo as any).ganZhi || `${(dayInfo as any).stem || ''}${(dayInfo as any).branch || ''}` || '—'
+  );
   const yi = asList(inner.suitable || inner.yi);
   const ji = asList(inner.avoid || inner.ji);
   const jishen = asList(inner.jishen || inner.jiShen);
@@ -295,8 +298,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
               <div className="grid gap-3 text-sm md:grid-cols-2">
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <span className="text-stone-500">干支：</span>
-                  <span><b>{String((dayInfo as any).ganZhi || '')}</b>日</span>
-                  <span>{String((dayInfo as any).stem || '')}{String((dayInfo as any).branch || '')}</span>
+                  <span><b>{dayGanZhi}</b>日</span>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <span className="text-stone-500">生肖：</span>
