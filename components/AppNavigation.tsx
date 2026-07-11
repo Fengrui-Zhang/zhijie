@@ -88,7 +88,7 @@ export function AppNavigation({
       </button>
 
       <div className={mobile ? 'grid gap-3 md:grid-cols-3' : 'min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'}>
-        <NavGroup label="常用任务">
+        <NavGroup label="命理运势">
           {COMMON_TASKS.map(([type, label]) => {
             const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
             return <NavButton key={type} label={label} selected={selected} onClick={() => selectModel(type)} />;
@@ -97,7 +97,7 @@ export function AppNavigation({
 
         <div className="space-y-2">
           <button type="button" onClick={onToggleProfessional} className="flex w-full items-center justify-between px-2 text-xs font-bold tracking-[0.18em] text-stone-400">
-            <span>专业工具</span><span>{professionalOpen ? '−' : '+'}</span>
+            <span>预测占卜</span><span>{professionalOpen ? '−' : '+'}</span>
           </button>
           {professionalOpen && (
             <div className="space-y-2">
