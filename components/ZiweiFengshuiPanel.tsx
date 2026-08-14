@@ -238,6 +238,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
   const [error, setError] = useState('');
   const [selectedPalaceName, setSelectedPalaceName] = useState<string | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [mobileSheetEnabled, setMobileSheetEnabled] = useState(false);
   const [availableRecords, setAvailableRecords] = useState<AvailableRecord[]>([]);
   const previewPalaces = useMemo(() => getPreviewPalaces(data), [data]);
   const periodKey = layer === 'natal' ? 'natal' : layer === 'decadal' ? selectedDecadalKey : String(targetYear);
@@ -304,6 +305,17 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
   }, [caseId, layer, onQuotaChange, periodKey]);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1279px)');
+    const syncMobileSheet = () => {
+      setMobileSheetEnabled(mediaQuery.matches);
+      if (!mediaQuery.matches) setMobileSheetOpen(false);
+    };
+    syncMobileSheet();
+    mediaQuery.addEventListener('change', syncMobileSheet);
+    return () => mediaQuery.removeEventListener('change', syncMobileSheet);
+  }, []);
+
+  useEffect(() => {
     if (!result) {
       setSelectedPalaceName(null);
       return;
@@ -358,7 +370,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
 
   const openPalace = (palaceName: string) => {
     setSelectedPalaceName(palaceName);
-    setMobileSheetOpen(true);
+    if (window.matchMedia('(max-width: 1279px)').matches) setMobileSheetOpen(true);
   };
 
   return (
@@ -540,7 +552,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
       ) : null}
 
       <DialogPortal
-        open={mobileSheetOpen && Boolean(selectedPalace)}
+        open={mobileSheetEnabled && mobileSheetOpen && Boolean(selectedPalace)}
         onClose={() => setMobileSheetOpen(false)}
         ariaLabel={selectedPalace ? `${selectedPalace.palaceName}紫微风水调整方案` : '紫微风水调整方案'}
         panelClassName="mt-auto max-h-[88dvh] rounded-b-none xl:hidden"
