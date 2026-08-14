@@ -13,8 +13,6 @@ type Props = {
   caseId?: string | null;
   aiPanel?: React.ReactNode;
   onTabChange?: (tab: ZiweiWorkspaceTab) => void;
-  onEditCase?: () => void;
-  onDeleteCase?: () => void;
   onQuotaChange?: (quota: number) => void;
 };
 
@@ -53,8 +51,6 @@ export default function ZiweiWorkspace({
   caseId,
   aiPanel,
   onTabChange,
-  onEditCase,
-  onDeleteCase,
   onQuotaChange,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ZiweiWorkspaceTab>('professional');
@@ -76,16 +72,6 @@ export default function ZiweiWorkspace({
         date={basic.阳历 || data.base_info.gongli}
         meta={`命主 ${basic.命主 || data.base_info.mingzhu || '—'} · 身主 ${basic.身主 || data.base_info.shenzhu || '—'}`}
         symbol="紫"
-        actions={caseId ? (
-          <div className="flex items-center gap-1.5">
-            {onEditCase ? (
-              <button type="button" onClick={onEditCase} className="rounded-xl border border-stone-200/70 bg-white/68 px-3 py-2 text-xs font-bold text-stone-600 hover:bg-white">编辑</button>
-            ) : null}
-            {onDeleteCase ? (
-              <button type="button" onClick={onDeleteCase} className="rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50">删除</button>
-            ) : null}
-          </div>
-        ) : null}
       />
 
       <nav className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3" aria-label="紫微斗数功能">

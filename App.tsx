@@ -10483,8 +10483,6 @@ const App: React.FC<AppProps> = ({
                       caseId={activeCase?.modelType === ModelType.ZIWEI ? activeCase.id : null}
                       aiPanel={renderCaseAnalysisPanel(false)}
                       onTabChange={setZiweiResultTab}
-                      onEditCase={activeCase?.modelType === ModelType.ZIWEI ? beginCaseEdit : undefined}
-                      onDeleteCase={activeCase?.modelType === ModelType.ZIWEI ? handleDeleteCase : undefined}
                       onQuotaChange={setUserQuota}
                     />
                   )}

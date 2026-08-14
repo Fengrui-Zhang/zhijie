@@ -287,8 +287,8 @@ const ZiweiGrid: React.FC<Props> = ({ data, embedded = false }) => {
         </div>
       )}
 
-      <div className={`${embedded ? '' : 'mt-5'} overflow-hidden rounded-[22px] border border-amber-900/25 bg-stone-300/70 p-[3px] shadow-[0_18px_45px_rgba(73,56,35,0.07)]`}>
-        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[18px] bg-stone-300/70">
+      <div className={`${embedded ? '' : 'mt-5'} overflow-hidden rounded-[22px] border border-amber-900/25 bg-stone-300/70 shadow-[0_18px_45px_rgba(73,56,35,0.07)]`}>
+        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[21px] bg-stone-300/70">
           {GRID_LAYOUT.map((row, rowIndex) => row.map((branch, colIndex) => {
           if (branch === -1) {
             if (rowIndex === 1 && colIndex === 1) {
