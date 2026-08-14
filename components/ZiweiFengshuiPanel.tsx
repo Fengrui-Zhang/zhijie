@@ -186,11 +186,13 @@ const PalaceButton = ({
   palace,
   selected,
   highlighted,
+  cornerClassName = '',
   onClick,
 }: {
   palace: ZiweiFengshuiPalaceResult;
   selected: boolean;
   highlighted: boolean;
+  cornerClassName?: string;
   onClick: () => void;
 }) => {
   const style = TENDENCY_STYLE[palace.tendency];
@@ -200,9 +202,9 @@ const PalaceButton = ({
       onClick={onClick}
       aria-pressed={selected}
       aria-label={`${palace.palaceName}，${palace.direction}，${palace.tendency}`}
-      className={`group relative flex min-h-[92px] flex-col justify-between overflow-hidden border p-2 text-left backdrop-blur-xl sm:min-h-[118px] sm:p-3 md:min-h-[138px] ${style.card} ${
+      className={`group relative flex min-h-[92px] flex-col justify-between overflow-hidden border p-2 text-left backdrop-blur-xl sm:min-h-[118px] sm:p-3 md:min-h-[138px] ${cornerClassName} ${style.card} ${
         selected
-          ? 'z-10 ring-2 ring-stone-800/70 ring-offset-1 ring-offset-white/60 shadow-[0_16px_34px_rgba(28,25,23,0.14)]'
+          ? 'z-10 ring-2 ring-inset ring-stone-800/70 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]'
           : highlighted
             ? 'ring-2 ring-amber-400/75 ring-inset shadow-[0_10px_26px_rgba(180,119,31,0.11)]'
             : 'opacity-[0.88] hover:opacity-100'
@@ -473,9 +475,18 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
 
       {caseId ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(330px,0.85fr)]">
-          <div className="self-start overflow-hidden rounded-[26px] border border-amber-900/20 bg-stone-300/65 shadow-[0_20px_52px_rgba(73,56,35,0.08)]">
-            <div className="grid grid-cols-4 gap-px">
+          <div className="self-start overflow-hidden rounded-[26px] border border-amber-900/20 bg-stone-300/65 p-px shadow-[0_20px_52px_rgba(73,56,35,0.08)]">
+            <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[24px]">
               {GRID_LAYOUT.flatMap((row, rowIndex) => row.map((branchIndex, colIndex) => {
+                const cornerClassName = rowIndex === 0 && colIndex === 0
+                  ? 'rounded-tl-[24px]'
+                  : rowIndex === 0 && colIndex === 3
+                    ? 'rounded-tr-[24px]'
+                    : rowIndex === 3 && colIndex === 0
+                      ? 'rounded-bl-[24px]'
+                      : rowIndex === 3 && colIndex === 3
+                        ? 'rounded-br-[24px]'
+                        : '';
                 if (branchIndex === -1) {
                   if (rowIndex === 1 && colIndex === 1) {
                     return (
@@ -507,13 +518,14 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
                       palace={palace}
                       selected={selectedPalaceName === palace.palaceName}
                       highlighted={highlightedSet.has(palace.palaceName)}
+                      cornerClassName={cornerClassName}
                       onClick={() => openPalace(palace.palaceName)}
                     />
                   );
                 }
                 const preview = previewByBranch.get(branch);
                 return (
-                  <div key={`preview-${branch}`} className="flex min-h-[92px] animate-pulse flex-col justify-between border border-white/45 bg-white/62 p-2 sm:min-h-[118px] sm:p-3 md:min-h-[138px]">
+                  <div key={`preview-${branch}`} className={`flex min-h-[92px] animate-pulse flex-col justify-between overflow-hidden border border-white/45 bg-white/62 p-2 sm:min-h-[118px] sm:p-3 md:min-h-[138px] ${cornerClassName}`}>
                     <div className="text-[11px] font-bold text-stone-500 sm:text-sm">{preview?.palaceName || `${branch}位`}</div>
                     <div>
                       <div className="text-[9px] font-semibold text-stone-400 sm:text-[11px]">{preview?.direction || '待定位'}</div>
