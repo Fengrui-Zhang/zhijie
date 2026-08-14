@@ -130,7 +130,7 @@ const PalaceCard = ({
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex min-h-[132px] flex-col border p-2.5 text-left transition backdrop-blur-xl md:min-h-[150px] ${highlight}`}
+      className={`relative flex min-h-[132px] flex-col border p-3 text-left transition backdrop-blur-xl md:min-h-[150px] md:p-3.5 ${highlight}`}
     >
       <div className="mb-1 flex items-center justify-between">
         <div className="whitespace-nowrap text-xs font-bold text-stone-900 md:text-sm">
@@ -287,8 +287,9 @@ const ZiweiGrid: React.FC<Props> = ({ data, embedded = false }) => {
         </div>
       )}
 
-      <div className={`${embedded ? '' : 'mt-5'} grid grid-cols-4 gap-px overflow-hidden rounded-[22px] border border-amber-900/25 bg-stone-300/70 shadow-[0_18px_45px_rgba(73,56,35,0.07)]`}>
-        {GRID_LAYOUT.map((row, rowIndex) => row.map((branch, colIndex) => {
+      <div className={`${embedded ? '' : 'mt-5'} overflow-hidden rounded-[22px] border border-amber-900/25 bg-stone-300/70 p-[3px] shadow-[0_18px_45px_rgba(73,56,35,0.07)]`}>
+        <div className="grid grid-cols-4 gap-px overflow-hidden rounded-[18px] bg-stone-300/70">
+          {GRID_LAYOUT.map((row, rowIndex) => row.map((branch, colIndex) => {
           if (branch === -1) {
             if (rowIndex === 1 && colIndex === 1) {
               const pillars = String(basic.四柱 || '').split(/\s+/);
@@ -327,7 +328,8 @@ const ZiweiGrid: React.FC<Props> = ({ data, embedded = false }) => {
               onClick={() => setSelectedPalaceIndex(activePalaceIndex === palace.宫位索引 ? null : palace.宫位索引)}
             />
           );
-        }))}
+          }))}
+        </div>
       </div>
 
       <ChartSurface className="mt-5">

@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   ZIWEI_DIRECTIONS,
+  getZiweiFengshuiDecadalOptions,
   getZiweiDirection,
   getZiweiFengshuiFocusPalaces,
+  resolveZiweiFengshuiPeriod,
   validateZiweiFengshuiGeneration,
   type ZiweiFengshuiResult,
 } from '../lib/ziwei-fengshui';
@@ -24,7 +26,7 @@ const expectedPalaces = [
 
 const makeRawResult = () => ({
   summary: '全盘物象与空间状态已经按十二方位呈现。',
-  yearlyNotice: '本命底色与目标年份变化已经分层呈现。',
+  periodNotice: '本命底色与目标时间层变化已经分层呈现。',
   priorityPalaceNames: ['命宫', '官禄宫', '田宅宫'],
   palaces: expectedPalaces.map(({ palaceName }) => ({
     palaceName,
@@ -32,7 +34,7 @@ const makeRawResult = () => ({
     summary: `${palaceName}所在方位有收纳柜、纸张与柔和照明，整体秩序平稳。`,
     currentObjects: ['一组木质收纳柜，内部文件较多。', '一盏暖色台灯，周围放有纸张和充电线。'],
     natalEvidence: ['本命星曜与宫位结构提示先做基础检查。'],
-    yearlyEvidence: ['本年无直接流曜叠入时，以本命检查为主。'],
+    timingEvidence: ['本年无直接流曜叠入时，以本命检查为主。'],
     optimizationSteps: ['清走失效纸张，将充电线整理到柜体一侧。'],
     placementAdvice: {
       item: '一只浅色文件托盘',
@@ -59,7 +61,8 @@ test('十二地支方向使用正北零度并保持每宫三十度', () => {
 });
 
 test('结构校验必须覆盖十二个唯一宫位并由程序补充方向', () => {
-  const result = validateZiweiFengshuiGeneration(makeRawResult(), expectedPalaces, 2026, '2026-08-14T00:00:00.000Z');
+  const yearly = { layer: 'yearly' as const, key: '2026', label: '2026年流年', targetYear: 2026 };
+  const result = validateZiweiFengshuiGeneration(makeRawResult(), expectedPalaces, yearly, '2026-08-14T00:00:00.000Z');
   assert.equal(result.palaces.length, 12);
   assert.equal(result.palaces[0].direction, '正北');
   assert.equal(result.palaces[3].direction, '正东');
@@ -69,20 +72,20 @@ test('结构校验必须覆盖十二个唯一宫位并由程序补充方向', ()
   const duplicated = makeRawResult();
   duplicated.palaces[1].palaceName = '命宫';
   assert.throws(
-    () => validateZiweiFengshuiGeneration(duplicated, expectedPalaces, 2026),
+    () => validateZiweiFengshuiGeneration(duplicated, expectedPalaces, yearly),
     /重复返回宫位/,
   );
 
   const invalidStatus = makeRawResult();
   invalidStatus.palaces[0].status = '大吉';
   assert.throws(
-    () => validateZiweiFengshuiGeneration(invalidStatus, expectedPalaces, 2026),
+    () => validateZiweiFengshuiGeneration(invalidStatus, expectedPalaces, yearly),
     /状态无效/,
   );
 });
 
 test('主题筛选最多高亮一个主宫和两个辅助宫', () => {
-  const result = validateZiweiFengshuiGeneration(makeRawResult(), expectedPalaces, 2026) as ZiweiFengshuiResult;
+  const result = validateZiweiFengshuiGeneration(makeRawResult(), expectedPalaces, { layer: 'yearly', key: '2026', label: '2026年流年', targetYear: 2026 }) as ZiweiFengshuiResult;
   assert.deepEqual(getZiweiFengshuiFocusPalaces('career', result), ['官禄宫', '命宫', '迁移宫']);
   assert.equal(getZiweiFengshuiFocusPalaces('overall', result).length, 3);
 });
@@ -102,14 +105,29 @@ test('真实排盘上下文分离本命与目标年份并计算对宫、三方�
       calendarType: 'solar',
     },
   }) as ZiweiResponse;
-  const context = buildZiweiFengshuiChartContext(chart, 2027);
+  const natal = resolveZiweiFengshuiPeriod(chart, 'natal');
+  const natalContext = buildZiweiFengshuiChartContext(chart, natal);
+  const yearly = resolveZiweiFengshuiPeriod(chart, 'yearly', '2027');
+  const context = buildZiweiFengshuiChartContext(chart, yearly);
 
-  assert.equal(context.targetYear, 2027);
+  assert.equal(natalContext.targetDate, null);
+  assert.equal(natalContext.timing.decadal, null);
+  assert.equal(natalContext.timing.yearly, null);
+  assert.ok(natalContext.palaces.every((palace) => palace.timingSignals.length === 0));
+  assert.equal(context.period.targetYear, 2027);
   assert.equal(context.targetDate, '2027-07-01');
   assert.equal(context.palaces.length, 12);
   assert.ok(context.palaces.every((palace) => palace.oppositePalace && palace.trinePalaces.length === 2));
-  assert.ok(context.annual.decadal);
-  assert.ok(context.annual.yearly);
+  assert.ok(context.timing.decadal);
+  assert.ok(context.timing.yearly);
+
+  const options = getZiweiFengshuiDecadalOptions(chart);
+  assert.ok(options.length > 0);
+  const decadal = resolveZiweiFengshuiPeriod(chart, 'decadal', options[0].key);
+  const decadalContext = buildZiweiFengshuiChartContext(chart, decadal);
+  assert.ok(decadalContext.timing.decadal);
+  assert.equal(decadalContext.timing.yearly, null);
+  assert.equal(decadalContext.timing.transitStars.length, 0);
 });
 
 test('紫微风水 prompt 只注入一次命盘且直接推演当前物象', async () => {
@@ -127,10 +145,12 @@ test('紫微风水 prompt 只注入一次命盘且直接推演当前物象', asy
       calendarType: 'solar',
     },
   }) as ZiweiResponse;
-  const prompt = buildZiweiFengshuiPrompt(buildZiweiFengshuiChartContext(chart, 2026));
+  const prompt = buildZiweiFengshuiPrompt(buildZiweiFengshuiChartContext(chart, resolveZiweiFengshuiPeriod(chart, 'natal')));
   const combined = `${prompt.system}\n${prompt.user}`;
 
-  assert.equal(combined.split('【确定性紫微命盘与流年上下文】').length - 1, 1);
+  assert.equal(combined.split('【确定性紫微命盘与时间层上下文】').length - 1, 1);
+  assert.match(combined, /原命局紫微风水/);
+  assert.doesNotMatch(combined, /2026年流年/);
   assert.doesNotMatch(combined, /【个性化偏好】|chart-json|知识库检索/);
   assert.match(combined, /先减后加/);
   assert.match(combined, /当前物象|具体物品|摆放方案/);

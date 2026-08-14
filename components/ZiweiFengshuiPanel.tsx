@@ -5,8 +5,11 @@ import type { ZiweiResponse } from '../types';
 import {
   ZIWEI_DIRECTIONS,
   ZIWEI_FENGSHUI_FOCUS_OPTIONS,
+  ZIWEI_FENGSHUI_LAYER_OPTIONS,
+  getZiweiFengshuiDecadalOptions,
   getZiweiFengshuiFocusPalaces,
   type ZiweiFengshuiFocus,
+  type ZiweiFengshuiLayer,
   type ZiweiFengshuiPalaceResult,
   type ZiweiFengshuiResult,
   type ZiweiFengshuiStatus,
@@ -20,6 +23,7 @@ type Props = {
 };
 
 type LoadState = 'loading' | 'empty' | 'ready' | 'error';
+type AvailableRecord = { layer: ZiweiFengshuiLayer; periodKey: string; periodLabel: string | null; generatedAt: string | null };
 
 const BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
 const GRID_LAYOUT = [
@@ -92,7 +96,7 @@ const DetailSection = ({ title, children }: { title: string; children: React.Rea
   </section>
 );
 
-const PalaceDetail = ({ palace }: { palace: ZiweiFengshuiPalaceResult }) => {
+const PalaceDetail = ({ palace, layer }: { palace: ZiweiFengshuiPalaceResult; layer: ZiweiFengshuiLayer }) => {
   const style = STATUS_STYLE[palace.status];
   return (
     <div className="space-y-3 p-4 md:p-5">
@@ -115,9 +119,11 @@ const PalaceDetail = ({ palace }: { palace: ZiweiFengshuiPalaceResult }) => {
       <DetailSection title="本命依据">
         <BulletList items={palace.natalEvidence} />
       </DetailSection>
-      <DetailSection title="流年变化">
-        <BulletList items={palace.yearlyEvidence} tone="amber" />
-      </DetailSection>
+      {palace.timingEvidence.length > 0 ? (
+        <DetailSection title={layer === 'decadal' ? '大运变化' : '流年变化'}>
+          <BulletList items={palace.timingEvidence} tone="amber" />
+        </DetailSection>
+      ) : null}
       <DetailSection title="整理与优化">
         <BulletList items={palace.optimizationSteps} tone="amber" />
       </DetailSection>
@@ -192,17 +198,33 @@ const PalaceButton = ({
 };
 
 export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Props) {
-  const [targetYear, setTargetYear] = useState(shanghaiYear);
-  const [draftYear, setDraftYear] = useState(String(targetYear));
+  const currentYear = shanghaiYear();
+  const decadalOptions = useMemo(() => getZiweiFengshuiDecadalOptions(data), [data]);
+  const birthYear = Number(String((data.taibuJson as any)?.基本信息?.阳历 || data.base_info.gongli || '').match(/\d{4}/)?.[0]);
+  const currentNominalAge = Number.isInteger(birthYear) ? currentYear - birthYear + 1 : 0;
+  const defaultDecadal = decadalOptions.find((option) => currentNominalAge >= option.startAge && currentNominalAge <= option.endAge) || decadalOptions[0];
+  const [layer, setLayer] = useState<ZiweiFengshuiLayer>('natal');
+  const [selectedDecadalKey, setSelectedDecadalKey] = useState(defaultDecadal?.key || '');
+  const [targetYear, setTargetYear] = useState(currentYear);
+  const [draftYear, setDraftYear] = useState(String(currentYear));
   const [focus, setFocus] = useState<ZiweiFengshuiFocus>('overall');
   const [state, setState] = useState<LoadState>('loading');
   const [result, setResult] = useState<ZiweiFengshuiResult | null>(null);
   const [error, setError] = useState('');
   const [selectedPalaceName, setSelectedPalaceName] = useState<string | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [availableRecords, setAvailableRecords] = useState<AvailableRecord[]>([]);
   const previewPalaces = useMemo(() => getPreviewPalaces(data), [data]);
+  const periodKey = layer === 'natal' ? 'natal' : layer === 'decadal' ? selectedDecadalKey : String(targetYear);
+  const decadal = decadalOptions.find((option) => option.key === selectedDecadalKey) || defaultDecadal;
+  const periodLabel = layer === 'natal' ? '原命局' : layer === 'decadal' ? (decadal?.label || '所选大运') : `${targetYear}年流年`;
+  const hasRecord = availableRecords.some((record) => record.layer === layer && record.periodKey === periodKey);
 
   useEffect(() => setDraftYear(String(targetYear)), [targetYear]);
+
+  useEffect(() => {
+    if (!selectedDecadalKey && defaultDecadal?.key) setSelectedDecadalKey(defaultDecadal.key);
+  }, [defaultDecadal?.key, selectedDecadalKey]);
 
   useEffect(() => {
     if (!caseId) {
@@ -210,18 +232,26 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
       setResult(null);
       return;
     }
+    if (!periodKey) {
+      setState('empty');
+      setResult(null);
+      return;
+    }
     const controller = new AbortController();
     let pollTimer: number | undefined;
     const load = async () => {
-      setState((current) => current === 'ready' ? current : 'loading');
+      setState('loading');
+      setResult(null);
       setError('');
       try {
-        const response = await fetch(`/api/ziwei/fengshui?caseId=${encodeURIComponent(caseId)}&targetYear=${targetYear}`, {
+        const params = new URLSearchParams({ caseId, layer, periodKey });
+        const response = await fetch(`/api/ziwei/fengshui?${params.toString()}`, {
           signal: controller.signal,
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || '读取紫微风水结果失败');
         if (typeof payload.quota === 'number') onQuotaChange?.(payload.quota);
+        if (Array.isArray(payload.availableRecords)) setAvailableRecords(payload.availableRecords as AvailableRecord[]);
         if (payload.result) setResult(payload.result as ZiweiFengshuiResult);
         if (payload.status === 'ready') {
           setState('ready');
@@ -237,7 +267,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
         }
       } catch (loadError) {
         if (controller.signal.aborted) return;
-        setState(result ? 'ready' : 'error');
+        setState('error');
         setError(loadError instanceof Error ? loadError.message : '读取紫微风水结果失败');
       }
     };
@@ -246,7 +276,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
       controller.abort();
       if (pollTimer) window.clearTimeout(pollTimer);
     };
-  }, [caseId, onQuotaChange, targetYear]);
+  }, [caseId, layer, onQuotaChange, periodKey]);
 
   useEffect(() => {
     if (!result) {
@@ -279,12 +309,16 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
       const response = await fetch('/api/ziwei/fengshui', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseId, targetYear, force }),
+        body: JSON.stringify({ caseId, layer, periodKey, force }),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || '紫微风水分析失败');
       if (typeof payload.quota === 'number') onQuotaChange?.(payload.quota);
       setResult(payload.result as ZiweiFengshuiResult);
+      setAvailableRecords((records) => {
+        const next: AvailableRecord = { layer, periodKey, periodLabel, generatedAt: payload.generatedAt || new Date().toISOString() };
+        return [next, ...records.filter((record) => !(record.layer === layer && record.periodKey === periodKey))];
+      });
       setState('ready');
     } catch (generateError) {
       setResult(previousResult);
@@ -315,26 +349,66 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
             disabled={!caseId || state === 'loading'}
             className="glass-panel-dark rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-200 disabled:opacity-45"
           >
-            {state === 'loading' ? '分析中…' : result ? '重新生成 · 1点' : '生成十二宫分析 · 1点'}
+            {state === 'loading' ? '分析中…' : result ? '重新生成 · 1点' : `生成${layer === 'natal' ? '本命' : layer === 'decadal' ? '此大运' : '此流年'} · 1点`}
           </button>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-2xl border border-white/75 bg-white/62 p-1 shadow-sm">
-            <button type="button" onClick={() => setTargetYear((year) => Math.max(1900, year - 1))} className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 hover:bg-white" aria-label="上一年">−</button>
-            <input
-              type="number"
-              min={1900}
-              max={2200}
-              value={draftYear}
-              onChange={(event) => setDraftYear(event.target.value)}
-              onBlur={commitDraftYear}
-              onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-              className="h-9 w-20 bg-transparent text-center text-base font-bold text-stone-800 outline-none"
-              aria-label="分析年份"
-            />
-            <button type="button" onClick={() => setTargetYear((year) => Math.min(2200, year + 1))} className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 hover:bg-white" aria-label="下一年">＋</button>
+        <div className="mt-4 space-y-2.5">
+          <div className="flex w-fit items-center rounded-2xl border border-white/75 bg-white/62 p-1 shadow-sm" aria-label="紫微风水时间层">
+            {ZIWEI_FENGSHUI_LAYER_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setLayer(option.key)}
+                aria-pressed={layer === option.key}
+                className={`min-w-[68px] rounded-xl px-3 py-2 text-xs font-bold transition-colors ${layer === option.key ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white hover:text-stone-800'}`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
+
+          {layer === 'decadal' ? (
+            <div className="glass-scrollbar flex max-w-full gap-2 overflow-x-auto pb-1">
+              {decadalOptions.map((option) => {
+                const generated = availableRecords.some((record) => record.layer === 'decadal' && record.periodKey === option.key);
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setSelectedDecadalKey(option.key)}
+                    aria-pressed={selectedDecadalKey === option.key}
+                    className={`shrink-0 rounded-2xl border px-3.5 py-2.5 text-left transition-colors ${selectedDecadalKey === option.key ? 'border-stone-800 bg-stone-900 text-amber-100 shadow-sm' : 'border-white/75 bg-white/55 text-stone-600 hover:bg-white'}`}
+                  >
+                    <span className="block text-xs font-bold">{option.startAge}–{option.endAge}岁</span>
+                    <span className={`mt-0.5 block text-[10px] ${selectedDecadalKey === option.key ? 'text-stone-300' : 'text-stone-400'}`}>{option.palaceName}{generated ? ' · 已生成' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {layer === 'yearly' ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-2xl border border-white/75 bg-white/62 p-1 shadow-sm">
+                <button type="button" onClick={() => setTargetYear((year) => Math.max(1900, year - 1))} className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 hover:bg-white" aria-label="上一年">−</button>
+                <input
+                  type="number"
+                  min={1900}
+                  max={2200}
+                  value={draftYear}
+                  onChange={(event) => setDraftYear(event.target.value)}
+                  onBlur={commitDraftYear}
+                  onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+                  className="h-9 w-20 bg-transparent text-center text-base font-bold text-stone-800 outline-none"
+                  aria-label="分析年份"
+                />
+                <button type="button" onClick={() => setTargetYear((year) => Math.min(2200, year + 1))} className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-500 hover:bg-white" aria-label="下一年">＋</button>
+              </div>
+              {hasRecord ? <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">已生成记录</span> : null}
+            </div>
+          ) : null}
+
           <div className="flex max-w-full gap-1.5 overflow-x-auto rounded-2xl border border-white/75 bg-white/45 p-1.5">
             {ZIWEI_FENGSHUI_FOCUS_OPTIONS.map((option) => (
               <button
@@ -366,8 +440,10 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
                     return (
                       <div key="fengshui-center" className="relative col-span-2 row-span-2 flex min-h-[185px] flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle,rgba(249,239,210,0.9),rgba(255,255,255,0.7)_72%)] p-3 text-center sm:min-h-[235px] md:min-h-[275px]">
                         <span className="pointer-events-none absolute text-[88px] font-bold text-stone-900/[0.025] sm:text-[130px]">宅</span>
-                        <div className="relative text-2xl font-bold text-stone-900 sm:text-4xl">{targetYear}</div>
-                      <div className="relative mt-1 text-[10px] font-semibold tracking-[0.12em] text-stone-400 sm:text-xs">当前物象 × 流年</div>
+                        <div className="relative text-2xl font-bold text-stone-900 sm:text-4xl">
+                          {layer === 'natal' ? '本命' : layer === 'decadal' ? `${decadal?.startAge || ''}–${decadal?.endAge || ''}岁` : targetYear}
+                        </div>
+                        <div className="relative mt-1 text-[10px] font-semibold tracking-[0.12em] text-stone-400 sm:text-xs">当前物象 × {layer === 'natal' ? '原命局' : layer === 'decadal' ? '大运' : '流年'}</div>
                         <div className="relative mt-3 hidden flex-wrap justify-center gap-1.5 sm:flex">
                           {Object.entries(STATUS_STYLE).map(([status, style]) => (
                             <span key={status} className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/60 px-2 py-1 text-[9px] font-semibold text-stone-500">
@@ -407,17 +483,17 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
               }))}
             </div>
             {state === 'empty' && !result ? (
-              <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成 {targetYear} 年物象与摆放分析。一次调用将返回完整十二宫，消耗 1 点。</div>
+              <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成“{periodLabel}”的物象与摆放分析。一次调用将返回完整十二宫，消耗 1 点。</div>
             ) : null}
             {state === 'loading' ? (
-              <div className="border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">正在结合本命、运限与流年四化推演十二方位物象…</div>
+              <div className="border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">正在推演“{periodLabel}”的十二方位物象…</div>
             ) : null}
           </div>
 
           <aside className="glass-panel-soft hidden h-[555px] self-start overflow-hidden rounded-[26px] border border-white/70 xl:block">
             {selectedPalace ? (
               <div className="glass-scrollbar h-full overflow-y-auto">
-                <PalaceDetail palace={selectedPalace} />
+                <PalaceDetail palace={selectedPalace} layer={layer} />
               </div>
             ) : (
               <div className="flex h-full min-h-[360px] items-center justify-center px-6 text-center text-sm leading-6 text-stone-400">生成后选择一个宫位，查看当前物象与摆放方案。</div>
@@ -430,7 +506,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
         <section className="rounded-[24px] border border-white/70 bg-white/48 p-4 text-sm leading-6 text-stone-600 md:p-5">
           <div className="font-bold text-stone-800">全盘空间概览</div>
           <p className="mt-2">{result.summary}</p>
-          <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/65 px-3 py-2.5 text-amber-800">{result.yearlyNotice}</div>
+          <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/65 px-3 py-2.5 text-amber-800">{result.periodNotice}</div>
         </section>
       ) : null}
 
@@ -446,7 +522,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
           <button type="button" onClick={() => setMobileSheetOpen(false)} className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-bold text-stone-500">关闭</button>
         </div>
         <DialogBody>
-          {selectedPalace ? <PalaceDetail palace={selectedPalace} /> : null}
+          {selectedPalace ? <PalaceDetail palace={selectedPalace} layer={layer} /> : null}
         </DialogBody>
       </DialogPortal>
     </div>

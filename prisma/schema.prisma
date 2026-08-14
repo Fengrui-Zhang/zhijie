@@ -81,7 +81,10 @@ model ZiweiFengshuiAnalysis {
   id               String   @id @default(cuid())
   userId           String
   caseId           String
-  targetYear       Int
+  analysisLayer    String   @default("yearly")
+  periodKey        String   @default("")
+  periodLabel      String?
+  targetYear       Int?
   chartFingerprint String
   promptVersion    String
   status           String   @default("pending")
@@ -94,8 +97,8 @@ model ZiweiFengshuiAnalysis {
   user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
   divinationCase   DivinationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
-  @@unique([caseId, targetYear, chartFingerprint, promptVersion])
-  @@index([userId, caseId, targetYear])
+  @@unique([caseId, analysisLayer, periodKey, chartFingerprint, promptVersion])
+  @@index([userId, caseId, analysisLayer, periodKey])
   @@index([status, updatedAt])
 }
 

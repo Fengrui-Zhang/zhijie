@@ -5,7 +5,7 @@ import {
 } from 'taibu-core/ziwei';
 import { toZiweiHoroscopeJson } from 'taibu-core/ziwei-horoscope';
 import type { ZiweiResponse } from '../types';
-import { getZiweiDirection } from './ziwei-fengshui';
+import { getZiweiDirection, type ZiweiFengshuiPeriod } from './ziwei-fengshui';
 
 type CanonicalStar = {
   星名: string;
@@ -70,7 +70,7 @@ const SYSTEM_PROMPT = `你是一位负责“紫微风水命盘映射”的专业
 
 【方法口径】
 1. 现实方向只由该命盘中宫位所落地支决定；方向与角度已经由程序计算，禁止改写。
-2. 本命、大限、流年必须分层解释。主星表示功能，辅煞与四化表示该功能如何被帮助、放大、阻塞或破坏。
+2. 只解释上下文实际包含的时间层：本命只读本命，大运只叠加所选大运，流年才叠加大运与所选流年；各层不得混写。主星表示功能，辅煞与四化表示该功能如何被帮助、放大、阻塞或破坏。
 3. 先看宫内主星，再看辅煞、四化、对宫和三方四正。不得“见煞即凶”或“见禄必吉”。
 4. 每宫必须直接给出 2–6 项当前物象，包括具体物品、陈设、材质、整洁度、光线、通道、潮湿、噪声或损坏状态。直接陈述推演结果，不要反复使用“可能、也许、待检查”等弱化措辞。
 5. 十二宫物象必须有区分度，不能全部套用“杂乱、损坏、过期”等通用词。优先使用星曜象意表中的具体对应，并结合四化、辅煞改变其状态。
@@ -111,14 +111,15 @@ const getStars = (palace: CanonicalPalace) => [
 ];
 
 export type ZiweiFengshuiChartContext = {
-  targetYear: number;
-  targetDate: string;
+  period: ZiweiFengshuiPeriod;
+  targetDate: string | null;
   basic: Record<string, unknown>;
-  annual: {
-    decadal: Record<string, unknown>;
-    yearly: Record<string, unknown>;
+  timing: {
+    decadal: Record<string, unknown> | null;
+    yearly: Record<string, unknown> | null;
     transitStars: Array<{ starName: string; palaceName: string }>;
     yearlyMutagens: Array<{ mutagen: string; starName: string; natalPalaceName: string | null }>;
+    decadalMutagens: Array<{ mutagen: string; starName: string; natalPalaceName: string | null }>;
   };
   palaces: Array<{
     palaceName: string;
@@ -133,12 +134,12 @@ export type ZiweiFengshuiChartContext = {
     trinePalaces: string[];
     stars: CanonicalStar[];
     shensha: string[];
-    annualSignals: string[];
+    timingSignals: string[];
   }>;
   relevantStarReferences: Record<string, string>;
 };
 
-export function buildZiweiFengshuiChartContext(chartData: ZiweiResponse, targetYear: number): ZiweiFengshuiChartContext {
+export function buildZiweiFengshuiChartContext(chartData: ZiweiResponse, period: ZiweiFengshuiPeriod): ZiweiFengshuiChartContext {
   if (!chartData?.calcInput) {
     throw new Error('该命例缺少可重算的出生参数，请编辑命例并重新排盘后再生成紫微风水分析。');
   }
@@ -148,33 +149,43 @@ export function buildZiweiFengshuiChartContext(chartData: ZiweiResponse, targetY
     throw new Error('紫微排盘数据未包含完整十二宫');
   }
 
-  const targetDate = getTargetDate(targetYear);
-  const horoscope = calculateZiweiHoroscopeDataWithAstrolabe(astrolabe, { targetDate });
-  const horoscopeJson = toZiweiHoroscopeJson(horoscope, { detailLevel: 'full' }) as any;
-  const transitStars = (horoscope.transitStars || []).map((item) => ({
+  const targetDate = period.targetYear === null ? null : getTargetDate(period.targetYear);
+  const horoscope = targetDate ? calculateZiweiHoroscopeDataWithAstrolabe(astrolabe, { targetDate }) : null;
+  const horoscopeJson = horoscope ? toZiweiHoroscopeJson(horoscope, { detailLevel: 'full' }) as any : null;
+  const transitStars = period.layer === 'yearly' ? (horoscope?.transitStars || []).map((item) => ({
     starName: item.starName,
     palaceName: normalizePalaceName(item.palaceName),
-  }));
-  const yearlyMutagens = MUTAGEN_NAMES.map((mutagen, index) => {
-    const starName = horoscope.yearly.mutagen[index] || '';
+  })) : [];
+  const yearlyMutagens = period.layer === 'yearly' ? MUTAGEN_NAMES.map((mutagen, index) => {
+    const starName = horoscope?.yearly.mutagen[index] || '';
     const natalPalace = canonical.十二宫位.find((palace) => getStars(palace).some((star) => star.星名 === starName));
     return starName ? { mutagen, starName, natalPalaceName: natalPalace?.宫位 || null } : null;
-  }).filter((item): item is NonNullable<typeof item> => Boolean(item));
+  }).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
+  const decadalMutagens = period.layer !== 'natal' ? MUTAGEN_NAMES.map((mutagen, index) => {
+    const starName = horoscope?.decadal.mutagen[index] || '';
+    const natalPalace = canonical.十二宫位.find((palace) => getStars(palace).some((star) => star.星名 === starName));
+    return starName ? { mutagen, starName, natalPalaceName: natalPalace?.宫位 || null } : null;
+  }).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
 
   const palaceByIndex = new Map(canonical.十二宫位.map((palace, fallbackIndex) => [palace.宫位索引 ?? fallbackIndex, palace]));
   const palaces = canonical.十二宫位.map((palace, fallbackIndex) => {
     const palaceIndex = palace.宫位索引 ?? fallbackIndex;
     const branch = palace.干支.slice(-1);
-    const starNames = new Set(getStars(palace).map((star) => star.星名));
-    const annualSignals = [
+    const timingSignals = [
+      ...decadalMutagens
+        .filter((item) => item.natalPalaceName === palace.宫位)
+        .map((item) => `${period.label}：${item.starName}化${item.mutagen}`),
       ...yearlyMutagens
         .filter((item) => item.natalPalaceName === palace.宫位)
-        .map((item) => `${targetYear}年${item.starName}化${item.mutagen}`),
+        .map((item) => `${period.targetYear}年${item.starName}化${item.mutagen}`),
       ...transitStars
         .filter((item) => item.palaceName === palace.宫位)
-        .map((item) => `${targetYear}年${item.starName}入宫`),
-      ...(normalizePalaceName(horoscope.yearly.palaceNames[0] || '') === palace.宫位
-        ? [`${targetYear}年流年命宫叠入本命${palace.宫位}`]
+        .map((item) => `${period.targetYear}年${item.starName}入宫`),
+      ...(period.layer === 'decadal' && period.palaceName === palace.宫位
+        ? [`${period.label}叠入本命${palace.宫位}`]
+        : []),
+      ...(period.layer === 'yearly' && normalizePalaceName(horoscope?.yearly.palaceNames[0] || '') === palace.宫位
+        ? [`${period.targetYear}年流年命宫叠入本命${palace.宫位}`]
         : []),
     ];
     return {
@@ -192,10 +203,9 @@ export function buildZiweiFengshuiChartContext(chartData: ZiweiResponse, targetY
         .filter(Boolean),
       stars: getStars(palace),
       shensha: palace.神煞 || [],
-      annualSignals,
-      _starNames: starNames,
+      timingSignals,
     };
-  }).map(({ _starNames: _ignored, ...palace }) => palace);
+  });
 
   const relevantNames = new Set(palaces.flatMap((palace) => palace.stars.map((star) => star.星名)));
   const relevantStarReferences = Object.fromEntries(
@@ -203,22 +213,23 @@ export function buildZiweiFengshuiChartContext(chartData: ZiweiResponse, targetY
   );
 
   return {
-    targetYear,
+    period,
     targetDate,
     basic: canonical.基本信息,
-    annual: {
-      decadal: {
+    timing: {
+      decadal: horoscope ? {
         干支: `${horoscope.decadal.heavenlyStem}${horoscope.decadal.earthlyBranch}`,
         落宫: normalizePalaceName(horoscope.decadal.palaceNames[0] || ''),
         年龄范围: typeof horoscope.decadal.startAge === 'number' ? `${horoscope.decadal.startAge}-${horoscope.decadal.endAge}岁` : '',
         四化: horoscope.decadal.mutagen.map((star, index) => `${star}[化${MUTAGEN_NAMES[index]}]`),
-      },
-      yearly: horoscopeJson.运限叠宫?.find((item: any) => item.层次 === '流年') || {
+      } : null,
+      yearly: period.layer === 'yearly' && horoscope ? (horoscopeJson?.运限叠宫?.find((item: any) => item.层次 === '流年') || {
         干支: `${horoscope.yearly.heavenlyStem}${horoscope.yearly.earthlyBranch}`,
         落入本命宫位: normalizePalaceName(horoscope.yearly.palaceNames[0] || ''),
-      },
+      }) : null,
       transitStars,
       yearlyMutagens,
+      decadalMutagens,
     },
     palaces,
     relevantStarReferences,
@@ -233,7 +244,7 @@ export function buildZiweiFengshuiPrompt(context: ZiweiFengshuiChartContext) {
     summary: '一句话概括该方位当前的空间状态与主要物象。',
     currentObjects: ['该方位当前存在的具体物品或陈设。', '该物品呈现的状态、材质、光线或使用情况。'],
     natalEvidence: ['本命层证据，至少一项。'],
-    yearlyEvidence: [`${context.targetYear}年流年层证据；若无直接流曜，也要明确写“本年无直接流曜叠入，以本命物象为主”。`],
+    timingEvidence: context.period.layer === 'natal' ? [] : [`${context.period.label}的时间层证据。`],
     optimizationSteps: ['针对现有物象优先进行的整理、移动、维修或清除。'],
     placementAdvice: {
       item: '建议摆放或重新安排的一件简单物品',
@@ -247,20 +258,25 @@ export function buildZiweiFengshuiPrompt(context: ZiweiFengshuiChartContext) {
       grade: '稳定传统',
     }],
   };
+  const taskLabel = context.period.layer === 'natal'
+    ? '原命局紫微风水全盘物象与优化结果，只分析稳定的本命底色，不加入任何大运或流年信息'
+    : context.period.layer === 'decadal'
+      ? `${context.period.label}的紫微风水全盘物象与优化结果，只把该大运叠加在本命上，不加入流年信息`
+      : `${context.period.label}的紫微风水全盘物象与优化结果，将本命、当前大运和该流年分层分析`;
   const userPrompt = [
-    '【确定性紫微命盘与流年上下文】',
+    '【确定性紫微命盘与时间层上下文】',
     JSON.stringify(context),
     '',
     '【任务】',
-    `请生成${context.targetYear}年的紫微风水全盘物象与优化结果。必须覆盖以下十二个唯一宫位，顺序与列表一致：${expectedPalaces.join('、')}。`,
+    `请生成${taskLabel}。必须覆盖以下十二个唯一宫位，顺序与列表一致：${expectedPalaces.join('、')}。`,
     'priorityPalaceNames 选择最值得优先优化的1-3宫；它们用于“全盘”主题高亮。',
-    '每宫都必须给出当前物象、本命依据、流年依据、优化步骤、恰好一项摆放方案、避免事项和推断链。',
+    `每宫都必须给出当前物象、本命依据、${context.period.layer === 'natal' ? '空的 timingEvidence 数组' : '对应时间层依据'}、优化步骤、恰好一项摆放方案、避免事项和推断链。`,
     '方向、角度和地支由程序在模型返回后补入，你只需准确使用上下文，不要在 JSON 中另造方向数据。',
     '',
     '【严格JSON形状】',
     JSON.stringify({
       summary: '全盘命盘提示摘要',
-      yearlyNotice: `${context.targetYear}年变化及本命/流年分层说明`,
+      periodNotice: `${context.period.label}的层级说明与全盘变化摘要`,
       priorityPalaceNames: expectedPalaces.slice(0, 3),
       palaces: [examplePalace],
     }),

@@ -6,8 +6,12 @@ import { resolveChatModel } from '../../../../lib/analysis-models';
 import { friendlyChatError, isTimeoutLike } from '../../../../lib/chat-errors';
 import { prisma } from '../../../../lib/prisma';
 import {
+  ZIWEI_FENGSHUI_LAYERS,
   ZIWEI_FENGSHUI_PROMPT_VERSION,
+  resolveZiweiFengshuiPeriod,
   validateZiweiFengshuiGeneration,
+  type ZiweiFengshuiLayer,
+  type ZiweiFengshuiPeriod,
 } from '../../../../lib/ziwei-fengshui';
 import {
   buildZiweiFengshuiChartContext,
@@ -26,12 +30,10 @@ const shanghaiYear = () => Number(new Intl.DateTimeFormat('en', {
   year: 'numeric',
 }).format(new Date()));
 
-const parseTargetYear = (value: unknown) => {
-  const year = typeof value === 'number' ? value : Number.parseInt(String(value || ''), 10);
-  if (!Number.isInteger(year) || year < 1900 || year > 2200) {
-    throw new Error('目标年份必须在 1900–2200 之间');
-  }
-  return year;
+const parseLayer = (value: unknown): ZiweiFengshuiLayer => {
+  const layer = String(value || 'natal') as ZiweiFengshuiLayer;
+  if (!ZIWEI_FENGSHUI_LAYERS.includes(layer)) throw new Error('紫微风水时间层无效');
+  return layer;
 };
 
 const chartFingerprint = (chartData: unknown) => {
@@ -72,6 +74,27 @@ async function getQuota(userId: string) {
   return user?.quota ?? 0;
 }
 
+async function getAvailableRecords(userId: string, caseId: string, fingerprint: string) {
+  const records = await prisma.ziweiFengshuiAnalysis.findMany({
+    where: {
+      userId,
+      caseId,
+      chartFingerprint: fingerprint,
+      promptVersion: ZIWEI_FENGSHUI_PROMPT_VERSION,
+      status: 'ready',
+      result: { not: Prisma.DbNull },
+    },
+    select: { analysisLayer: true, periodKey: true, periodLabel: true, generatedAt: true },
+    orderBy: { generatedAt: 'desc' },
+  });
+  return records.map((record) => ({
+    layer: record.analysisLayer,
+    periodKey: record.periodKey,
+    periodLabel: record.periodLabel,
+    generatedAt: record.generatedAt?.toISOString() || null,
+  }));
+}
+
 export async function GET(request: Request) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -81,30 +104,38 @@ export async function GET(request: Request) {
   const caseId = searchParams.get('caseId')?.trim() || '';
   if (!caseId) return NextResponse.json({ error: '缺少命例 ID' }, { status: 400 });
 
-  let targetYear: number;
   try {
-    targetYear = parseTargetYear(searchParams.get('targetYear') || shanghaiYear());
     const divinationCase = await readOwnedCase(userId, caseId);
+    const chartData = divinationCase.chartData as unknown as ZiweiResponse;
+    const layer = parseLayer(searchParams.get('layer'));
+    const requestedKey = searchParams.get('periodKey') || (layer === 'yearly' ? String(shanghaiYear()) : null);
+    const period = resolveZiweiFengshuiPeriod(chartData, layer, requestedKey);
     const fingerprint = chartFingerprint(divinationCase.chartData);
     const analysis = await prisma.ziweiFengshuiAnalysis.findFirst({
       where: {
         userId,
         caseId,
-        targetYear,
+        analysisLayer: period.layer,
+        periodKey: period.key,
         chartFingerprint: fingerprint,
         promptVersion: ZIWEI_FENGSHUI_PROMPT_VERSION,
       },
       orderBy: { updatedAt: 'desc' },
     });
-    if (!analysis) return NextResponse.json({ status: 'empty', targetYear, quota: await getQuota(userId) });
+    const [quota, availableRecords] = await Promise.all([
+      getQuota(userId),
+      getAvailableRecords(userId, caseId, fingerprint),
+    ]);
+    if (!analysis) return NextResponse.json({ status: 'empty', period, availableRecords, quota });
     return NextResponse.json({
       status: analysis.status,
-      targetYear,
+      period,
       result: analysis.result || null,
       error: analysis.status === 'failed' ? analysis.lastError : null,
       generatedAt: analysis.generatedAt?.toISOString() || null,
       updatedAt: analysis.updatedAt.toISOString(),
-      quota: await getQuota(userId),
+      availableRecords,
+      quota,
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : '读取紫微风水分析失败' }, { status: 400 });
@@ -119,7 +150,7 @@ type ClaimResult =
 async function claimAnalysis(input: {
   userId: string;
   caseId: string;
-  targetYear: number;
+  period: ZiweiFengshuiPeriod;
   fingerprint: string;
   force: boolean;
 }): Promise<ClaimResult> {
@@ -127,7 +158,8 @@ async function claimAnalysis(input: {
     const existing = await tx.ziweiFengshuiAnalysis.findFirst({
       where: {
         caseId: input.caseId,
-        targetYear: input.targetYear,
+        analysisLayer: input.period.layer,
+        periodKey: input.period.key,
         chartFingerprint: input.fingerprint,
         promptVersion: ZIWEI_FENGSHUI_PROMPT_VERSION,
       },
@@ -158,7 +190,10 @@ async function claimAnalysis(input: {
       data: {
         userId: input.userId,
         caseId: input.caseId,
-        targetYear: input.targetYear,
+        analysisLayer: input.period.layer,
+        periodKey: input.period.key,
+        periodLabel: input.period.label,
+        targetYear: input.period.targetYear,
         chartFingerprint: input.fingerprint,
         promptVersion: ZIWEI_FENGSHUI_PROMPT_VERSION,
         status: 'pending',
@@ -173,21 +208,24 @@ export async function POST(request: Request) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: '请先登录后再使用紫微风水分析' }, { status: 401 });
 
-  const body = await request.json().catch(() => ({})) as { caseId?: unknown; targetYear?: unknown; force?: unknown };
-  const unknownKeys = Object.keys(body).filter((key) => !['caseId', 'targetYear', 'force'].includes(key));
+  const body = await request.json().catch(() => ({})) as { caseId?: unknown; layer?: unknown; periodKey?: unknown; force?: unknown };
+  const unknownKeys = Object.keys(body).filter((key) => !['caseId', 'layer', 'periodKey', 'force'].includes(key));
   if (unknownKeys.length > 0) {
     return NextResponse.json({ error: `请求包含不支持的字段：${unknownKeys.join('、')}` }, { status: 400 });
   }
   const caseId = typeof body.caseId === 'string' ? body.caseId.trim() : '';
   if (!caseId) return NextResponse.json({ error: '缺少命例 ID' }, { status: 400 });
 
-  let targetYear: number;
   let divinationCase: Awaited<ReturnType<typeof readOwnedCase>>;
   let context: ReturnType<typeof buildZiweiFengshuiChartContext>;
+  let period: ZiweiFengshuiPeriod;
   try {
-    targetYear = parseTargetYear(body.targetYear ?? shanghaiYear());
     divinationCase = await readOwnedCase(userId, caseId);
-    context = buildZiweiFengshuiChartContext(divinationCase.chartData as unknown as ZiweiResponse, targetYear);
+    const chartData = divinationCase.chartData as unknown as ZiweiResponse;
+    const layer = parseLayer(body.layer);
+    const requestedKey = typeof body.periodKey === 'string' ? body.periodKey : (layer === 'yearly' ? String(shanghaiYear()) : null);
+    period = resolveZiweiFengshuiPeriod(chartData, layer, requestedKey);
+    context = buildZiweiFengshuiChartContext(chartData, period);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : '紫微风水分析参数无效' }, { status: 400 });
   }
@@ -198,13 +236,13 @@ export async function POST(request: Request) {
     claim = await claimAnalysis({
       userId,
       caseId,
-      targetYear,
+      period,
       fingerprint,
       force: body.force === true,
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: '该命例与年份正在分析，请稍候' }, { status: 409 });
+      return NextResponse.json({ error: '该命例的所选周期正在分析，请稍候' }, { status: 409 });
     }
     return NextResponse.json({ error: friendlyChatError(error, '创建紫微风水分析任务失败') }, { status: 500 });
   }
@@ -219,7 +257,7 @@ export async function POST(request: Request) {
     });
   }
   if (claim.kind === 'busy') {
-    return NextResponse.json({ error: '该命例与年份正在分析，请稍候' }, { status: 409 });
+    return NextResponse.json({ error: '该命例的所选周期正在分析，请稍候' }, { status: 409 });
   }
 
   const pointReserved = await prisma.$transaction(async (tx) => {
@@ -310,7 +348,7 @@ export async function POST(request: Request) {
     const result = validateZiweiFengshuiGeneration(
       raw,
       context.palaces.map((palace) => ({ palaceName: palace.palaceName, branch: palace.branch })),
-      targetYear,
+      period,
     );
     await prisma.ziweiFengshuiAnalysis.update({
       where: { id: claim.id },

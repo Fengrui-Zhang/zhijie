@@ -1,4 +1,27 @@
-export const ZIWEI_FENGSHUI_PROMPT_VERSION = 'ziwei_fengshui_v2' as const;
+import type { ZiweiResponse } from '../types';
+
+export const ZIWEI_FENGSHUI_PROMPT_VERSION = 'ziwei_fengshui_v3' as const;
+
+export const ZIWEI_FENGSHUI_LAYERS = ['natal', 'decadal', 'yearly'] as const;
+export type ZiweiFengshuiLayer = (typeof ZIWEI_FENGSHUI_LAYERS)[number];
+
+export type ZiweiFengshuiPeriod = {
+  layer: ZiweiFengshuiLayer;
+  key: string;
+  label: string;
+  targetYear: number | null;
+  startAge?: number;
+  endAge?: number;
+  palaceName?: string;
+};
+
+export type ZiweiFengshuiDecadalOption = ZiweiFengshuiPeriod & {
+  layer: 'decadal';
+  targetYear: number;
+  startAge: number;
+  endAge: number;
+  palaceName: string;
+};
 
 export const ZIWEI_FENGSHUI_STATUSES = ['协调顺畅', '基本平稳', '杂乱受阻', '重点调整'] as const;
 export type ZiweiFengshuiStatus = (typeof ZIWEI_FENGSHUI_STATUSES)[number];
@@ -38,7 +61,7 @@ export type ZiweiFengshuiPalaceResult = {
   summary: string;
   currentObjects: string[];
   natalEvidence: string[];
-  yearlyEvidence: string[];
+  timingEvidence: string[];
   optimizationSteps: string[];
   placementAdvice: ZiweiFengshuiPlacementAdvice;
   avoid: string[];
@@ -47,17 +70,20 @@ export type ZiweiFengshuiPalaceResult = {
 
 export type ZiweiFengshuiResult = {
   schemaVersion: typeof ZIWEI_FENGSHUI_PROMPT_VERSION;
-  targetYear: number;
+  analysisLayer: ZiweiFengshuiLayer;
+  periodKey: string;
+  periodLabel: string;
+  targetYear: number | null;
   generatedAt: string;
   summary: string;
-  yearlyNotice: string;
+  periodNotice: string;
   priorityPalaceNames: string[];
   palaces: ZiweiFengshuiPalaceResult[];
 };
 
 export type ZiweiFengshuiGenerationPayload = {
   summary: string;
-  yearlyNotice: string;
+  periodNotice: string;
   priorityPalaceNames: string[];
   palaces: Array<Omit<ZiweiFengshuiPalaceResult, 'branch' | 'direction' | 'degreeRange' | 'centerDegree'>>;
 };
@@ -86,6 +112,53 @@ export const ZIWEI_FENGSHUI_FOCUS_OPTIONS: Array<{ key: ZiweiFengshuiFocus; labe
   { key: 'health', label: '健康' },
   { key: 'home', label: '住宅' },
 ];
+
+export const ZIWEI_FENGSHUI_LAYER_OPTIONS: Array<{ key: ZiweiFengshuiLayer; label: string }> = [
+  { key: 'natal', label: '本命' },
+  { key: 'decadal', label: '大运' },
+  { key: 'yearly', label: '流年' },
+];
+
+export function getZiweiFengshuiDecadalOptions(data: ZiweiResponse): ZiweiFengshuiDecadalOption[] {
+  const canonical = data.taibuJson as { 十二宫位?: Array<{ 宫位?: string; 大限?: string }> } | undefined;
+  const birthYear = Number(String((data.taibuJson as any)?.基本信息?.阳历 || data.base_info.gongli || '').match(/\d{4}/)?.[0]);
+  if (!Number.isInteger(birthYear)) return [];
+  return (canonical?.十二宫位 || [])
+    .flatMap((palace) => {
+      const match = String(palace.大限 || '').match(/(\d+)[~～—–-](\d+)/u);
+      if (!match) return [];
+      const startAge = Number(match[1]);
+      const endAge = Number(match[2]);
+      const startYear = birthYear + startAge - 1;
+      const endYear = birthYear + endAge - 1;
+      return [{
+        layer: 'decadal' as const,
+        key: `${startAge}-${endAge}`,
+        label: `${startAge}–${endAge}岁 · ${palace.宫位 || '大运'}`,
+        targetYear: Math.min(2200, Math.max(1900, startYear + Math.floor((endYear - startYear) / 2))),
+        startAge,
+        endAge,
+        palaceName: palace.宫位 || '',
+      }];
+    })
+    .sort((left, right) => left.startAge - right.startAge);
+}
+
+export function resolveZiweiFengshuiPeriod(
+  data: ZiweiResponse,
+  layer: ZiweiFengshuiLayer,
+  periodKey?: string | null,
+): ZiweiFengshuiPeriod {
+  if (layer === 'natal') return { layer, key: 'natal', label: '原命局', targetYear: null };
+  if (layer === 'yearly') {
+    const year = Number.parseInt(String(periodKey || ''), 10);
+    if (!Number.isInteger(year) || year < 1900 || year > 2200) throw new Error('流年必须在 1900–2200 之间');
+    return { layer, key: String(year), label: `${year}年流年`, targetYear: year };
+  }
+  const option = getZiweiFengshuiDecadalOptions(data).find((item) => item.key === periodKey);
+  if (!option) throw new Error('所选大运不在该命盘的大运列表中');
+  return option;
+}
 
 const FOCUS_PALACE_CANDIDATES: Record<Exclude<ZiweiFengshuiFocus, 'overall'>, string[]> = {
   wealth: ['财帛宫', '福德宫', '田宅宫'],
@@ -143,7 +216,7 @@ function readPlacementAdvice(value: unknown, field: string): ZiweiFengshuiPlacem
 export function validateZiweiFengshuiGeneration(
   raw: unknown,
   expectedPalaces: Array<{ palaceName: string; branch: string }>,
-  targetYear: number,
+  period: ZiweiFengshuiPeriod,
   generatedAt = new Date().toISOString(),
 ): ZiweiFengshuiResult {
   if (!isRecord(raw)) throw new Error('模型返回的紫微风水结果不是对象');
@@ -190,7 +263,7 @@ export function validateZiweiFengshuiGeneration(
       summary: readString(value.summary, `${palaceName}.summary`, 220),
       currentObjects: readStringList(value.currentObjects, `${palaceName}.currentObjects`, { min: 2, max: 6 }),
       natalEvidence: readStringList(value.natalEvidence, `${palaceName}.natalEvidence`, { min: 1, max: 5 }),
-      yearlyEvidence: readStringList(value.yearlyEvidence, `${palaceName}.yearlyEvidence`, { min: 1, max: 5 }),
+      timingEvidence: readStringList(value.timingEvidence, `${palaceName}.timingEvidence`, { min: 0, max: 5 }),
       optimizationSteps: readStringList(value.optimizationSteps, `${palaceName}.optimizationSteps`, { min: 1, max: 6 }),
       placementAdvice: readPlacementAdvice(value.placementAdvice, `${palaceName}.placementAdvice`),
       avoid: readStringList(value.avoid, `${palaceName}.avoid`, { min: 1, max: 4 }),
@@ -206,10 +279,13 @@ export function validateZiweiFengshuiGeneration(
 
   return {
     schemaVersion: ZIWEI_FENGSHUI_PROMPT_VERSION,
-    targetYear,
+    analysisLayer: period.layer,
+    periodKey: period.key,
+    periodLabel: period.label,
+    targetYear: period.targetYear,
     generatedAt,
     summary: readString(raw.summary, 'summary', 900),
-    yearlyNotice: readString(raw.yearlyNotice, 'yearlyNotice', 600),
+    periodNotice: readString(raw.periodNotice, 'periodNotice', 600),
     priorityPalaceNames,
     palaces,
   };
