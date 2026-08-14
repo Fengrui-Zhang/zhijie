@@ -25,26 +25,33 @@ const expectedPalaces = [
 }));
 
 const makeRawResult = () => ({
-  summary: '全盘物象与空间状态已经按十二方位呈现。',
+  summary: '全盘物象预测与十二宫催旺方案已经按方位呈现。',
   periodNotice: '本命底色与目标时间层变化已经分层呈现。',
   priorityPalaceNames: ['命宫', '官禄宫', '田宅宫'],
   palaces: expectedPalaces.map(({ palaceName }) => ({
     palaceName,
-    status: '基本平稳',
-    summary: `${palaceName}所在方位有收纳柜、纸张与柔和照明，整体秩序平稳。`,
-    currentObjects: ['一组木质收纳柜，内部文件较多。', '一盏暖色台灯，周围放有纸张和充电线。'],
-    natalEvidence: ['本命星曜与宫位结构提示先做基础检查。'],
-    timingEvidence: ['本年无直接流曜叠入时，以本命检查为主。'],
-    optimizationSteps: ['清走失效纸张，将充电线整理到柜体一侧。'],
-    placementAdvice: {
-      item: '一只浅色文件托盘',
-      method: '放在收纳柜上方靠内侧，集中承接当周使用的文件。',
-      reason: '以少量、可逆的收纳动作稳定该宫位对应的空间功能。',
-      avoidWhen: ['柜面潮湿、过热或已经影响通行时。'],
+    tendency: '中性成象',
+    summary: `${palaceName}所在方位以柜体、纸张与柔和照明物象最为鲜明。`,
+    predictedObjects: [
+      { item: '木质柜体', state: '颜色偏深、体量适中，常位于墙边。', basis: '天府库藏与土性共同取象。' },
+      { item: '暖色台灯', state: '灯体较小，光线集中向下。', basis: '太阳与文昌共同指向照明和阅读物件。' },
+    ],
+    natalEvidence: ['本命星曜与宫位结构支持该方位物象。'],
+    timingEvidence: ['本年四化进一步修饰物品的强弱与状态。'],
+    enhancementAdvice: {
+      goal: '增强该宫位对应的人事主题',
+      supportingStar: '天府化科',
+      items: [{ item: '陶瓷聚宝罐', material: '陶瓷', color: '米黄色', quantity: '1件', symbolism: '承接天府库藏与化科稳定成形的正向类象。' }],
+      placement: '摆在该宫对应方位内侧稳定台面，罐口朝向室内中心。',
+      activationLogic: `${palaceName}→天府→化科→陶瓷库器→稳定承接宫位正向功能。`,
+      expectedEffect: '强化该宫的资源承接、稳定与累积主题。',
     },
-    avoid: ['不自行进行强电、明火、管道或结构改造。'],
+    contraindications: ['不搭配明火、刀具或过量金属物件。'],
     evidenceChains: [{
-      chain: `${palaceName}→地支方向→星曜→辅煞四化→可能物象→安全检查`,
+      chain: `${palaceName}→地支方向→星曜→辅煞四化→预测物品与状态`,
+      grade: '稳定传统',
+    }, {
+      chain: `改善目标→${palaceName}→助力星曜→有利四化→催旺物→摆放方法`,
       grade: '稳定传统',
     }],
   })),
@@ -66,8 +73,8 @@ test('结构校验必须覆盖十二个唯一宫位并由程序补充方向', ()
   assert.equal(result.palaces.length, 12);
   assert.equal(result.palaces[0].direction, '正北');
   assert.equal(result.palaces[3].direction, '正东');
-  assert.equal(result.palaces[0].currentObjects.length, 2);
-  assert.equal(result.palaces[0].placementAdvice.item, '一只浅色文件托盘');
+  assert.equal(result.palaces[0].predictedObjects.length, 2);
+  assert.equal(result.palaces[0].enhancementAdvice.items[0].item, '陶瓷聚宝罐');
 
   const duplicated = makeRawResult();
   duplicated.palaces[1].palaceName = '命宫';
@@ -76,17 +83,18 @@ test('结构校验必须覆盖十二个唯一宫位并由程序补充方向', ()
     /重复返回宫位/,
   );
 
-  const invalidStatus = makeRawResult();
-  invalidStatus.palaces[0].status = '大吉';
+  const invalidTendency = makeRawResult();
+  invalidTendency.palaces[0].tendency = '大吉';
   assert.throws(
-    () => validateZiweiFengshuiGeneration(invalidStatus, expectedPalaces, yearly),
-    /状态无效/,
+    () => validateZiweiFengshuiGeneration(invalidTendency, expectedPalaces, yearly),
+    /物象倾向无效/,
   );
 });
 
 test('主题筛选最多高亮一个主宫和两个辅助宫', () => {
   const result = validateZiweiFengshuiGeneration(makeRawResult(), expectedPalaces, { layer: 'yearly', key: '2026', label: '2026年流年', targetYear: 2026 }) as ZiweiFengshuiResult;
   assert.deepEqual(getZiweiFengshuiFocusPalaces('career', result), ['官禄宫', '命宫', '迁移宫']);
+  assert.deepEqual(getZiweiFengshuiFocusPalaces('social', result), ['仆役宫', '兄弟宫', '官禄宫']);
   assert.equal(getZiweiFengshuiFocusPalaces('overall', result).length, 3);
 });
 
@@ -130,7 +138,7 @@ test('真实排盘上下文分离本命与目标年份并计算对宫、三方�
   assert.equal(decadalContext.timing.transitStars.length, 0);
 });
 
-test('紫微风水 prompt 只注入一次命盘且直接推演当前物象', async () => {
+test('紫微风水 prompt 只注入一次命盘并分开物象预测与催旺建议', async () => {
   const chart = await calculateTaibuChart({
     modelType: ModelType.ZIWEI,
     params: {
@@ -152,9 +160,9 @@ test('紫微风水 prompt 只注入一次命盘且直接推演当前物象', asy
   assert.match(combined, /原命局紫微风水/);
   assert.doesNotMatch(combined, /2026年流年/);
   assert.doesNotMatch(combined, /【个性化偏好】|chart-json|知识库检索/);
-  assert.match(combined, /先减后加/);
-  assert.match(combined, /当前物象|具体物品|摆放方案/);
-  assert.match(combined, /不要反复使用“可能、也许、待检查”/);
+  assert.doesNotMatch(combined, /先减后加|整理与优化|清走失效/);
+  assert.match(combined, /物象预测|具体物品|催旺摆放方案/);
+  assert.match(combined, /材质、颜色、数量|助力星曜|有利四化/);
   assert.doesNotMatch(combined, /不等同于真实户型勘察|仅供娱乐/);
   assert.match(combined, /大型水景|强电改造|结构拆改/);
 });

@@ -12,7 +12,7 @@ import {
   type ZiweiFengshuiLayer,
   type ZiweiFengshuiPalaceResult,
   type ZiweiFengshuiResult,
-  type ZiweiFengshuiStatus,
+  type ZiweiFengshuiTendency,
 } from '../lib/ziwei-fengshui';
 import DialogPortal, { DialogBody } from './DialogPortal';
 
@@ -33,23 +33,23 @@ const GRID_LAYOUT = [
   [2, 1, 0, 11],
 ];
 
-const STATUS_STYLE: Record<ZiweiFengshuiStatus, { dot: string; card: string; pill: string }> = {
-  协调顺畅: {
+const TENDENCY_STYLE: Record<ZiweiFengshuiTendency, { dot: string; card: string; pill: string }> = {
+  吉象鲜明: {
     dot: 'bg-emerald-500',
     card: 'border-emerald-200/90 bg-emerald-50/72',
     pill: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   },
-  基本平稳: {
+  中性成象: {
     dot: 'bg-sky-500',
     card: 'border-sky-200/80 bg-sky-50/62',
     pill: 'border-sky-200 bg-sky-50 text-sky-700',
   },
-  杂乱受阻: {
-    dot: 'bg-amber-500',
-    card: 'border-amber-200/90 bg-amber-50/72',
-    pill: 'border-amber-200 bg-amber-50 text-amber-700',
+  动象突出: {
+    dot: 'bg-violet-500',
+    card: 'border-violet-200/90 bg-violet-50/68',
+    pill: 'border-violet-200 bg-violet-50 text-violet-700',
   },
-  重点调整: {
+  煞忌成象: {
     dot: 'bg-rose-500',
     card: 'border-rose-200/90 bg-rose-50/68',
     pill: 'border-rose-200 bg-rose-50 text-rose-700',
@@ -97,14 +97,14 @@ const DetailSection = ({ title, children }: { title: string; children: React.Rea
 );
 
 const PalaceDetail = ({ palace, layer }: { palace: ZiweiFengshuiPalaceResult; layer: ZiweiFengshuiLayer }) => {
-  const style = STATUS_STYLE[palace.status];
+  const style = TENDENCY_STYLE[palace.tendency];
   return (
     <div className="space-y-3 p-4 md:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="display-title text-2xl font-bold tracking-[-0.02em] text-stone-950">{palace.palaceName}</h3>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${style.pill}`}>{palace.status}</span>
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${style.pill}`}>{palace.tendency}</span>
           </div>
           <div className="mt-1 text-xs font-medium text-stone-500">
             {palace.branch}位 · {palace.direction} · {palace.degreeRange}
@@ -113,8 +113,16 @@ const PalaceDetail = ({ palace, layer }: { palace: ZiweiFengshuiPalaceResult; la
       </div>
       <p className="rounded-[18px] border border-white/70 bg-white/52 px-4 py-3 text-sm leading-6 text-stone-700">{palace.summary}</p>
 
-      <DetailSection title="当前物象">
-        <BulletList items={palace.currentObjects} tone="rose" />
+      <DetailSection title="方位物象预测">
+        <div className="space-y-2.5">
+          {palace.predictedObjects.map((prediction, index) => (
+            <div key={`${prediction.item}-${index}`} className="rounded-2xl border border-stone-100 bg-white/65 px-3.5 py-3">
+              <div className="font-bold text-stone-800">{prediction.item}</div>
+              <div className="mt-1 text-sm leading-6 text-stone-600">{prediction.state}</div>
+              <div className="mt-1.5 text-xs leading-5 text-stone-400">取象：{prediction.basis}</div>
+            </div>
+          ))}
+        </div>
       </DetailSection>
       <DetailSection title="本命依据">
         <BulletList items={palace.natalEvidence} />
@@ -124,24 +132,41 @@ const PalaceDetail = ({ palace, layer }: { palace: ZiweiFengshuiPalaceResult; la
           <BulletList items={palace.timingEvidence} tone="amber" />
         </DetailSection>
       ) : null}
-      <DetailSection title="整理与优化">
-        <BulletList items={palace.optimizationSteps} tone="amber" />
-      </DetailSection>
-
-      <DetailSection title="摆放方案">
+      <DetailSection title={`催旺方案 · ${palace.enhancementAdvice.goal}`}>
         <div className="space-y-3 text-sm leading-6 text-stone-600">
-          <div className="font-bold text-emerald-700">{palace.placementAdvice.item}</div>
-          <p>{palace.placementAdvice.method}</p>
-          <p>{palace.placementAdvice.reason}</p>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/65 px-3.5 py-3">
+            <div className="text-xs font-semibold text-emerald-600">助力星曜</div>
+            <div className="mt-1 font-bold text-emerald-800">{palace.enhancementAdvice.supportingStar}</div>
+          </div>
+          <div className="grid gap-2">
+            {palace.enhancementAdvice.items.map((item, index) => (
+              <div key={`${item.item}-${index}`} className="rounded-2xl border border-amber-100 bg-amber-50/55 px-3.5 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="font-bold text-stone-800">{item.item}</div>
+                  <span className="shrink-0 rounded-full border border-amber-200 bg-white/70 px-2 py-0.5 text-[10px] font-bold text-amber-700">{item.quantity}</span>
+                </div>
+                <div className="mt-1 text-xs text-stone-500">{item.material} · {item.color}</div>
+                <div className="mt-1.5 text-xs leading-5 text-stone-600">{item.symbolism}</div>
+              </div>
+            ))}
+          </div>
           <div>
-            <div className="mb-1 font-semibold text-stone-700">以下情况不宜采用</div>
-            <BulletList items={palace.placementAdvice.avoidWhen} tone="rose" />
+            <div className="mb-1 font-semibold text-stone-700">怎么摆</div>
+            <p>{palace.enhancementAdvice.placement}</p>
+          </div>
+          <div>
+            <div className="mb-1 font-semibold text-stone-700">催旺逻辑</div>
+            <p>{palace.enhancementAdvice.activationLogic}</p>
+          </div>
+          <div>
+            <div className="mb-1 font-semibold text-stone-700">重点强化</div>
+            <p>{palace.enhancementAdvice.expectedEffect}</p>
           </div>
         </div>
       </DetailSection>
 
-      <DetailSection title="暂不建议">
-        <BulletList items={palace.avoid} tone="rose" />
+      <DetailSection title="不宜搭配">
+        <BulletList items={palace.contraindications} tone="rose" />
       </DetailSection>
       <DetailSection title="推断依据">
         <div className="space-y-2.5">
@@ -168,13 +193,13 @@ const PalaceButton = ({
   highlighted: boolean;
   onClick: () => void;
 }) => {
-  const style = STATUS_STYLE[palace.status];
+  const style = TENDENCY_STYLE[palace.tendency];
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      aria-label={`${palace.palaceName}，${palace.direction}，${palace.status}`}
+      aria-label={`${palace.palaceName}，${palace.direction}，${palace.tendency}`}
       className={`group relative flex min-h-[92px] flex-col justify-between overflow-hidden border p-2 text-left backdrop-blur-xl sm:min-h-[118px] sm:p-3 md:min-h-[138px] ${style.card} ${
         selected
           ? 'z-10 ring-2 ring-stone-800/70 ring-offset-1 ring-offset-white/60 shadow-[0_16px_34px_rgba(28,25,23,0.14)]'
@@ -189,7 +214,7 @@ const PalaceButton = ({
       </div>
       <div>
         <div className="text-[9px] font-semibold text-stone-500 sm:text-[11px]">{palace.direction}</div>
-        <div className="mt-1 text-[9px] font-bold leading-4 text-stone-700 sm:text-xs">{palace.status}</div>
+        <div className="mt-1 text-[9px] font-bold leading-4 text-stone-700 sm:text-xs">{palace.tendency}</div>
         <div className="mt-1 hidden line-clamp-2 text-[10px] leading-4 text-stone-500 sm:block">{palace.summary}</div>
       </div>
       {highlighted ? <span className="absolute bottom-0 left-0 h-0.5 w-full bg-amber-500/75" /> : null}
@@ -293,6 +318,10 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
   const palaceByBranch = useMemo(() => new Map(result?.palaces.map((palace) => [palace.branch, palace]) || []), [result]);
   const previewByBranch = useMemo(() => new Map(previewPalaces.map((palace) => [palace.branch, palace])), [previewPalaces]);
 
+  useEffect(() => {
+    if (focus !== 'overall' && highlightedNames[0]) setSelectedPalaceName(highlightedNames[0]);
+  }, [focus, highlightedNames]);
+
   const commitDraftYear = () => {
     const parsed = Number.parseInt(draftYear, 10);
     const next = Number.isFinite(parsed) ? Math.max(1900, Math.min(2200, parsed)) : shanghaiYear();
@@ -341,7 +370,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
               <h3 className="display-title text-xl font-bold tracking-[-0.02em] text-stone-900 md:text-2xl">紫微风水</h3>
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">命盘映射</span>
             </div>
-            <p className="mt-2 text-sm leading-6 text-stone-500">AI 根据十二宫落支、星曜与四化，推演各方位当前物象，并给出对应的整理与摆放方案。</p>
+            <p className="mt-2 text-sm leading-6 text-stone-500">AI 根据十二宫落支、星曜与四化，预测各方位容易出现的物品及状态，并为财运、事业、人际等宫位生成专属催旺摆放方案。</p>
           </div>
           <button
             type="button"
@@ -443,11 +472,11 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
                         <div className="relative text-2xl font-bold text-stone-900 sm:text-4xl">
                           {layer === 'natal' ? '本命' : layer === 'decadal' ? `${decadal?.startAge || ''}–${decadal?.endAge || ''}岁` : targetYear}
                         </div>
-                        <div className="relative mt-1 text-[10px] font-semibold tracking-[0.12em] text-stone-400 sm:text-xs">当前物象 × {layer === 'natal' ? '原命局' : layer === 'decadal' ? '大运' : '流年'}</div>
+                        <div className="relative mt-1 text-[10px] font-semibold tracking-[0.12em] text-stone-400 sm:text-xs">物象预测 × {layer === 'natal' ? '原命局' : layer === 'decadal' ? '大运' : '流年'}</div>
                         <div className="relative mt-3 hidden flex-wrap justify-center gap-1.5 sm:flex">
-                          {Object.entries(STATUS_STYLE).map(([status, style]) => (
-                            <span key={status} className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/60 px-2 py-1 text-[9px] font-semibold text-stone-500">
-                              <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />{status}
+                          {Object.entries(TENDENCY_STYLE).map(([tendency, style]) => (
+                            <span key={tendency} className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/60 px-2 py-1 text-[9px] font-semibold text-stone-500">
+                              <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />{tendency}
                             </span>
                           ))}
                         </div>
@@ -483,7 +512,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
               }))}
             </div>
             {state === 'empty' && !result ? (
-              <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成“{periodLabel}”的物象与摆放分析。一次调用将返回完整十二宫，消耗 1 点。</div>
+              <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成“{periodLabel}”的物象预测与催旺方案。一次调用将返回完整十二宫，消耗 1 点。</div>
             ) : null}
             {state === 'loading' ? (
               <div className="border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">正在推演“{periodLabel}”的十二方位物象…</div>
@@ -496,7 +525,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
                 <PalaceDetail palace={selectedPalace} layer={layer} />
               </div>
             ) : (
-              <div className="flex h-full min-h-[360px] items-center justify-center px-6 text-center text-sm leading-6 text-stone-400">生成后选择一个宫位，查看当前物象与摆放方案。</div>
+              <div className="flex h-full min-h-[360px] items-center justify-center px-6 text-center text-sm leading-6 text-stone-400">生成后选择一个宫位，查看方位物象预测与催旺摆放方案。</div>
             )}
           </aside>
         </div>
@@ -518,7 +547,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
       >
         <div className="flex justify-center py-2.5"><span className="h-1.5 w-11 rounded-full bg-stone-300" /></div>
         <div className="flex items-center justify-between border-b border-white/60 px-4 pb-3">
-          <div className="text-sm font-bold text-stone-700">宫位物象与优化</div>
+          <div className="text-sm font-bold text-stone-700">宫位物象与催旺方案</div>
           <button type="button" onClick={() => setMobileSheetOpen(false)} className="rounded-full border border-stone-200 bg-white/70 px-3 py-1.5 text-xs font-bold text-stone-500">关闭</button>
         </div>
         <DialogBody>

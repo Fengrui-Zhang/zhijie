@@ -1,6 +1,6 @@
 import type { ZiweiResponse } from '../types';
 
-export const ZIWEI_FENGSHUI_PROMPT_VERSION = 'ziwei_fengshui_v3' as const;
+export const ZIWEI_FENGSHUI_PROMPT_VERSION = 'ziwei_fengshui_v4' as const;
 
 export const ZIWEI_FENGSHUI_LAYERS = ['natal', 'decadal', 'yearly'] as const;
 export type ZiweiFengshuiLayer = (typeof ZIWEI_FENGSHUI_LAYERS)[number];
@@ -23,13 +23,13 @@ export type ZiweiFengshuiDecadalOption = ZiweiFengshuiPeriod & {
   palaceName: string;
 };
 
-export const ZIWEI_FENGSHUI_STATUSES = ['协调顺畅', '基本平稳', '杂乱受阻', '重点调整'] as const;
-export type ZiweiFengshuiStatus = (typeof ZIWEI_FENGSHUI_STATUSES)[number];
+export const ZIWEI_FENGSHUI_TENDENCIES = ['吉象鲜明', '中性成象', '动象突出', '煞忌成象'] as const;
+export type ZiweiFengshuiTendency = (typeof ZIWEI_FENGSHUI_TENDENCIES)[number];
 
 export const ZIWEI_FENGSHUI_EVIDENCE_GRADES = ['稳定传统', '视频明示', '扩展取象'] as const;
 export type ZiweiFengshuiEvidenceGrade = (typeof ZIWEI_FENGSHUI_EVIDENCE_GRADES)[number];
 
-export type ZiweiFengshuiFocus = 'overall' | 'wealth' | 'career' | 'study' | 'relationship' | 'health' | 'home';
+export type ZiweiFengshuiFocus = 'overall' | 'wealth' | 'career' | 'social' | 'study' | 'relationship' | 'health' | 'home';
 
 export type ZiweiDirection = {
   branch: string;
@@ -44,11 +44,27 @@ export type ZiweiFengshuiEvidence = {
   grade: ZiweiFengshuiEvidenceGrade;
 };
 
-export type ZiweiFengshuiPlacementAdvice = {
+export type ZiweiFengshuiObjectPrediction = {
   item: string;
-  method: string;
-  reason: string;
-  avoidWhen: string[];
+  state: string;
+  basis: string;
+};
+
+export type ZiweiFengshuiEnhancementItem = {
+  item: string;
+  material: string;
+  color: string;
+  quantity: string;
+  symbolism: string;
+};
+
+export type ZiweiFengshuiEnhancementAdvice = {
+  goal: string;
+  supportingStar: string;
+  items: ZiweiFengshuiEnhancementItem[];
+  placement: string;
+  activationLogic: string;
+  expectedEffect: string;
 };
 
 export type ZiweiFengshuiPalaceResult = {
@@ -57,14 +73,13 @@ export type ZiweiFengshuiPalaceResult = {
   direction: string;
   degreeRange: string;
   centerDegree: number;
-  status: ZiweiFengshuiStatus;
+  tendency: ZiweiFengshuiTendency;
   summary: string;
-  currentObjects: string[];
+  predictedObjects: ZiweiFengshuiObjectPrediction[];
   natalEvidence: string[];
   timingEvidence: string[];
-  optimizationSteps: string[];
-  placementAdvice: ZiweiFengshuiPlacementAdvice;
-  avoid: string[];
+  enhancementAdvice: ZiweiFengshuiEnhancementAdvice;
+  contraindications: string[];
   evidenceChains: ZiweiFengshuiEvidence[];
 };
 
@@ -107,6 +122,7 @@ export const ZIWEI_FENGSHUI_FOCUS_OPTIONS: Array<{ key: ZiweiFengshuiFocus; labe
   { key: 'overall', label: '全盘' },
   { key: 'wealth', label: '财运' },
   { key: 'career', label: '事业' },
+  { key: 'social', label: '人际/交友' },
   { key: 'study', label: '学习' },
   { key: 'relationship', label: '感情' },
   { key: 'health', label: '健康' },
@@ -163,6 +179,7 @@ export function resolveZiweiFengshuiPeriod(
 const FOCUS_PALACE_CANDIDATES: Record<Exclude<ZiweiFengshuiFocus, 'overall'>, string[]> = {
   wealth: ['财帛宫', '福德宫', '田宅宫'],
   career: ['官禄宫', '命宫', '迁移宫'],
+  social: ['交友宫', '仆役宫', '兄弟宫', '官禄宫'],
   study: ['命宫', '父母宫', '官禄宫'],
   relationship: ['夫妻宫', '子女宫', '福德宫'],
   health: ['疾厄宫', '父母宫', '命宫'],
@@ -203,13 +220,39 @@ const readStringList = (value: unknown, field: string, options: { min?: number; 
   return list;
 };
 
-function readPlacementAdvice(value: unknown, field: string): ZiweiFengshuiPlacementAdvice {
+function readObjectPredictions(value: unknown, field: string): ZiweiFengshuiObjectPrediction[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 6) throw new Error(`${field}数量必须在2-6之间`);
+  return value.map((entry, index) => {
+    if (!isRecord(entry)) throw new Error(`${field}[${index}]格式无效`);
+    return {
+      item: readString(entry.item, `${field}[${index}].item`, 160),
+      state: readString(entry.state, `${field}[${index}].state`, 220),
+      basis: readString(entry.basis, `${field}[${index}].basis`, 300),
+    };
+  });
+}
+
+function readEnhancementAdvice(value: unknown, field: string): ZiweiFengshuiEnhancementAdvice {
   if (!isRecord(value)) throw new Error(`${field}格式无效`);
+  if (!Array.isArray(value.items) || value.items.length < 1 || value.items.length > 3) {
+    throw new Error(`${field}.items数量必须在1-3之间`);
+  }
   return {
-    item: readString(value.item, `${field}.item`, 160),
-    method: readString(value.method, `${field}.method`, 260),
-    reason: readString(value.reason, `${field}.reason`, 300),
-    avoidWhen: readStringList(value.avoidWhen, `${field}.avoidWhen`, { min: 1, max: 4, itemLength: 180 }),
+    goal: readString(value.goal, `${field}.goal`, 100),
+    supportingStar: readString(value.supportingStar, `${field}.supportingStar`, 120),
+    items: value.items.map((entry, index) => {
+      if (!isRecord(entry)) throw new Error(`${field}.items[${index}]格式无效`);
+      return {
+        item: readString(entry.item, `${field}.items[${index}].item`, 160),
+        material: readString(entry.material, `${field}.items[${index}].material`, 120),
+        color: readString(entry.color, `${field}.items[${index}].color`, 120),
+        quantity: readString(entry.quantity, `${field}.items[${index}].quantity`, 120),
+        symbolism: readString(entry.symbolism, `${field}.items[${index}].symbolism`, 260),
+      };
+    }),
+    placement: readString(value.placement, `${field}.placement`, 320),
+    activationLogic: readString(value.activationLogic, `${field}.activationLogic`, 420),
+    expectedEffect: readString(value.expectedEffect, `${field}.expectedEffect`, 260),
   };
 }
 
@@ -233,13 +276,13 @@ export function validateZiweiFengshuiGeneration(
     if (!expected) throw new Error(`模型返回未知宫位：${palaceName}`);
     if (seen.has(palaceName)) throw new Error(`模型重复返回宫位：${palaceName}`);
     seen.add(palaceName);
-    const status = value.status;
-    if (!ZIWEI_FENGSHUI_STATUSES.includes(status as ZiweiFengshuiStatus)) {
-      throw new Error(`${palaceName}的状态无效`);
+    const tendency = value.tendency;
+    if (!ZIWEI_FENGSHUI_TENDENCIES.includes(tendency as ZiweiFengshuiTendency)) {
+      throw new Error(`${palaceName}的物象倾向无效`);
     }
     const chainsRaw = value.evidenceChains;
-    if (!Array.isArray(chainsRaw) || chainsRaw.length < 1 || chainsRaw.length > 4) {
-      throw new Error(`${palaceName}的象意链数量必须在1-4之间`);
+    if (!Array.isArray(chainsRaw) || chainsRaw.length < 2 || chainsRaw.length > 4) {
+      throw new Error(`${palaceName}的象意链数量必须在2-4之间`);
     }
     const evidenceChains = chainsRaw.map((chain, chainIndex): ZiweiFengshuiEvidence => {
       if (!isRecord(chain)) throw new Error(`${palaceName}.evidenceChains[${chainIndex}]格式无效`);
@@ -259,14 +302,13 @@ export function validateZiweiFengshuiGeneration(
       direction: direction.direction,
       degreeRange: direction.degreeRange,
       centerDegree: direction.centerDegree,
-      status: status as ZiweiFengshuiStatus,
+      tendency: tendency as ZiweiFengshuiTendency,
       summary: readString(value.summary, `${palaceName}.summary`, 220),
-      currentObjects: readStringList(value.currentObjects, `${palaceName}.currentObjects`, { min: 2, max: 6 }),
+      predictedObjects: readObjectPredictions(value.predictedObjects, `${palaceName}.predictedObjects`),
       natalEvidence: readStringList(value.natalEvidence, `${palaceName}.natalEvidence`, { min: 1, max: 5 }),
       timingEvidence: readStringList(value.timingEvidence, `${palaceName}.timingEvidence`, { min: 0, max: 5 }),
-      optimizationSteps: readStringList(value.optimizationSteps, `${palaceName}.optimizationSteps`, { min: 1, max: 6 }),
-      placementAdvice: readPlacementAdvice(value.placementAdvice, `${palaceName}.placementAdvice`),
-      avoid: readStringList(value.avoid, `${palaceName}.avoid`, { min: 1, max: 4 }),
+      enhancementAdvice: readEnhancementAdvice(value.enhancementAdvice, `${palaceName}.enhancementAdvice`),
+      contraindications: readStringList(value.contraindications, `${palaceName}.contraindications`, { min: 1, max: 4 }),
       evidenceChains,
     };
   });
