@@ -1,5 +1,6 @@
 import { ChatModel } from '../lib/analysis-models';
 import { formatPromptCopyMessages, type PromptCopyMessage } from '../lib/chat-prompt-copy';
+import { friendlyChatError } from '../lib/chat-errors';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -11,6 +12,15 @@ type KnowledgeOptions = {
   board?: string;
   query?: string;
   topK?: number;
+};
+
+type StreamRequestOptions = {
+  timeoutMs?: number;
+  maxTokens?: number;
+  thinking?: 'enabled' | 'disabled';
+  responseFormat?: 'text' | 'json_object';
+  visualResponse?: boolean;
+  temperature?: number;
 };
 
 export type KnowledgeSourceSummary = {
@@ -136,72 +146,88 @@ export const sendMessageToDeepseekStream = async (
   message: string,
   onDelta: (state: StreamState) => void,
   knowledge?: KnowledgeOptions,
-  model?: ChatModel
+  model?: ChatModel,
+  requestOptions?: StreamRequestOptions,
 ): Promise<StreamState> => {
   if (chatMessages.length === 0) {
     throw new Error('Chat session not initialized. Please start a reading first.');
   }
 
+  const previousLength = chatMessages.length;
   chatMessages.push({ role: 'user', content: message });
 
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: chatMessages,
-      stream: true,
-      knowledge,
-      model,
-    }),
-  });
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: chatMessages,
+        stream: true,
+        knowledge,
+        model,
+        timeoutMs: requestOptions?.timeoutMs,
+        maxTokens: requestOptions?.maxTokens,
+        thinking: requestOptions?.thinking,
+        responseFormat: requestOptions?.responseFormat,
+        visualResponse: requestOptions?.visualResponse,
+        temperature: requestOptions?.temperature,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
-  }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
+    }
 
-  const knowledgeFailed = response.headers.get('X-Knowledge-Failed')
-    ? decodeURIComponent(response.headers.get('X-Knowledge-Failed')!)
-    : undefined;
-  const knowledgeSources = parseKnowledgeSourcesHeader(response.headers.get('X-Knowledge-Sources'));
+    const knowledgeFailed = response.headers.get('X-Knowledge-Failed')
+      ? decodeURIComponent(response.headers.get('X-Knowledge-Failed')!)
+      : undefined;
+    const knowledgeSources = parseKnowledgeSourcesHeader(response.headers.get('X-Knowledge-Sources'));
 
-  if (!response.body) {
-    const data = await response.json();
-    const content = data.content || '无法获取回复';
-    chatMessages.push({ role: 'assistant', content });
-    return {
-      reasoning: '',
-      content,
-      knowledgeFailed: data.knowledgeFailed ?? knowledgeFailed,
-      knowledgeSources: data.knowledgeSources ?? knowledgeSources,
-    };
-  }
+    if (!response.body) {
+      const data = await response.json();
+      const content = data.content || '无法获取回复';
+      chatMessages.push({ role: 'assistant', content });
+      return {
+        reasoning: '',
+        content,
+        knowledgeFailed: data.knowledgeFailed ?? knowledgeFailed,
+        knowledgeSources: data.knowledgeSources ?? knowledgeSources,
+      };
+    }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let reasoningText = '';
-  let contentText = '';
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let reasoningText = '';
+    let contentText = '';
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const chunks = buffer.split('\n\n');
-    buffer = chunks.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split('\n\n');
+      buffer = chunks.pop() || '';
 
-    for (const chunk of chunks) {
-      const lines = chunk.split('\n');
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue;
-        const payload = line.replace(/^data:\s?/, '').trim();
-        if (!payload || payload === '[DONE]') continue;
+      for (const chunk of chunks) {
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
+          const payload = line.replace(/^data:\s?/, '').trim();
+          if (!payload || payload === '[DONE]') continue;
 
-        try {
-          const json = JSON.parse(payload);
+          let json: Record<string, any>;
+          try {
+            json = JSON.parse(payload) as Record<string, any>;
+          } catch {
+            continue;
+          }
+          if (json.error) {
+            throw new Error(extractResponseError(JSON.stringify(json), 'AI 请求失败，请稍后重试'));
+          }
           const reasoningDelta = json.choices?.[0]?.delta?.reasoning_content ?? '';
           const contentDelta = json.choices?.[0]?.delta?.content ?? '';
           if (reasoningDelta) {
@@ -213,19 +239,20 @@ export const sendMessageToDeepseekStream = async (
           if (reasoningDelta || contentDelta) {
             onDelta({ reasoning: reasoningText, content: contentText });
           }
-        } catch {
-          // Ignore malformed SSE chunks.
         }
       }
     }
-  }
 
-  if (!reasoningText && !contentText) {
-    contentText = '无法获取回复';
-  }
+    if (!reasoningText && !contentText) {
+      throw new Error('AI 未返回有效内容，本次请求不会扣除点数，请稍后重试。');
+    }
 
-  chatMessages.push({ role: 'assistant', content: contentText });
-  return { reasoning: reasoningText, content: contentText, knowledgeFailed, knowledgeSources };
+    chatMessages.push({ role: 'assistant', content: contentText });
+    return { reasoning: reasoningText, content: contentText, knowledgeFailed, knowledgeSources };
+  } catch (error) {
+    chatMessages.length = previousLength;
+    throw new Error(friendlyChatError(error));
+  }
 };
 
 export const clearChatSession = () => {

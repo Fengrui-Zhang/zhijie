@@ -1,31 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --glass-bg: rgba(255, 253, 249, 0.82);
-  --glass-bg-strong: rgba(255, 253, 249, 0.92);
-  --glass-bg-soft: rgba(255, 255, 255, 0.68);
-  --glass-dark: rgba(27, 24, 22, 0.78);
-  --glass-border: rgba(231, 229, 228, 0.78);
-  --glass-border-soft: rgba(231, 229, 228, 0.7);
-  --glass-shadow: 0 8px 22px rgba(28, 25, 23, 0.055);
-  --glass-shadow-soft: 0 4px 14px rgba(28, 25, 23, 0.035);
-  --glass-highlight: rgba(255, 255, 255, 0.32);
+  color-scheme: light;
+  --canvas: #f5f3ef;
+  --canvas-deep: #eeebe5;
+  --ink: #211f1c;
+  --muted: #6f6a63;
+  --accent: #9a661e;
+  --accent-soft: #f4e8d2;
+  --focus-ring: rgba(180, 119, 31, 0.3);
+  --glass-bg: rgba(255, 254, 251, 0.78);
+  --glass-bg-strong: rgba(255, 254, 251, 0.92);
+  --glass-bg-soft: rgba(255, 255, 255, 0.57);
+  --glass-dark: rgba(31, 29, 26, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.76);
+  --glass-border-soft: rgba(255, 255, 255, 0.62);
+  --glass-shadow: 0 18px 50px rgba(42, 36, 28, 0.075), 0 2px 8px rgba(42, 36, 28, 0.035);
+  --glass-shadow-soft: 0 10px 32px rgba(42, 36, 28, 0.055);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --spring-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html {
-  background: linear-gradient(180deg, #f7f4ef 0%, #f1eee9 100%);
+  min-height: 100%;
+  background: var(--canvas);
+  scroll-behavior: smooth;
 }
 
 body {
   position: relative;
   min-height: 100vh;
-  font-family: 'Noto Serif SC', serif;
-  background: transparent;
-  color: #1c1917;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0.002em;
+  background:
+    radial-gradient(circle at 12% 4%, rgba(222, 184, 123, 0.16), transparent 30rem),
+    radial-gradient(circle at 92% 94%, rgba(171, 184, 181, 0.13), transparent 34rem),
+    linear-gradient(145deg, #f8f6f2 0%, var(--canvas) 48%, var(--canvas-deep) 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body::before,
@@ -58,37 +78,97 @@ body::after {
 .app-shell {
   position: relative;
   z-index: 1;
+  isolation: isolate;
+}
+
+.brand-title,
+.display-title {
+  font-family: "Songti SC", "STSong", "Noto Serif CJK SC", ui-serif, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.025em;
+}
+
+.app-shell button,
+.app-shell [role="button"],
+.app-shell a,
+.app-shell input,
+.app-shell select,
+.app-shell textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari zooms the page when a focused form control is smaller than 16px. */
+@media (max-width: 767px) {
+  .app-shell input,
+  .app-shell select,
+  .app-shell textarea {
+    font-size: 16px;
+  }
+}
+
+.app-shell button,
+.app-shell [role="button"],
+.app-shell a {
+  touch-action: manipulation;
+}
+
+.app-shell button:not(:disabled),
+.app-shell [role="button"],
+.app-shell a {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, filter;
+  transition-duration: 180ms;
+  transition-timing-function: var(--spring-ease);
+}
+
+.app-shell button:not(:disabled):active,
+.app-shell [role="button"]:active,
+.app-shell a:active {
+  transform: scale(0.975);
+  transition-duration: 90ms;
+}
+
+.app-shell :focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.app-shell button:disabled,
+.app-shell input:disabled,
+.app-shell select:disabled,
+.app-shell textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .glass-panel {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
 }
 
 .glass-panel-soft {
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border-soft);
   box-shadow: var(--glass-shadow-soft);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
 }
 
 .glass-panel-dark {
-  background: linear-gradient(135deg, rgba(41, 37, 36, 0.88), rgba(28, 25, 23, 0.72));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 26px rgba(28, 25, 23, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(145deg, rgba(45, 41, 36, 0.94), var(--glass-dark));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 34px rgba(28, 25, 23, 0.18), inset 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
 }
 
 .glass-topbar {
-  background: linear-gradient(135deg, rgba(24, 20, 18, 0.88), rgba(31, 27, 25, 0.72));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 6px 16px rgba(28, 25, 23, 0.12);
+  background: rgba(29, 27, 24, 0.88);
+  backdrop-filter: blur(26px) saturate(145%);
+  -webkit-backdrop-filter: blur(26px) saturate(145%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.09), 0 10px 30px rgba(28, 25, 23, 0.11);
 }
 
 .glass-banner {
@@ -98,17 +178,20 @@ body::after {
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(214, 211, 209, 0.78);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(168, 162, 158, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 1px 2px rgba(28, 25, 23, 0.025);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 .glass-input:focus {
   outline: none;
-  border-color: rgba(245, 158, 11, 0.72);
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18), 0 12px 26px rgba(28, 25, 23, 0.09);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(180, 119, 31, 0.68);
+  box-shadow: 0 0 0 4px var(--focus-ring), 0 10px 26px rgba(28, 25, 23, 0.07);
 }
 
 .glass-select {
@@ -141,19 +224,24 @@ body::after {
 }
 
 .glass-chip {
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(214, 211, 209, 0.64);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: none;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(168, 162, 158, 0.3);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .glass-cta {
-  background: linear-gradient(135deg, rgba(24, 20, 18, 0.9), rgba(41, 37, 36, 0.8));
-  border: 1px solid rgba(251, 191, 36, 0.36);
-  box-shadow: 0 20px 40px rgba(28, 25, 23, 0.18);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: linear-gradient(145deg, rgba(50, 45, 39, 0.97), rgba(29, 27, 24, 0.93));
+  border: 1px solid rgba(232, 196, 139, 0.28);
+  box-shadow: 0 12px 28px rgba(28, 25, 23, 0.16), inset 0 1px rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+.glass-cta:not(:disabled):hover {
+  box-shadow: 0 16px 34px rgba(28, 25, 23, 0.2), inset 0 1px rgba(255, 255, 255, 0.13);
+  filter: brightness(1.035);
 }
 
 .glass-chat-bg {
@@ -166,15 +254,59 @@ body::after {
 }
 
 .glass-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 .glass-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(120, 113, 108, 0.28);
+  background: rgba(120, 113, 108, 0.3);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+.materialize-in {
+  animation: materialize-in 320ms var(--spring-ease) both;
+  transform-origin: var(--material-origin, 50% 0%);
+}
+
+.mobile-sheet-in {
+  animation: mobile-sheet-in 360ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.mobile-scrim-in {
+  animation: mobile-scrim-in 220ms ease-out both;
+}
+
+@keyframes materialize-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes mobile-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes mobile-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .glass-scrollbar::-webkit-scrollbar-track {
@@ -194,3 +326,75 @@ body::after {
 .markdown-body th,
 .markdown-body td { border: 1px solid #e7e5e4; padding: 6px; text-align: left; }
 .markdown-body th { background-color: #f5f5f4; font-weight: bold; }
+
+@media (max-width: 767px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  .app-shell button,
+  .app-shell [role="button"] {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .materialize-in {
+    animation: none;
+  }
+
+  .mobile-sheet-in,
+  .mobile-scrim-in {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-panel-soft,
+  .glass-input,
+  .glass-chip {
+    background: #fffefa;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .glass-topbar,
+  .glass-panel-dark,
+  .glass-cta {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+
+  .mobile-sheet-in {
+    background: #fbfaf7;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass-panel,
+  .glass-panel-soft,
+  .glass-input,
+  .glass-chip {
+    background: #fff;
+    border-color: #78716c;
+  }
+
+  .app-shell :focus-visible {
+    outline-color: #7c2d12;
+  }
+}

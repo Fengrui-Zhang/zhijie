@@ -1,198 +1,193 @@
-
 import React from 'react';
-import { LiuyaoResponse, LiuyaoGuaInfo } from '../types';
+import type { LiuyaoResponse } from '../types';
 import { getWuxingColor } from '../utils/wuxing';
+import {
+  ChartMasthead,
+  ChartSectionTitle,
+  ChartSurface,
+  ElementBadge,
+  FourPillarsStrip,
+  HexagramLines,
+} from './DivinationVisualSystem';
 
-interface Props {
-  data: LiuyaoResponse;
-}
+interface Props { data: LiuyaoResponse }
 
-const YaoLine = ({ 
-  index, 
-  isYang, 
-  liuqin, 
-  liushen, 
-  isShi, 
-  isYing, 
-  fushen,
-  isBian,
-  bianLiuqin,
-  bianIsYang
-}: any) => {
-  const textColor = getWuxingColor(liuqin);
-  const bianColor = getWuxingColor(bianLiuqin);
-
-  return (
-    <div className="flex items-center gap-0 h-10 border-b border-white/50 last:border-0 hover:bg-white/45 transition-colors px-2">
-       {/* 1. Liushen (Six Gods) - Fixed width, always rendered to maintain structure */}
-       <div className="w-12 shrink-0 text-xs text-stone-500 font-bold text-center">
-          {liushen || ''}
-       </div>
-
-       {/* 2. Fushen (Hidden Spirit) */}
-       <div className="w-20 shrink-0 text-[10px] text-stone-400 text-right pr-2">
-         {fushen && (
-           <span className={`${getWuxingColor(fushen)}`}>{fushen}</span>
-         )}
-       </div>
-
-       {/* 3. Liuqin (Six Relatives) */}
-       <div className={`w-28 shrink-0 text-sm font-serif font-bold text-center ${textColor}`}>
-          {liuqin}
-       </div>
-
-       {/* 4. The Line Graphic (Main) */}
-       <div className="w-20 shrink-0 flex justify-center items-center px-1">
-          {isYang ? (
-            <div className="w-full h-3 bg-stone-800 rounded-sm"></div>
-          ) : (
-            <div className="w-full h-3 flex justify-between">
-              <div className="w-[45%] h-full bg-stone-800 rounded-sm"></div>
-              <div className="w-[45%] h-full bg-stone-800 rounded-sm"></div>
-            </div>
-          )}
-       </div>
-
-       {/* 5. Shi/Ying Marker */}
-       <div className="w-10 shrink-0 flex justify-center">
-          {isShi && <span className="text-[10px] bg-red-100/75 text-red-600 px-1 rounded font-bold border border-red-100/80">世</span>}
-          {isYing && <span className="text-[10px] bg-blue-50/75 text-blue-600 px-1 rounded font-bold border border-blue-100/80">应</span>}
-       </div>
-
-       {/* 6. Transformation Indicator */}
-       <div className="w-12 shrink-0 flex justify-center text-stone-300">
-          {isBian !== undefined ? '→' : ''}
-       </div>
-
-       {/* 7. Changed Line Graphic */}
-       {isBian !== undefined ? (
-         <div className="w-20 shrink-0 flex justify-center items-center px-1 opacity-80">
-            {bianIsYang ? (
-              <div className="w-full h-3 bg-stone-600 rounded-sm"></div>
-            ) : (
-              <div className="w-full h-3 flex justify-between">
-                <div className="w-[45%] h-full bg-stone-600 rounded-sm"></div>
-                <div className="w-[45%] h-full bg-stone-600 rounded-sm"></div>
-              </div>
-            )}
-         </div>
-       ) : (
-         <div className="w-20 shrink-0" />
-       )}
-
-       {/* 8. Changed Liuqin */}
-       {isBian !== undefined ? (
-         <div className={`w-28 shrink-0 text-sm font-serif text-center opacity-80 ${bianColor}`}>
-            {bianLiuqin}
-         </div>
-       ) : (
-         <div className="w-28 shrink-0" />
-       )}
+const LineGraphic = ({ isYang, muted = false, moving = false }: { isYang: boolean; muted?: boolean; moving?: boolean }) => {
+  const color = moving ? 'bg-red-600' : muted ? 'bg-stone-500' : 'bg-stone-800';
+  return isYang ? (
+    <div className={`h-2.5 w-full rounded-sm ${color}`} />
+  ) : (
+    <div className="flex h-2.5 w-full justify-between">
+      <div className={`h-full w-[43%] rounded-sm ${color}`} />
+      <div className={`h-full w-[43%] rounded-sm ${color}`} />
     </div>
   );
 };
+
+const ChangeArrow = ({ moving }: { moving: boolean }) => (
+  <svg viewBox="0 0 28 12" className={`mx-auto h-3 w-7 ${moving ? 'text-red-500' : 'text-stone-300'}`} fill="none" aria-hidden="true">
+    <path d="M1 6h23m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const GuaSummary = ({
+  label,
+  name,
+  gong,
+  mark,
+  moving,
+  muted = false,
+}: {
+  label: string;
+  name: string;
+  gong: string;
+  mark: string;
+  moving: number[];
+  muted?: boolean;
+}) => (
+  <div className={`flex items-center justify-center gap-4 px-4 py-4 ${muted ? 'bg-white/40' : 'bg-amber-50/48'}`}>
+    <div className="rounded-[16px] border border-stone-200/70 bg-white/72 p-3 shadow-sm"><HexagramLines mark={mark} moving={muted ? [] : moving} /></div>
+    <div className="text-left">
+      <div className="text-[9px] font-bold tracking-[0.2em] text-stone-400">{label}</div>
+      <div className={`mt-1 font-['STKaiti','KaiTi','Songti_SC','serif'] text-2xl font-bold ${getWuxingColor(name)}`}>{name}</div>
+      <div className="mt-0.5 text-[10px] text-stone-500">{gong}</div>
+    </div>
+  </div>
+);
 
 const LiuyaoGrid: React.FC<Props> = ({ data }) => {
   const { gua_info, sizhu_info, shensha_info, kongwang } = data;
   const ben = gua_info.bengua;
   const bian = gua_info.biangua;
-
-  // Prepare Lines Data (6 down to 1)
-  const lines = [6, 5, 4, 3, 2, 1].map(i => {
-    const key = `gua_yao${i}`;
-    // gua_mark 按初爻到上爻存储；当前表格从上爻往下画，因此需要取第 i 爻对应的索引 i-1。
-    const benIdx = i - 1;
-    const isYangBen = ben.gua_mark[benIdx] === '1'; 
-    const isYangBian = bian ? bian.gua_mark[benIdx] === '1' : undefined;
-
+  const pillars = ['year', 'month', 'day', 'hour'].map((key) => `${(sizhu_info as any)[`${key}_gan`] || ''}${(sizhu_info as any)[`${key}_zhi`] || ''}`);
+  const movingPositions = String(data.dongyao || '').split(/[,、\s]+/).map(Number).filter((value) => value >= 1 && value <= 6);
+  const lines = [6, 5, 4, 3, 2, 1].map((position) => {
+    const key = `gua_yao${position}`;
+    const index = position - 1;
+    const isYang = ben.gua_mark[index] === '1';
+    const changedYang = bian ? bian.gua_mark[index] === '1' : undefined;
     return {
-      index: i,
-      isYang: isYangBen,
-      isYangBian: isYangBian,
+      position,
+      isYang,
+      changedYang,
+      moving: Boolean(bian && isYang !== changedYang),
       liuqin: (ben.gua_yao_info.liuqin as any)[key],
       liushen: (ben.gua_yao_info.liushen as any)[key],
-      liuqinBian: bian ? (bian.gua_yao_info.liuqin as any)[key] : '',
-      isShi: ben.gua_yao_info.shiying.shi_yao_position === i.toString(),
-      isYing: ben.gua_yao_info.shiying.ying_yao_position === i.toString(),
-      fushen: ben.gua_yao_info.fushen?.has_fushen === '1' 
-        ? ben.gua_yao_info.fushen.fushen_arr.find(f => f.fushen_yao_position === i.toString())?.fushen 
-        : null
+      changedLiuqin: bian ? (bian.gua_yao_info.liuqin as any)[key] : '',
+      isShi: ben.gua_yao_info.shiying.shi_yao_position === String(position),
+      isYing: ben.gua_yao_info.shiying.ying_yao_position === String(position),
+      fushen: ben.gua_yao_info.fushen?.has_fushen === '1'
+        ? ben.gua_yao_info.fushen.fushen_arr.find((item) => item.fushen_yao_position === String(position))?.fushen
+        : '',
     };
   });
 
   return (
-    <div className="glass-panel glass-scrollbar w-full max-w-4xl mx-auto my-6 p-6 rounded-[30px] overflow-x-auto">
-      
-      {/* Header Info */}
-      <div className="glass-panel-soft flex flex-wrap justify-between items-center mb-6 p-3 rounded-[24px] text-sm text-stone-600 border border-white/60">
-         <div className="flex gap-6">
-            <span className="font-serif font-bold text-stone-800">{sizhu_info.year_gan}{sizhu_info.year_zhi}年 {sizhu_info.month_gan}{sizhu_info.month_zhi}月 {sizhu_info.day_gan}{sizhu_info.day_zhi}日</span>
-            <span className="font-bold text-red-700 bg-red-50/75 px-2 rounded border border-red-100/80">旬空: {kongwang}</span>
-         </div>
-         <div className="flex gap-4 text-xs font-semibold">
-            <span className="text-blue-700">驿马:{shensha_info.yima}</span>
-            <span className="text-pink-700">桃花:{shensha_info.taohua}</span>
-            <span className="text-amber-800">贵人:{shensha_info.guiren}</span>
-            <span className="text-emerald-800">日禄:{shensha_info.rilu}</span>
-         </div>
-      </div>
+    <div className="glass-panel mx-auto my-6 w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/75">
+      <div className="p-4 md:p-6">
+        <ChartMasthead
+          title="六爻纳甲"
+          subtitle={`${ben.gua_name}${bian ? ` → ${bian.gua_name}` : ''} · ${movingPositions.length ? `${movingPositions.join('、')}爻动` : '静卦'}`}
+          date={data.gongli}
+          meta={`${data.nongli} · 旬空 ${kongwang}`}
+          symbol="☵"
+        />
 
-      <div className="mx-auto w-fit min-w-[600px]">
-        <div className="mb-4 grid grid-cols-[48px_80px_112px_80px_40px_48px_80px_112px] items-end px-2">
-           <div className="col-start-3 col-span-2 text-center">
-              <div className="text-xs text-stone-400 font-bold uppercase mb-1">本卦</div>
-              <div className="font-bold text-2xl text-stone-800 border-b-2 border-stone-800 pb-1">{ben.gua_name}</div>
-              <div className="text-xs text-stone-500 mt-1">{ben.gua_gong}</div>
-           </div>
-           {bian && (
-              <div className="col-start-7 col-span-2 text-center">
-                <div className="text-xs text-stone-400 font-bold uppercase mb-1">变卦</div>
-                <div className="font-bold text-2xl text-stone-600 border-b-2 border-stone-400 pb-1">{bian.gua_name}</div>
-                <div className="text-xs text-stone-400 mt-1">{bian.gua_gong}</div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <FourPillarsStrip pillars={pillars} />
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              ['驿马', shensha_info.yima, '木'],
+              ['桃花', shensha_info.taohua, '火'],
+              ['贵人', shensha_info.guiren, '金'],
+              ['日禄', shensha_info.rilu, '水'],
+            ].map(([label, value, element]) => (
+              <div key={label} className="rounded-[15px] border border-stone-200/70 bg-white/52 px-2 py-2 text-center">
+                <div className="flex items-center justify-center gap-1 text-[9px] font-bold text-stone-400"><ElementBadge value={element} />{label}</div>
+                <div className={`mt-1 truncate font-['STKaiti','KaiTi','Songti_SC','serif'] text-base font-bold ${getWuxingColor(value)}`}>{value || '—'}</div>
               </div>
-           )}
+            ))}
+          </div>
         </div>
 
-        {/* Hexagram Lines Container */}
-        <div className="glass-panel-soft border border-white/60 rounded-[24px] overflow-hidden mb-6">
-           <div className="bg-white/45 flex text-[10px] font-bold text-stone-400 py-1 px-2 border-b border-white/60">
-              <div className="w-12 shrink-0 text-center">六神</div>
-              <div className="w-20 shrink-0 text-right pr-2">伏神</div>
-              <div className="w-28 shrink-0 text-center">本卦爻象</div>
-              <div className="w-20 shrink-0 text-center">卦画</div>
-              <div className="w-10 shrink-0 text-center">世应</div>
-              <div className="w-12 shrink-0 text-center">动</div>
-              <div className="w-20 shrink-0 text-center">变画</div>
-              <div className="w-28 shrink-0 text-center">变卦爻象</div>
+        <ChartSurface className="mt-5 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(249,239,210,0.62),rgba(255,255,255,0.46)_66%)]">
+          <ChartSectionTitle title="纳甲卦盘" note="六神 · 六亲 · 世应 · 动变" />
+          <div className="grid overflow-hidden rounded-[20px] border border-stone-200/70 md:grid-cols-[1fr_auto_1fr]">
+            <GuaSummary label="本卦" name={ben.gua_name} gong={ben.gua_gong} mark={ben.gua_mark} moving={movingPositions} />
+            <div className="flex h-10 items-center justify-center border-y border-stone-200/60 bg-white/32 md:h-auto md:w-12 md:border-x md:border-y-0">
+              <div className="rotate-90 md:rotate-0"><ChangeArrow moving={movingPositions.length > 0} /></div>
             </div>
-           {lines.map(line => (
-             <YaoLine
-               key={line.index}
-               index={line.index}
-               isYang={line.isYang}
-               liuqin={line.liuqin}
-               liushen={line.liushen}
-               isShi={line.isShi}
-               isYing={line.isYing}
-               fushen={line.fushen}
-               isBian={line.isYangBian}
-               bianLiuqin={line.liuqinBian}
-               bianIsYang={line.isYangBian}
-             />
-           ))}
-        </div>
-      </div>
+            {bian ? <GuaSummary label="变卦" name={bian.gua_name} gong={bian.gua_gong} mark={bian.gua_mark} moving={[]} muted /> : <div className="flex items-center justify-center bg-white/40 p-5 text-sm text-stone-400">静卦无变</div>}
+          </div>
 
-      <div className="glass-panel-soft mt-4 text-sm text-stone-600 bg-amber-50/65 p-4 rounded-[24px] border border-amber-100/80">
-         <div className="font-bold text-amber-900 mb-2 flex items-center gap-2">
-            <span className="text-lg">📜</span> 卦辞详情:
-         </div>
-         <div className="italic text-stone-700 leading-relaxed">"{ben.gua_qian}"</div>
-         <div className="mt-3 text-xs text-stone-500 border-t border-amber-200/50 pt-2">
-           <span className="font-bold">决策参考: </span>{ben.gua_description.gua_juece}
-         </div>
-      </div>
+          <div className="mt-4 space-y-2 md:hidden">
+            {lines.map((line) => {
+              const positionLabel = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻'][line.position - 1];
+              return (
+                <div
+                  key={line.position}
+                  className={`rounded-[16px] border px-3 py-2.5 ${line.moving ? 'border-red-200/80 bg-red-50/55' : 'border-stone-200/70 bg-white/54'}`}
+                >
+                  <div className="grid grid-cols-[42px_minmax(0,1fr)_36px] items-center gap-2.5">
+                    <div className="text-center">
+                      <div className="text-[9px] font-bold tracking-wide text-stone-400">{positionLabel}</div>
+                      <div className="mt-0.5 text-xs font-bold text-stone-600">{line.liushen}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <div className={`truncate font-['STKaiti','KaiTi','Songti_SC','serif'] text-sm font-bold ${getWuxingColor(line.liuqin)}`}>{line.liuqin}</div>
+                        {bian ? <div className={`truncate text-right font-['STKaiti','KaiTi','Songti_SC','serif'] text-xs ${getWuxingColor(line.changedLiuqin)}`}>变 · {line.changedLiuqin || '—'}</div> : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1"><LineGraphic isYang={line.isYang} moving={line.moving} /></div>
+                        {bian ? <>
+                          <ChangeArrow moving={line.moving} />
+                          <div className="w-[42%] min-w-0"><LineGraphic isYang={Boolean(line.changedYang)} muted moving={line.moving} /></div>
+                        </> : null}
+                      </div>
+                      {line.fushen ? <div className={`mt-1.5 truncate text-[9px] ${getWuxingColor(line.fushen)}`}>伏神 · {line.fushen}</div> : null}
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      {line.isShi ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">世</span> : null}
+                      {line.isYing ? <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">应</span> : null}
+                      {!line.isShi && !line.isYing ? <span className="text-[9px] text-stone-300">—</span> : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
+          <div className="glass-scrollbar mt-4 hidden overflow-x-auto rounded-[20px] border border-stone-200/70 bg-white/54 md:block">
+            <div className="min-w-[720px]">
+              <div className="grid grid-cols-[54px_92px_140px_100px_50px_54px_100px_140px] border-b border-stone-200/70 bg-white/48 px-2 py-2 text-center text-[9px] font-bold tracking-wider text-stone-400">
+                <div>六神</div><div>伏神</div><div>本卦爻象</div><div>卦画</div><div>世应</div><div>动</div><div>变画</div><div>变卦爻象</div>
+              </div>
+              {lines.map((line) => (
+                <div key={line.position} className={`grid min-h-12 grid-cols-[54px_92px_140px_100px_50px_54px_100px_140px] items-center border-b border-stone-200/60 px-2 text-center last:border-b-0 ${line.moving ? 'bg-red-50/45' : 'hover:bg-white/45'}`}>
+                  <div className="text-xs font-bold text-stone-600">{line.liushen}</div>
+                  <div className={`truncate text-[10px] ${getWuxingColor(line.fushen || '')}`}>{line.fushen || '—'}</div>
+                  <div className={`font-['STKaiti','KaiTi','Songti_SC','serif'] text-sm font-bold ${getWuxingColor(line.liuqin)}`}>{line.liuqin}</div>
+                  <div className="px-3"><LineGraphic isYang={line.isYang} moving={line.moving} /></div>
+                  <div className="flex justify-center gap-0.5">
+                    {line.isShi ? <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">世</span> : null}
+                    {line.isYing ? <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">应</span> : null}
+                  </div>
+                  <div>{bian ? <ChangeArrow moving={line.moving} /> : null}</div>
+                  <div className="px-3">{typeof line.changedYang === 'boolean' ? <LineGraphic isYang={line.changedYang} muted moving={line.moving} /> : null}</div>
+                  <div className={`font-['STKaiti','KaiTi','Songti_SC','serif'] text-sm ${getWuxingColor(line.changedLiuqin)}`}>{line.changedLiuqin || '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </ChartSurface>
+
+        <ChartSurface className="mt-5 border-amber-200/70 bg-amber-50/35">
+          <ChartSectionTitle title="卦辞与决策" note={ben.gua_xiongji || '本卦参断'} />
+          <div className="font-['STKaiti','KaiTi','Songti_SC','serif'] text-lg leading-8 text-stone-700">{ben.gua_qian}</div>
+          <div className="mt-3 border-t border-amber-200/60 pt-3 text-sm leading-7 text-stone-600"><span className="font-bold text-amber-900">决策参考：</span>{ben.gua_description.gua_juece}</div>
+        </ChartSurface>
+      </div>
     </div>
   );
 };

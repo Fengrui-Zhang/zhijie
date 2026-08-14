@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { GenericTaibuResponse } from '../types';
+import { DaliurenBoard, TaiyiBoard, XiaoliurenBoard } from './TraditionalDivinationBoards';
 
 type Props = {
   data: GenericTaibuResponse;
@@ -330,7 +331,6 @@ const AlmanacBlock = ({ data }: { data: any }) => {
 };
 
 const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => {
-  const [showFullText, setShowFullText] = React.useState(false);
   const baseEntries = Object.entries(data.base_info || {}).filter(([, value]) => value !== undefined && value !== '');
   const detail = data.detail_info || {};
   const fortune = (detail as any).fortune;
@@ -338,43 +338,30 @@ const GenericTaibuGrid: React.FC<Props> = ({ data, title = '排盘结果' }) => 
   const taiyi = (detail as any).taiyi;
   const xiaoliuren = (detail as any).xiaoliuren;
   const almanac = (detail as any).almanac;
+  const specializedBoard = daliuren
+    ? <DaliurenBoard data={data} />
+    : taiyi
+      ? <TaiyiBoard data={data} />
+      : xiaoliuren
+        ? <XiaoliurenBoard data={data} />
+        : null;
 
   return (
     <div className="space-y-4">
-      <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
+      {specializedBoard || <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-800">{title}</div>
           </div>
         </div>
         <EntryList entries={baseEntries} />
-      </div>
+      </div>}
 
-      <DaliurenBlock data={daliuren} />
-      <TaiyiBlock data={taiyi} />
-      <XiaoliurenBlock data={xiaoliuren} />
+      {!specializedBoard ? <DaliurenBlock data={daliuren} /> : null}
+      {!specializedBoard ? <TaiyiBlock data={taiyi} /> : null}
+      {!specializedBoard ? <XiaoliurenBlock data={xiaoliuren} /> : null}
       <AlmanacBlock data={almanac} />
       <FortuneBlock fortune={fortune} />
-
-      <div className="glass-panel-soft rounded-[28px] border border-white/60 p-5 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-bold text-stone-700">完整盘面文本</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowFullText((current) => !current)}
-            className="rounded-full border border-white/70 bg-white/60 px-3 py-1.5 text-xs font-bold text-stone-600 transition hover:bg-white"
-          >
-            {showFullText ? '收起' : '展开'}
-          </button>
-        </div>
-        {showFullText && (
-          <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-white/60 bg-white/65 p-4 text-sm leading-7 text-stone-700">
-            {data.taibuText || JSON.stringify(data.taibuJson || detail, null, 2)}
-          </pre>
-        )}
-      </div>
     </div>
   );
 };

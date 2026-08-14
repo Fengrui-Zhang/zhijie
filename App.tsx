@@ -39,6 +39,10 @@ import {
   type WuxingCalibration,
 } from './lib/bazi-wuxing-calibration';
 import {
+  BAZI_COMPATIBILITY_MAX_OUTPUT_TOKENS,
+  BAZI_COMPATIBILITY_TIMEOUT_MS,
+} from './lib/bazi-compatibility';
+import {
   appendCaseSpecialTag,
   BAZI_COMPATIBILITY_SESSION_TYPE,
   getBaziCompatibilityCaseIds,
@@ -73,6 +77,17 @@ import {
   buildZiweiAnalysisPrompt,
   buildZiweiSystemPrompt,
 } from './lib/ziwei-prompt';
+import {
+  ALMANAC_SYSTEM_PROMPT,
+  DAILY_FORTUNE_SYSTEM_PROMPT,
+  DALIUREN_SYSTEM_PROMPT,
+  LIUYAO_SYSTEM_PROMPT,
+  MEIHUA_SYSTEM_PROMPT,
+  MONTHLY_FORTUNE_SYSTEM_PROMPT,
+  QIMEN_SYSTEM_PROMPT,
+  TAIYI_SYSTEM_PROMPT,
+  XIAOLIUREN_SYSTEM_PROMPT,
+} from './lib/analysis-system-prompts';
 
 // Services
 import { 
@@ -120,7 +135,7 @@ import {
 // Components
 import QimenGrid from './components/QimenGrid';
 import BaziGrid from './components/BaziGrid';
-import ZiweiGrid from './components/ZiweiGrid';
+import ZiweiWorkspace, { type ZiweiWorkspaceTab } from './components/ZiweiWorkspace';
 import MeihuaGrid from './components/MeihuaGrid';
 import LiuyaoGrid from './components/LiuyaoGrid';
 import GenericTaibuGrid from './components/GenericTaibuGrid';
@@ -134,7 +149,10 @@ import MarkdownContent from './components/MarkdownContent';
 import { buildBirthPlaceText, findPlaceCoord } from './utils/locations';
 import { useBodyScrollLock } from './hooks/useBodyScrollLock';
 import { useDialogFocus } from './hooks/useDialogFocus';
+import { assertCompleteKlineResult, KLINE_REQUEST_OPTIONS } from './lib/kline-request';
 import HomeWorkspace from './components/HomeWorkspace';
+import AgentChatWorkspace from './components/agent/AgentChatWorkspace';
+import { useAgentChat, type AgentToolCard, type AgentTurnUsage } from './components/agent/useAgentChat';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
   ssr: false,
@@ -574,6 +592,7 @@ const buildBaziCompatibilityAnalysisPrompt = (compatData: BaziCompatibilityChart
     '要求：先分别提炼两人命局的核心特征、做功逻辑、情感表达方式与关系需求，再分析双方的匹配度、吸引点、冲突点、现实磨合重点与长期稳定性。',
     relationText ? `两人关系补充：${relationText}` : '两人关系补充：未提供明确关系，请按默认合盘逻辑分析。',
     '请不要只做抽象性格判断，要结合双方八字之间的实际互动来分析。',
+    '请控制在 2500–3500 个中文字左右：先给综合结论，再分别说明双方特点、匹配与吸引、冲突与风险、长期稳定性，最后给出可执行的相处建议。',
     '',
     `【${compatData.personAName}的八字命盘】`,
     formatBaziPrompt(compatData.personAChartData),
@@ -583,22 +602,42 @@ const buildBaziCompatibilityAnalysisPrompt = (compatData: BaziCompatibilityChart
   ].join('\n');
 };
 
-const buildBaziCompatibilitySystemInstruction = (compatData: BaziCompatibilityChartData) => {
+const buildBaziCompatibilitySystemInstruction = (
+  compatData: BaziCompatibilityChartData,
+  includeCharts = false,
+) => {
   return [
     '你是一位同时精通盲派八字与八字合盘分析的高级命理顾问。',
-    '回答时要先分别读取两人的命局，再做关系互动分析，避免只看单方命盘下结论。',
-    '',
-    `【${compatData.personAName}的八字系统上下文】`,
-    buildBaziSystemInstruction(compatData.personAChartData),
-    '',
-    `【${compatData.personBName}的八字系统上下文】`,
-    buildBaziSystemInstruction(compatData.personBChartData),
+    '你推命的核心逻辑是理法、象法、技法三位一体，重点观察八字如何通过做功表述人生与关系。',
+    '【共同分析方法】',
+    '1. 建立坐标：宾主与体用。日、时为主位（代表我、我的家、我的工具）；年、月为宾位（代表他人、外界、我面对的环境）。日主、印、禄、比劫为体，代表自己或所操纵的工具；财、官为用，代表目的与追求；食伤视情况而定，食神近体，伤官近用。',
+    '2. 核心分析：寻找做功方式。检查日干有无合财、合官或生食伤，以确定日干意向；观察日支是否参与刑、冲、克、穿、合、墓，日支不做功时再看禄神和比劫做功。分析干支是否成党成势，以强方制去弱方做功；判定制用、化用、生用、合用结构。丁亥、戊子、辛巳、壬午等干支自合属于合制做功，合则能去，效率极高。',
+    '3. 层次判定：效率与干净度。制得干净、做功效率高者层次高；制不干净、能量内耗或废神多者层次降低。虚实取象时，财星虚透主才华、口才而非必然主钱财；官星虚透主名气而非必然主权位。',
+    '4. 细节推断：穿、破与墓库。重点观察子未、丑午、卯辰、酉戌等相穿，识别防不胜防的伤害或穿倒的破坏性质。辰戌丑未不冲时为墓，冲开时为库，库需开才能发挥作用；日主坐下的印库或比劫库不宜被冲，财库和官库逢冲则开。',
+    '【合盘专项规则】',
+    '1. 先分别分析两人的命局核心、做功逻辑、情感表达和关系需求，再做交叉验证，不得只看单方。',
+    '2. 交叉核对双方日主、夫妻宫、十神映射、天干合克、地支合冲刑穿破害、强弱成势与双方做功方式，区分吸引、互补、制约、消耗和现实磨合。',
+    '3. 关系标签只是现实背景，不能倒推命理结论。若盘面不支持标签中的角色设定，必须明确指出。',
+    '4. 如双方信号不一致，分别说明依据、共同点与分歧，不强行制造高匹配或低匹配结论。',
+    '5. 严格基于排盘数据分析，不得臆测未知经历、性格或亲密行为。除非用户明确要求，不输出图表。',
+    includeCharts ? `\n【${compatData.personAName}的八字命盘】\n${formatBaziPrompt(compatData.personAChartData)}` : '',
+    includeCharts ? `\n【${compatData.personBName}的八字命盘】\n${formatBaziPrompt(compatData.personBChartData)}` : '',
   ].join('\n');
 };
 
 const buildBaziCompatibilityInitialUserContent = (compatData: BaziCompatibilityChartData) => {
   return `请为“${compatData.personAName}”与“${compatData.personBName}”做八字合盘分析。`;
 };
+
+const getCompatibilityStreamRequestOptions = (chartParams: Record<string, unknown>) => (
+  getProfessionalFeature(chartParams) === PROFESSIONAL_FEATURE_BAZI_COMPAT
+    ? {
+        timeoutMs: BAZI_COMPATIBILITY_TIMEOUT_MS,
+        maxTokens: BAZI_COMPATIBILITY_MAX_OUTPUT_TOKENS,
+        thinking: 'disabled' as const,
+      }
+    : undefined
+);
 
 const buildReportHeadAssets = () =>
   Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))
@@ -621,7 +660,39 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   knowledgeSources?: KnowledgeSourceSummary[];
+  agentMeta?: {
+    tools?: AgentToolCard[];
+    usage?: AgentTurnUsage;
+  };
 }
+
+const normalizeAgentMessageMeta = (value: unknown): ChatMessage['agentMeta'] => {
+  if (!value || typeof value !== 'object') return undefined;
+  const metadata = value as Record<string, unknown>;
+  const rawRuns = Array.isArray(metadata.toolRuns) ? metadata.toolRuns : [];
+  const tools: AgentToolCard[] = rawRuns.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const run = item as Record<string, unknown>;
+    const id = typeof run.id === 'string' ? run.id : '';
+    const toolName = typeof run.toolName === 'string' ? run.toolName : '';
+    if (!id || !toolName) return [];
+    return [{
+      id,
+      toolName,
+      label: toolName,
+      status: run.status === 'failed' ? 'failed' as const : 'completed' as const,
+      summary: typeof run.resultSummary === 'string' ? run.resultSummary : '',
+      detail: typeof run.divinationMode === 'string' ? `方式：${run.divinationMode}` : undefined,
+    }];
+  });
+  const aiCalls = Number(metadata.aiCalls);
+  const pointsUsed = Number(metadata.pointsUsed);
+  const remainingQuota = Number(metadata.remainingQuota);
+  const usage = Number.isFinite(aiCalls) && Number.isFinite(pointsUsed)
+    ? { aiCalls, pointsUsed, remainingQuota: Number.isFinite(remainingQuota) ? remainingQuota : 0 }
+    : undefined;
+  return tools.length || usage ? { tools, usage } : undefined;
+};
 
 type PersistedChatMessage = {
   role: string;
@@ -942,6 +1013,19 @@ const buildPersonalizationPrompt = (settings: PersonalizationSettings) => {
   return lines.length ? `【个性化偏好】\n${lines.join('\n')}` : '';
 };
 
+const buildCompatibilityPersonalizationPrompt = (settings: PersonalizationSettings) => {
+  const lines: string[] = [];
+  const identity = settings.identity.trim();
+  const customInstructions = settings.customInstructions.trim();
+  if (identity) lines.push(`用户身份：${identity}。`);
+  const expressionPrompt = EXPRESSION_STYLE_OPTIONS.find((item) => item.value === settings.expressionStyle)?.prompt;
+  if (expressionPrompt) lines.push(expressionPrompt);
+  const detailPrompt = CHART_DETAIL_OPTIONS.find((item) => item.value === settings.chartPromptDetailLevel)?.prompt;
+  if (detailPrompt) lines.push(detailPrompt);
+  if (customInstructions) lines.push(`自定义指令：${customInstructions}`);
+  return lines.length ? `【合盘表达偏好】\n${lines.join('\n')}` : '';
+};
+
 const SETTINGS_WORKSPACE_TABS: Array<{
   id: SettingsWorkspaceTab;
   label: string;
@@ -1216,7 +1300,6 @@ const buildLifeReadingAnalysisBundle = (
   question: string
 ) => {
   const trimmedQuestion = question.trim();
-  const currentTimeText = buildCurrentTimeText();
 
   if (mType === ModelType.BAZI) {
     const defaultBaziQuestion = "请分析此命造的性格、事业、财运、婚姻，并给出未来5-10年的大致运势点评。";
@@ -1231,7 +1314,7 @@ const buildLifeReadingAnalysisBundle = (
   }
 
   return {
-    prompt: buildZiweiAnalysisPrompt(cData as ZiweiResponse, trimmedQuestion, currentTimeText),
+    prompt: buildZiweiAnalysisPrompt(trimmedQuestion),
     systemInstruction: buildZiweiSystemInstruction(cData as ZiweiResponse),
     knowledgeQuery: trimmedQuestion,
   };
@@ -1333,7 +1416,7 @@ const buildSystemInstruction = (
     chartParams &&
     isBaziCompatibilityChartData(chartParams.compatibilityChartData)
   ) {
-    return buildBaziCompatibilitySystemInstruction(chartParams.compatibilityChartData);
+    return buildBaziCompatibilitySystemInstruction(chartParams.compatibilityChartData, true);
   }
 
   const snapshot = chartParams ? getSessionInitialAnalysisSnapshot(chartParams) : null;
@@ -1342,7 +1425,7 @@ const buildSystemInstruction = (
 
   switch (mType) {
     case ModelType.QIMEN:
-      return `你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。\n\n${formatQimenPrompt(cData as any, '')}`;
+      return `${QIMEN_SYSTEM_PROMPT}\n\n${formatQimenPrompt(cData as any, '')}`;
     case ModelType.BAZI:
       return appendInitialAnalysisContext(
         buildBaziSystemInstruction(cData as BaziResponse),
@@ -1354,21 +1437,21 @@ const buildSystemInstruction = (
         baseAnalysisContent
       );
     case ModelType.MEIHUA:
-      return `你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。\n\n${formatMeihuaPrompt(cData as any, '')}`;
+      return `${MEIHUA_SYSTEM_PROMPT}\n\n${formatMeihuaPrompt(cData as any, '')}`;
     case ModelType.LIUYAO:
-      return `你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。\n\n${formatLiuyaoPrompt(cData as any, '')}`;
+      return `${LIUYAO_SYSTEM_PROMPT}\n\n${formatLiuyaoPrompt(cData as any, '')}`;
     case ModelType.DALIUREN:
-      return `你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。\n\n${formatDaliurenPrompt(cData as GenericTaibuResponse, '')}`;
+      return `${DALIUREN_SYSTEM_PROMPT}\n\n${formatDaliurenPrompt(cData as GenericTaibuResponse, '')}`;
     case ModelType.TAIYI:
-      return `你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。\n\n${formatTaiyiPrompt(cData as GenericTaibuResponse, '')}`;
+      return `${TAIYI_SYSTEM_PROMPT}\n\n${formatTaiyiPrompt(cData as GenericTaibuResponse, '')}`;
     case ModelType.XIAOLIUREN:
-      return `你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。\n\n${formatXiaoliurenPrompt(cData as GenericTaibuResponse, '')}`;
+      return `${XIAOLIUREN_SYSTEM_PROMPT}\n\n${formatXiaoliurenPrompt(cData as GenericTaibuResponse, '')}`;
     case ModelType.ALMANAC:
-      return `你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。\n\n${formatAlmanacPrompt(cData as GenericTaibuResponse, '')}`;
+      return `${ALMANAC_SYSTEM_PROMPT}\n\n${formatAlmanacPrompt(cData as GenericTaibuResponse, '')}`;
     case ModelType.DAILY_FORTUNE:
-      return `你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。\n\n${formatDailyFortunePrompt(cData as GenericTaibuResponse, '')}`;
+      return `${DAILY_FORTUNE_SYSTEM_PROMPT}\n\n${formatDailyFortunePrompt(cData as GenericTaibuResponse, '')}`;
     case ModelType.MONTHLY_FORTUNE:
-      return `你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。\n\n${formatMonthlyFortunePrompt(cData as GenericTaibuResponse, '')}`;
+      return `${MONTHLY_FORTUNE_SYSTEM_PROMPT}\n\n${formatMonthlyFortunePrompt(cData as GenericTaibuResponse, '')}`;
     default:
       return '';
   }
@@ -1466,7 +1549,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatQimenPrompt(cData as QimenResponse, question),
-      systemInstruction: "你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。",
+      systemInstruction: QIMEN_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1476,7 +1559,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatMeihuaPrompt(cData as MeihuaResponse, question),
-      systemInstruction: "你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。",
+      systemInstruction: MEIHUA_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1486,7 +1569,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatDaliurenPrompt(cData as GenericTaibuResponse, question),
-      systemInstruction: "你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。",
+      systemInstruction: DALIUREN_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1496,7 +1579,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatTaiyiPrompt(cData as GenericTaibuResponse, question),
-      systemInstruction: "你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。",
+      systemInstruction: TAIYI_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1506,7 +1589,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatXiaoliurenPrompt(cData as GenericTaibuResponse, question),
-      systemInstruction: "你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。",
+      systemInstruction: XIAOLIUREN_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1516,7 +1599,7 @@ const buildInitialAnalysisBundle = (
     return {
       question,
       prompt: formatAlmanacPrompt(cData as GenericTaibuResponse, question),
-      systemInstruction: "你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。",
+      systemInstruction: ALMANAC_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1530,8 +1613,8 @@ const buildInitialAnalysisBundle = (
         ? formatMonthlyFortunePrompt(cData as GenericTaibuResponse, question)
         : formatDailyFortunePrompt(cData as GenericTaibuResponse, question),
       systemInstruction: isMonthly
-        ? "你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。"
-        : "你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。",
+        ? MONTHLY_FORTUNE_SYSTEM_PROMPT
+        : DAILY_FORTUNE_SYSTEM_PROMPT,
       knowledgeQuery: question,
       userContent: buildInitialUserContent(mType, chartParams, question),
     };
@@ -1540,7 +1623,7 @@ const buildInitialAnalysisBundle = (
   return {
     question,
     prompt: formatLiuyaoPrompt(cData as LiuyaoResponse, question),
-    systemInstruction: "你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。",
+    systemInstruction: LIUYAO_SYSTEM_PROMPT,
     knowledgeQuery: question,
     userContent: buildInitialUserContent(mType, chartParams, question),
   };
@@ -1692,6 +1775,7 @@ const App: React.FC<AppProps> = ({
   const [standaloneCaseSelectValue, setStandaloneCaseSelectValue] = useState('');
   const [standaloneSelectedSessionIds, setStandaloneSelectedSessionIds] = useState<string[]>([]);
   const [standaloneSessionSelectValue, setStandaloneSessionSelectValue] = useState('');
+  const agentChat = useAgentChat();
   const [settingsWorkspaceTab, setSettingsWorkspaceTab] = useState<SettingsWorkspaceTab>(
     initialSettingsTab === 'charts' || initialSettingsTab === 'knowledge' ? 'general' : initialSettingsTab
   );
@@ -1763,8 +1847,13 @@ const App: React.FC<AppProps> = ({
     }
   }, []);
 
-  const applyPersonalizationToSystemInstruction = useCallback((systemInstruction: string) => {
-    const prompt = buildPersonalizationPrompt(personalizationSettings);
+  const applyPersonalizationToSystemInstruction = useCallback((
+    systemInstruction: string,
+    chartParams?: Record<string, unknown>,
+  ) => {
+    const prompt = chartParams && getProfessionalFeature(chartParams) === PROFESSIONAL_FEATURE_BAZI_COMPAT
+      ? buildCompatibilityPersonalizationPrompt(personalizationSettings)
+      : buildPersonalizationPrompt(personalizationSettings);
     return prompt ? [systemInstruction, prompt].filter(Boolean).join('\n\n') : systemInstruction;
   }, [personalizationSettings]);
 
@@ -1826,6 +1915,7 @@ const App: React.FC<AppProps> = ({
   const [klineProgress, setKlineProgress] = useState(0);
   const [klineYearProgress, setKlineYearProgress] = useState(0);
   const [baziResultTab, setBaziResultTab] = useState<'basic' | 'professional' | 'ai' | 'notes'>('basic');
+  const [ziweiResultTab, setZiweiResultTab] = useState<ZiweiWorkspaceTab>('professional');
   const hasBlockingOverlayOpen = Boolean(activeCompactPanel) ||
     desktopHistoryOpen ||
     showAuth ||
@@ -2902,12 +2992,13 @@ const App: React.FC<AppProps> = ({
 
       if (data.modelType === 'chat') {
         const msgs: ChatMessage[] = (data.messages || []).map(
-          (m: { id: string; role: string; content: string; createdAt: string; knowledgeSources?: KnowledgeSourceSummary[] }) => ({
+          (m: { id: string; role: string; content: string; createdAt: string; knowledgeSources?: KnowledgeSourceSummary[]; metadata?: unknown }) => ({
             id: m.id,
             role: m.role as 'user' | 'model',
             content: m.content,
             timestamp: new Date(m.createdAt),
             knowledgeSources: Array.isArray(m.knowledgeSources) ? m.knowledgeSources : undefined,
+            agentMeta: normalizeAgentMessageMeta(m.metadata),
           })
         );
         clearChatSession();
@@ -3022,7 +3113,10 @@ const App: React.FC<AppProps> = ({
           (data.chartParams || {}) as Record<string, unknown>
         );
         restoreChatSession(
-          applyPersonalizationToSystemInstruction(systemInstruction),
+          applyPersonalizationToSystemInstruction(
+            systemInstruction,
+            (data.chartParams || {}) as Record<string, unknown>,
+          ),
           msgs.map(m => ({ role: m.role, content: m.content }))
         );
       }
@@ -3144,7 +3238,7 @@ const App: React.FC<AppProps> = ({
         storedSession.chartParams || {}
       );
       restoreChatSession(
-        applyPersonalizationToSystemInstruction(systemInstruction),
+        applyPersonalizationToSystemInstruction(systemInstruction, storedSession.chartParams || {}),
         msgs.map((msg) => ({ role: msg.role, content: msg.content }))
       );
     }
@@ -3948,6 +4042,7 @@ const App: React.FC<AppProps> = ({
     setStandaloneSessionSelectValue('');
     setStandaloneSessionId(null);
     setActiveSessionId(null);
+    agentChat.reset();
   };
 
   const buildStandaloneChatPromptCopyText = async () => {
@@ -4009,7 +4104,10 @@ const App: React.FC<AppProps> = ({
     event?.preventDefault();
     const content = standaloneChatInput.trim();
     if (!content || standaloneChatLoading) return;
-    if (requireLoginIfGuestModeDisabled()) return;
+    if (!isLoggedIn) {
+      setShowAuth(true);
+      return;
+    }
     setStandaloneChatError('');
     setStandaloneChatInput('');
     const userMsg: ChatMessage = {
@@ -4022,6 +4120,42 @@ const App: React.FC<AppProps> = ({
     setStandaloneChatMessages(nextMessages);
     setStandaloneChatLoading(true);
     try {
+      try {
+        const agentResult = await agentChat.runTurn({
+          sessionId: standaloneSessionId,
+          message: content,
+          selectedCaseIds: standaloneSelectedCaseIds,
+          selectedSessionIds: standaloneSelectedSessionIds,
+          knowledgeEnabled: standaloneChatUseKnowledge,
+          personalizationPrompt: buildPersonalizationPrompt(personalizationSettings),
+        });
+        const modelMsg: ChatMessage = {
+          id: `agent-m-${agentResult.turnId}`,
+          role: 'model',
+          content: agentResult.content,
+          timestamp: new Date(),
+          agentMeta: {
+            tools: agentResult.tools,
+            usage: {
+              aiCalls: agentResult.aiCalls,
+              pointsUsed: agentResult.pointsUsed,
+              remainingQuota: agentResult.remainingQuota,
+            },
+          },
+        };
+        setStandaloneChatMessages((prev) => [...prev, modelMsg]);
+        setStandaloneSessionId(agentResult.sessionId);
+        setActiveSessionId(agentResult.sessionId);
+        setUserQuota(agentResult.remainingQuota);
+        await fetchSessions();
+        return;
+      } catch (agentError) {
+        const code = agentError && typeof agentError === 'object' && 'code' in agentError
+          ? String((agentError as { code?: unknown }).code || '')
+          : '';
+        if (code !== 'AGENT_DISABLED') throw agentError;
+      }
+
       const selectedCases = standaloneSelectedCaseIds
         .map((id) => standaloneCaseOptions.find((item) => item.id === id))
         .filter((item): item is CaseItem => Boolean(item));
@@ -4526,7 +4660,7 @@ const App: React.FC<AppProps> = ({
         setActiveSessionId(currentSessionId);
       }
 
-      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction, sessionChartParams));
 
       const userMsg: ChatMessage = {
         id: 'joint-init-u',
@@ -4779,7 +4913,7 @@ const App: React.FC<AppProps> = ({
         setActiveSessionId(currentSessionId);
       }
 
-      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction));
+      await startQimenChat(applyPersonalizationToSystemInstruction(systemInstruction, sessionChartParams));
 
       const userMsg: ChatMessage = {
         id: 'compat-init-u',
@@ -4800,7 +4934,12 @@ const App: React.FC<AppProps> = ({
           updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
         },
         undefined,
-        analysisModel
+        analysisModel,
+        {
+          timeoutMs: BAZI_COMPATIBILITY_TIMEOUT_MS,
+          maxTokens: BAZI_COMPATIBILITY_MAX_OUTPUT_TOKENS,
+          thinking: 'disabled',
+        }
       );
 
       const finalAnswer = appendDisclaimer(finalState.content);
@@ -5972,7 +6111,7 @@ const App: React.FC<AppProps> = ({
             };
             resultData = await fetchQimen(qimenParams);
           }
-          systemInstruction = "你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。";
+          systemInstruction = QIMEN_SYSTEM_PROMPT;
           break;
         case ModelType.BAZI:
           resultData = await fetchBazi(baseParams);
@@ -5984,35 +6123,35 @@ const App: React.FC<AppProps> = ({
           break;
         case ModelType.MEIHUA:
           resultData = await fetchMeihua(baseParams);
-          systemInstruction = "你是梅花易数占卜师。请基于本卦、互卦、变卦及动爻，直断吉凶成败。";
+          systemInstruction = MEIHUA_SYSTEM_PROMPT;
           break;
         case ModelType.LIUYAO:
           resultData = await fetchLiuyao(baseParams);
-          systemInstruction = "你是六爻纳甲预测专家。请基于卦象、六亲、世应、六神及神煞空亡，详细推断吉凶、应期及建议。";
+          systemInstruction = LIUYAO_SYSTEM_PROMPT;
           break;
         case ModelType.DALIUREN:
           resultData = await fetchDaliuren(baseParams);
-          systemInstruction = "你是大六壬预测专家。请基于四课三传、天将、课体与神煞解答问题。";
+          systemInstruction = DALIUREN_SYSTEM_PROMPT;
           break;
         case ModelType.TAIYI:
           resultData = await fetchTaiyi(baseParams);
-          systemInstruction = "你是太乙神数预测专家。请基于太乙盘面与局式信号解答问题。";
+          systemInstruction = TAIYI_SYSTEM_PROMPT;
           break;
         case ModelType.XIAOLIUREN:
           resultData = await fetchXiaoliuren(baseParams);
-          systemInstruction = "你是小六壬预测师。请基于六宫课体和所问事项给出直接判断。";
+          systemInstruction = XIAOLIUREN_SYSTEM_PROMPT;
           break;
         case ModelType.ALMANAC:
           resultData = await fetchAlmanac(baseParams);
-          systemInstruction = "你是黄历择日顾问。请结合日课、宜忌、神煞与用户事项给出择日建议。";
+          systemInstruction = ALMANAC_SYSTEM_PROMPT;
           break;
         case ModelType.DAILY_FORTUNE:
           resultData = await fetchDailyFortune(baseParams);
-          systemInstruction = "你是命理运势顾问。请结合每日运势盘面给出当天建议，不输出重要日期提醒。";
+          systemInstruction = DAILY_FORTUNE_SYSTEM_PROMPT;
           break;
         case ModelType.MONTHLY_FORTUNE:
           resultData = await fetchMonthlyFortune(baseParams);
-          systemInstruction = "你是命理运势顾问。请结合每月运势盘面给出本月建议，不输出重要日期提醒。";
+          systemInstruction = MONTHLY_FORTUNE_SYSTEM_PROMPT;
           break;
       }
 
@@ -6202,7 +6341,7 @@ const App: React.FC<AppProps> = ({
     clearChatSession();
 
     try {
-      await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
+      await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction, activeChartParams));
 
       const userMsg: ChatMessage = {
         id: 'rerun-u',
@@ -6230,7 +6369,8 @@ const App: React.FC<AppProps> = ({
           updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
         },
         knowledge,
-        analysisModel
+        analysisModel,
+        getCompatibilityStreamRequestOptions(activeChartParams)
       );
 
       if (finalState.knowledgeFailed) {
@@ -6350,7 +6490,7 @@ const App: React.FC<AppProps> = ({
           chatHistory
         );
         clearChatSession();
-        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
+        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction, activeChartParams));
         prompt = bundle.prompt;
         knowledgeQuery = bundle.knowledgeQuery || bundle.question;
         nextMessagesBase = [
@@ -6364,7 +6504,10 @@ const App: React.FC<AppProps> = ({
       } else {
         const prefixHistory = chatHistory.slice(0, userIndex);
         restoreChatSession(
-          applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, chartData, activeChartParams)),
+          applyPersonalizationToSystemInstruction(
+            buildSystemInstruction(modelType, chartData, activeChartParams),
+            activeChartParams,
+          ),
           prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
         );
         prompt = chatHistory[userIndex].content;
@@ -6394,7 +6537,8 @@ const App: React.FC<AppProps> = ({
           updateChatMessage(messageId, buildModelContent(state.reasoning, state.content));
         },
         knowledge,
-        lockedModel
+        lockedModel,
+        getCompatibilityStreamRequestOptions(activeChartParams)
       );
 
       if (finalState.knowledgeFailed) {
@@ -6509,7 +6653,7 @@ const App: React.FC<AppProps> = ({
           analysisModel: lockedModel,
         };
         clearChatSession();
-        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction));
+        await startQimenChat(applyPersonalizationToSystemInstruction(bundle.systemInstruction, activeChartParams));
         prompt = bundle.prompt;
         knowledgeQuery = bundle.knowledgeQuery || bundle.question || editedContent;
         nextMessagesBase = [editedUserMessage];
@@ -6518,7 +6662,10 @@ const App: React.FC<AppProps> = ({
       } else {
         const prefixHistory = chatHistory.slice(0, userIndex);
         restoreChatSession(
-          applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, chartData, activeChartParams)),
+          applyPersonalizationToSystemInstruction(
+            buildSystemInstruction(modelType, chartData, activeChartParams),
+            activeChartParams,
+          ),
           prefixHistory.map((msg) => ({ role: msg.role, content: msg.content }))
         );
         prompt = editedContent;
@@ -6549,7 +6696,8 @@ const App: React.FC<AppProps> = ({
           updateChatMessage(replyId, buildModelContent(state.reasoning, state.content));
         },
         knowledge,
-        lockedModel
+        lockedModel,
+        getCompatibilityStreamRequestOptions(activeChartParams)
       );
 
       if (finalState.knowledgeFailed) {
@@ -6674,7 +6822,8 @@ const App: React.FC<AppProps> = ({
           updateChatMessage(modelId, buildModelContent(state.reasoning, state.content));
         },
         knowledge,
-        analysisModel
+        analysisModel,
+        getCompatibilityStreamRequestOptions(activeChartParams)
       );
       if (finalState.knowledgeFailed) {
         setKnowledgeHint(finalState.knowledgeFailed);
@@ -7282,7 +7431,7 @@ const App: React.FC<AppProps> = ({
       setBaziInitialAnalysis(initializationAnalysis);
 
       const prompt = buildKlinePrompt(chartData as BaziResponse, initializationAnalysis);
-      await startQimenChat(applyPersonalizationToSystemInstruction(buildKlineSystemInstruction()));
+      await startQimenChat(buildKlineSystemInstruction());
       const finalState = await sendMessageToDeepseekStream(prompt, (state) => {
         const matches = state.content.match(/"year"\s*:\s*\d{4}/g) || [];
         const years = new Set(matches.map((m) => m.replace(/[^0-9]/g, '')));
@@ -7292,7 +7441,7 @@ const App: React.FC<AppProps> = ({
           setKlineYearProgress(count);
           setKlineProgress(Math.min(99, Math.round((count / 70) * 100)));
         }
-      }, undefined, KLINE_CHAT_MODEL);
+      }, undefined, KLINE_CHAT_MODEL, KLINE_REQUEST_OPTIONS);
       let parsed: KlineResult | null = null;
       try {
         parsed = parseKlineResult(finalState.content);
@@ -7302,15 +7451,30 @@ const App: React.FC<AppProps> = ({
         } catch {
           try {
             const repairPrompt = buildKlineRepairPrompt(finalState.content);
-            const repaired = await sendMessageToDeepseekStream(repairPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
+            await startQimenChat(buildKlineSystemInstruction());
+            const repaired = await sendMessageToDeepseekStream(
+              repairPrompt,
+              () => {},
+              undefined,
+              KLINE_CHAT_MODEL,
+              KLINE_REQUEST_OPTIONS,
+            );
             parsed = parseKlineResult(sanitizeKlineJson(repaired.content));
           } catch {
             const strictPrompt = buildKlinePromptStrict(chartData as BaziResponse);
-            const retryState = await sendMessageToDeepseekStream(strictPrompt, () => {}, undefined, KLINE_CHAT_MODEL);
+            await startQimenChat(buildKlineSystemInstruction());
+            const retryState = await sendMessageToDeepseekStream(
+              strictPrompt,
+              () => {},
+              undefined,
+              KLINE_CHAT_MODEL,
+              KLINE_REQUEST_OPTIONS,
+            );
             parsed = parseKlineResult(sanitizeKlineJson(retryState.content));
           }
         }
       }
+      assertCompleteKlineResult(parsed);
       const normalized = normalizeKlineResult(parsed as KlineResult);
       setKlineResult(normalized);
       setKlineProgress(100);
@@ -7388,7 +7552,7 @@ const App: React.FC<AppProps> = ({
     return buildPromptCopyText([
       {
         role: 'system',
-        content: applyPersonalizationToSystemInstruction(bundle.systemInstruction),
+        content: applyPersonalizationToSystemInstruction(bundle.systemInstruction, activeChartParams),
       },
       {
         role: 'user',
@@ -7428,7 +7592,7 @@ const App: React.FC<AppProps> = ({
     return buildPromptCopyText([
       {
         role: 'system',
-        content: applyPersonalizationToSystemInstruction(buildKlineSystemInstruction()),
+        content: buildKlineSystemInstruction(),
       },
       {
         role: 'user',
@@ -7806,7 +7970,7 @@ const App: React.FC<AppProps> = ({
 
   if (authStatus === 'loading') {
     return (
-      <div className="app-shell min-h-screen bg-stone-50 text-stone-800 font-serif" aria-busy="true" aria-label="正在载入元分智解">
+      <div className="app-shell min-h-screen text-stone-800" aria-busy="true" aria-label="正在载入元分智解">
         <header className="glass-topbar h-[61px] border-b border-amber-500/40" />
         <div className="mx-auto grid w-full max-w-[1500px] gap-6 px-4 py-6 xl:grid-cols-[236px_minmax(0,1fr)]">
           <div className="hidden h-[calc(100vh-110px)] animate-pulse rounded-2xl bg-white/65 xl:block" />
@@ -8349,6 +8513,58 @@ const App: React.FC<AppProps> = ({
         </button>
       </form>
     </ChatWorkspace>
+  );
+
+  const renderAgentChatWorkspace = () => (
+    <AgentChatWorkspace
+      messages={standaloneChatMessages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        agentMeta: message.agentMeta,
+      }))}
+      input={standaloneChatInput}
+      loading={standaloneChatLoading}
+      error={standaloneChatError}
+      statusText={agentChat.statusText}
+      liveTools={agentChat.tools}
+      liveUsage={agentChat.usage}
+      contextOpen={standaloneContextOpen}
+      knowledgeEnabled={standaloneChatUseKnowledge}
+      selectedCases={standaloneSelectedCases.map((item) => ({
+        id: item.id,
+        title: getCaseDisplayName(item),
+        modelLabel: getCaseModelDisplayLabel(item.modelType),
+      }))}
+      availableCases={standaloneAvailableCaseOptions.map((item) => ({
+        id: item.id,
+        title: getCaseDisplayName(item),
+        modelLabel: getCaseModelDisplayLabel(item.modelType),
+      }))}
+      selectedSessions={standaloneSelectedSessions.map((item) => ({
+        id: item.id,
+        title: item.title,
+        modelLabel: MODEL_LABELS[item.modelType] || item.modelType,
+      }))}
+      availableSessions={standaloneAvailableSessionOptions.map((item) => ({
+        id: item.id,
+        title: item.title,
+        modelLabel: MODEL_LABELS[item.modelType] || item.modelType,
+      }))}
+      caseSelectValue={standaloneCaseSelectValue}
+      sessionSelectValue={standaloneSessionSelectValue}
+      copied={copiedPromptKey === 'standalone-chat'}
+      onInputChange={setStandaloneChatInput}
+      onSubmit={(event) => void handleStandaloneChatSubmit(event)}
+      onNewChat={handleNewStandaloneChat}
+      onToggleContext={() => setStandaloneContextOpen((current) => !current)}
+      onToggleKnowledge={() => setStandaloneChatUseKnowledge((current) => !current)}
+      onSelectCase={handleSelectStandaloneCaseReference}
+      onRemoveCase={handleRemoveStandaloneCaseReference}
+      onSelectSession={handleSelectStandaloneSessionReference}
+      onRemoveSession={handleRemoveStandaloneSessionReference}
+      onCopyPrompt={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat'))}
+    />
   );
 
   const renderSettingsWorkspace = () => (
@@ -9360,19 +9576,22 @@ const App: React.FC<AppProps> = ({
   );
 
   return (
-    <div className="app-shell min-h-screen flex flex-col text-stone-800 font-serif">
+    <div className="app-shell min-h-screen flex flex-col text-stone-800">
       {/* Header */}
-      <header className="glass-topbar text-stone-100 py-4 px-4 border-b border-amber-500/40 sticky top-0 z-20">
-        <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-2">
+      <header className="glass-topbar sticky top-0 z-20 border-b border-white/10 px-3 py-2.5 text-stone-100 md:px-5">
+        <div className="mx-auto flex min-h-10 w-full max-w-[1500px] items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl md:text-2xl font-bold tracking-wider">元分 · 智解</h1>
+            <span className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-amber-200/20 bg-white/10 text-amber-100 shadow-inner" aria-hidden="true"><TaijiIcon className="h-6 w-6" /></span>
+            <div>
+              <h1 className="brand-title text-lg font-bold leading-none text-stone-50 md:text-xl">元分 · 智解</h1>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5 md:gap-2">
             {isLoggedIn && workspaceView === 'divination' && (
               <button
                 type="button"
                 onClick={() => setDesktopHistoryOpen(true)}
-                className="hidden rounded-full border border-stone-600/60 px-3 py-1.5 text-xs text-stone-200 transition hover:border-stone-400 hover:text-white xl:inline-flex 2xl:hidden"
+                className="hidden min-h-9 items-center rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-stone-200 hover:border-white/25 hover:bg-white/10 hover:text-white xl:inline-flex 2xl:hidden"
               >
                 分析记录
               </button>
@@ -9381,7 +9600,7 @@ const App: React.FC<AppProps> = ({
               <button
                 type="button"
                 onClick={() => setShowUserMenu(true)}
-                className="text-[10px] px-2 py-1 rounded border border-stone-600/60 text-stone-300 hover:text-white hover:border-stone-400 transition"
+                className="min-h-9 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-stone-200 hover:border-white/25 hover:bg-white/10 hover:text-white"
               >
                 {authSession?.user?.name || '用户'}{typeof userQuota === 'number' ? ` · ${userQuota}点` : ''}
               </button>
@@ -9389,7 +9608,7 @@ const App: React.FC<AppProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAuth(true)}
-                className="text-[10px] px-2 py-1 rounded border border-amber-500/60 text-amber-300 hover:text-amber-200 hover:border-amber-400 transition"
+                className="min-h-9 rounded-full border border-amber-300/30 bg-amber-200/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:border-amber-300/50 hover:bg-amber-200/15 hover:text-amber-100"
               >
                 {authEntryLabel}
               </button>
@@ -9430,17 +9649,22 @@ const App: React.FC<AppProps> = ({
         <div
           className="xl:hidden fixed inset-x-0 top-[61px] bottom-0 z-30"
         >
-          <div
-            className="absolute inset-0 bg-black/30"
+          <button
+            type="button"
+            aria-label={activeCompactPanel === 'history' ? '关闭历史记录' : '关闭更多功能'}
+            className="mobile-scrim-in absolute inset-0 h-full w-full bg-stone-950/45 backdrop-blur-[2px]"
             onClick={() => setActiveCompactPanel(null)}
           />
           <div
             ref={compactPanelDialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label={activeCompactPanel === 'history' ? '历史记录' : '更多功能'}
+            aria-label={activeCompactPanel === 'history' ? '历史记录' : undefined}
+            aria-labelledby={activeCompactPanel === 'more' ? 'mobile-more-title' : undefined}
             tabIndex={-1}
-            className="absolute inset-y-0 right-0 w-[82vw] max-w-[340px]"
+            className={activeCompactPanel === 'history'
+              ? 'materialize-in absolute inset-y-0 right-0 w-[82vw] max-w-[340px] origin-right'
+              : 'mobile-sheet-in absolute inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] top-3 isolate flex origin-bottom flex-col overflow-hidden rounded-[30px] border border-white/80 bg-[#fbfaf7]/95 shadow-[0_28px_80px_rgba(28,25,23,0.32)] backdrop-blur-3xl'}
           >
             {activeCompactPanel === 'history' ? (
               <SessionSidebar
@@ -9462,29 +9686,35 @@ const App: React.FC<AppProps> = ({
                 mobile
               />
             ) : (
-              <div className="h-full overflow-y-auto border-l border-white/70 bg-white/86 p-4 shadow-[0_28px_80px_rgba(28,25,23,0.24)] backdrop-blur-2xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-base font-bold text-stone-800">更多功能</div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-stone-200/70 bg-[#fbfaf7]/94 px-5 pb-3 pt-4 backdrop-blur-2xl">
+                  <div>
+                    <div id="mobile-more-title" className="text-lg font-bold tracking-[-0.015em] text-stone-900">更多功能</div>
+                    <div className="mt-0.5 text-xs font-medium tracking-wide text-stone-500">选择要进入的工具或工作区</div>
+                  </div>
                   <button
                     type="button"
+                    aria-label="关闭更多功能"
                     onClick={() => setActiveCompactPanel(null)}
-                    className="rounded-full border border-stone-200 px-3 py-1 text-sm text-stone-500"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-stone-200/80 bg-white/80 text-xl leading-none text-stone-500 shadow-sm hover:bg-white hover:text-stone-900"
                   >
-                    关闭
+                    <span aria-hidden="true">×</span>
                   </button>
                 </div>
-                <AppNavigation
-                  mobile
-                  workspaceView={workspaceView}
-                  modelType={modelType}
-                  professionalSelectedProject={professionalSelectedProject}
-                  professionalOpen={professionalNavOpen}
-                  onToggleProfessional={() => setProfessionalNavOpen((current) => !current)}
-                  onModelChange={handleModelChange}
-                  onProfessionalFeature={openProfessionalFeature}
-                  onWorkspaceChange={navigateWorkspace}
-                  onMobileClose={() => setActiveCompactPanel(null)}
-                />
+                <div className="glass-scrollbar min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-5 pt-3">
+                  <AppNavigation
+                    mobile
+                    workspaceView={workspaceView}
+                    modelType={modelType}
+                    professionalSelectedProject={professionalSelectedProject}
+                    professionalOpen={professionalNavOpen}
+                    onToggleProfessional={() => setProfessionalNavOpen((current) => !current)}
+                    onModelChange={handleModelChange}
+                    onProfessionalFeature={openProfessionalFeature}
+                    onWorkspaceChange={navigateWorkspace}
+                    onMobileClose={() => setActiveCompactPanel(null)}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -9534,7 +9764,7 @@ const App: React.FC<AppProps> = ({
       />
 
       <div className="flex flex-1 overflow-hidden min-h-0">
-        <div className="hidden xl:block fixed left-3 top-[85px] z-10">
+        <div className="fixed left-3 top-[76px] z-10 hidden xl:block">
           <AppNavigation
             workspaceView={workspaceView}
             modelType={modelType}
@@ -9548,7 +9778,7 @@ const App: React.FC<AppProps> = ({
         </div>
 
         {isLoggedIn && workspaceView === 'divination' && (
-          <div className="hidden 2xl:block fixed right-3 top-[85px] z-10">
+          <div className="fixed right-3 top-[76px] z-10 hidden 2xl:block">
             <SessionSidebar
               sessions={savedSessions}
               activeSessionId={activeSessionId}
@@ -9568,7 +9798,6 @@ const App: React.FC<AppProps> = ({
       >
         {workspaceView === 'home' && (
           <HomeWorkspace
-            isLoggedIn={isLoggedIn}
             primaryCase={homePrimaryCase ? {
               id: homePrimaryCase.id,
               title: homePrimaryCase.title,
@@ -9576,7 +9805,6 @@ const App: React.FC<AppProps> = ({
               detail: homePrimaryPillars ? `四柱：${homePrimaryPillars}` : '命盘已保存',
             } : undefined}
             hasBaziCase={Boolean(homeBaziCase)}
-            onLogin={() => setShowAuth(true)}
             onOpenCase={openHomePrimaryCase}
             onCreateBazi={() => openHomeCaseCreate(ModelType.BAZI)}
             onCreateZiwei={() => openHomeCaseCreate(ModelType.ZIWEI)}
@@ -9588,7 +9816,7 @@ const App: React.FC<AppProps> = ({
           />
         )}
         {workspaceView === 'records' && renderRecordsWorkspace()}
-        {workspaceView === 'chat' && renderChatWorkspace()}
+        {workspaceView === 'chat' && renderAgentChatWorkspace()}
         {workspaceView === 'settings' && renderSettingsWorkspace()}
         {workspaceView === 'divination' && (
           <>
@@ -10249,7 +10477,17 @@ const App: React.FC<AppProps> = ({
                       onAnalysisSaved={handleBaziBasicAnalysisSaved}
                     />
                   )}
-                  {modelType === ModelType.ZIWEI && <ZiweiGrid data={chartData} />}
+                  {modelType === ModelType.ZIWEI && (
+                    <ZiweiWorkspace
+                      data={chartData}
+                      caseId={activeCase?.modelType === ModelType.ZIWEI ? activeCase.id : null}
+                      aiPanel={renderCaseAnalysisPanel(false)}
+                      onTabChange={setZiweiResultTab}
+                      onEditCase={activeCase?.modelType === ModelType.ZIWEI ? beginCaseEdit : undefined}
+                      onDeleteCase={activeCase?.modelType === ModelType.ZIWEI ? handleDeleteCase : undefined}
+                      onQuotaChange={setUserQuota}
+                    />
+                  )}
                   {modelType === ModelType.MEIHUA && <MeihuaGrid data={chartData} />}
                   {modelType === ModelType.LIUYAO && <LiuyaoGrid data={chartData} />}
                   {[ModelType.DAILY_FORTUNE, ModelType.MONTHLY_FORTUNE].includes(modelType) && (
@@ -10284,7 +10522,7 @@ const App: React.FC<AppProps> = ({
               )}
             </div>
 
-            {isCaseModel && activeCase && modelType !== ModelType.BAZI && (
+            {isCaseModel && activeCase && modelType !== ModelType.BAZI && modelType !== ModelType.ZIWEI && (
               <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -10525,6 +10763,10 @@ const App: React.FC<AppProps> = ({
 
             {/* Chat */}
             {(chatHistory.length > 0 || isTyping) && (
+              !isCaseModel ||
+              (modelType === ModelType.BAZI && baziResultTab === 'ai') ||
+              (modelType === ModelType.ZIWEI && ziweiResultTab === 'ai')
+            ) && (
             <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : 'AI 解读'}</h3>

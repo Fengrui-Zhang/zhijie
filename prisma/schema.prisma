@@ -20,6 +20,11 @@ model User {
   sessions  DivinationSession[]
   caseRelations CaseRelation[]
   note      UserNote?
+  agentTurns AgentTurn[]
+  agentToolRuns AgentToolRun[]
+  ziweiFengshuiAnalyses ZiweiFengshuiAnalysis[]
+  agentLockUntil DateTime?
+  agentLockTurnId String?
 }
 
 model EmailVerificationCode {
@@ -67,8 +72,31 @@ model DivinationCase {
   sessions   DivinationSession[]
   relationLinksA CaseRelation[] @relation("CaseRelationA")
   relationLinksB CaseRelation[] @relation("CaseRelationB")
+  ziweiFengshuiAnalyses ZiweiFengshuiAnalysis[]
 
   @@index([userId, modelType, updatedAt])
+}
+
+model ZiweiFengshuiAnalysis {
+  id               String   @id @default(cuid())
+  userId           String
+  caseId           String
+  targetYear       Int
+  chartFingerprint String
+  promptVersion    String
+  status           String   @default("pending")
+  result           Json?
+  lastError        String?
+  pointReserved    Boolean  @default(false)
+  generatedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  divinationCase   DivinationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, targetYear, chartFingerprint, promptVersion])
+  @@index([userId, caseId, targetYear])
+  @@index([status, updatedAt])
 }
 
 model CaseRelation {
@@ -103,6 +131,8 @@ model DivinationSession {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   divinationCase DivinationCase? @relation(fields: [caseId], references: [id], onDelete: Cascade)
   messages    ChatMessage[]
+  agentTurns  AgentTurn[]
+  agentToolRuns AgentToolRun[]
 
   @@index([caseId, updatedAt])
   @@index([userId, isPinned, updatedAt])
@@ -115,8 +145,61 @@ model ChatMessage {
   role      String
   content   String
   knowledgeSources Json?
+  agentTurnId String?
+  metadata  Json?
   createdAt DateTime @default(now())
   session   DivinationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  agentTurn AgentTurn? @relation(fields: [agentTurnId], references: [id], onDelete: SetNull)
+
+  @@index([agentTurnId, createdAt])
+}
+
+model AgentTurn {
+  id          String   @id @default(cuid())
+  userId      String
+  sessionId   String
+  status      String   @default("running")
+  aiCallCount Int      @default(0)
+  pointsUsed  Int      @default(0)
+  matterKey   String?
+  clarification Json?
+  errorCode   String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session     DivinationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+  toolRuns    AgentToolRun[]
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model AgentToolRun {
+  id            String   @id @default(cuid())
+  userId        String
+  sessionId     String
+  turnId        String
+  toolCallId    String?
+  toolName      String
+  status        String   @default("running")
+  input         Json
+  resultSummary String?
+  resultText    String?
+  rawResult     Json?
+  errorCode     String?
+  matterKey     String?
+  divinationMode String?
+  timeBucketKey String?
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session       DivinationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turn          AgentTurn @relation(fields: [turnId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timeBucketKey, divinationMode])
+  @@index([sessionId, startedAt])
+  @@index([turnId, startedAt])
 }
 
 model UserNote {

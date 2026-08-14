@@ -16,13 +16,13 @@ export default function WorkspaceViewport({
 }: WorkspaceViewportProps) {
   return (
     <main
-      className={`min-h-0 flex-1 overflow-y-auto transition-[padding] duration-300 xl:pl-[260px] ${
+      className={`glass-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto transition-[padding] duration-300 xl:pl-[276px] ${
         isLoggedIn && workspaceView === 'divination'
           ? historyCollapsed ? '2xl:pr-[72px]' : '2xl:pr-[320px]'
           : ''
       }`}
     >
-      <div className="mx-auto mt-6 w-full max-w-[1180px] px-3 pb-24 xl:pb-6">
+      <div className="mx-auto mt-5 w-full max-w-[1180px] px-3 pb-28 md:px-5 xl:mt-6 xl:pb-8">
         {children}
       </div>
     </main>

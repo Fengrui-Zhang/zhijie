@@ -46,7 +46,7 @@ export default function DialogPortal({
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : ariaLabel}
         tabIndex={-1}
-        className={`glass-panel flex min-h-0 w-full flex-col overflow-hidden rounded-[26px] border border-white/60 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:rounded-[30px] ${
+        className={`materialize-in glass-panel flex min-h-0 w-full flex-col overflow-hidden rounded-[26px] border border-white/70 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:rounded-[30px] ${
           mobileFill ? 'h-full max-h-full md:h-auto md:max-h-[calc(100dvh-2rem)]' : 'max-h-full md:max-h-[calc(100dvh-2rem)]'
         } ${panelClassName}`}
         onClick={(event) => event.stopPropagation()}

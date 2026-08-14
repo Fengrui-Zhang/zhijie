@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { QimenResponse, PalaceData } from '../types';
 import { getWuxingColor } from '../utils/wuxing';
+import { ChartMasthead, ChartSectionTitle, ChartSurface, ElementBadge, FourPillarsStrip } from './DivinationVisualSystem';
 
 interface Props {
   data: QimenResponse;
@@ -125,36 +126,40 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
   const zhifuInfo = `值符: ${data.zhifu_info?.zhifu_name || '-'}   值使: ${data.zhifu_info?.zhishi_name || '-'}`;
 
   return (
-    <div className="w-full max-w-4xl mx-auto my-6 select-none">
-      <div className="glass-panel rounded-[30px] overflow-hidden">
-        <div className="glass-panel-soft px-5 py-4 border-b border-white/50">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4 text-stone-800">
-              {pillars.map((pillar) => (
-                <div key={pillar.label} className="flex items-center gap-2">
-                  <span className="text-xs text-stone-400">{pillar.label}</span>
-                  <span className="text-2xl font-semibold tracking-wider text-stone-800">
-                    {pillar.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="text-right text-sm text-stone-600 leading-snug">
-              <div className="font-semibold text-stone-700">{dunInfo}</div>
-              <div className="text-stone-500">{zhifuInfo}</div>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-stone-400">
-            {data.gongli} · {data.nongli}
+    <div className="glass-panel mx-auto my-6 w-full max-w-5xl select-none overflow-hidden rounded-[28px] border border-white/75">
+      <div className="p-4 md:p-6">
+        <ChartMasthead
+          title="奇门遁甲"
+          subtitle={`${dunInfo} · ${data.panlei || data.dingju || '转盘奇门'}`}
+          date={data.gongli}
+          meta={data.nongli}
+          symbol="☷"
+        />
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <FourPillarsStrip pillars={pillars.map((pillar) => pillar.value)} />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              ['值符', data.zhifu_info?.zhifu_name, '金'],
+              ['值使', data.zhifu_info?.zhishi_name, '木'],
+              ['旬首', data.xunshou, '水'],
+              ['空马', `${data.kongwang_info?.kongwang_name || '—'} · ${data.maxing_info?.maxing_name || '—'}`, '火'],
+            ].map(([label, value, element]) => (
+              <div key={label} className="rounded-[15px] border border-stone-200/70 bg-white/52 px-2 py-2 text-center">
+                <div className="flex items-center justify-center gap-1 text-[9px] font-bold text-stone-400"><ElementBadge value={element} />{label}</div>
+                <div className="mt-1 truncate font-['STKaiti','KaiTi','Songti_SC','serif'] text-base font-bold text-stone-800">{value || '—'}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="grid grid-cols-3 gap-[1px] rounded-[24px] border border-white/60 bg-stone-500/40 overflow-hidden shadow-[0_18px_40px_rgba(28,25,23,0.08)]">
+        <ChartSurface className="relative mt-5 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(249,239,210,0.65),rgba(255,255,255,0.45)_62%)]">
+          <ChartSectionTitle title="九宫遁甲盘" note={`${zhifuInfo} · 上天盘 / 下地盘`} />
+          <div className="pointer-events-none absolute inset-[12%] rotate-45 border border-amber-700/10" />
+          <div className="relative grid grid-cols-3 gap-px overflow-hidden rounded-[22px] border border-amber-900/30 bg-stone-300/70 shadow-[0_18px_40px_rgba(28,25,23,0.07)]">
             {gridCells.map((cell, idx) => {
               const pData = cell.data;
               const cornerClass = getCornerClass(idx);
-              if (!pData) return <div key={idx} className={`glass-panel-soft min-h-[170px] ${cornerClass}`}></div>;
+              if (!pData) return <div key={idx} className={`min-h-[148px] bg-white/55 md:min-h-[180px] ${cornerClass}`}></div>;
 
               const isKong = pData.is_kongwang == 1 || pData.is_kongwang == '1';
               const isMa = pData.is_maxing == 1 || pData.is_maxing == '1';
@@ -173,59 +178,63 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
               return (
                 <div
                   key={idx}
-                  className={`relative glass-panel-soft min-h-[170px] px-2 py-2 font-['STKaiti','KaiTi','Songti_SC','serif'] text-stone-900 ${cornerClass}`}
+                  className={`relative min-h-[148px] bg-white/80 px-2 py-2 font-['STKaiti','KaiTi','Songti_SC','serif'] text-stone-900 md:min-h-[180px] md:p-3 ${cornerClass}`}
                 >
-                  <div className="absolute left-2 top-2 text-xs text-stone-400">
-                    <span className={`font-semibold ${palaceColor}`}>
-                      {cell.key}
+                  <div className="absolute left-2 top-2 flex items-center gap-1 text-[9px] text-stone-400 md:left-3 md:top-3 md:text-xs">
+                    <span className={`font-bold ${palaceColor}`}>
+                      {cell.key}{PALACE_NUMBERS[cell.key] || ''}宫
                     </span>
+                    <span className="hidden text-base text-stone-300 md:inline">{BAGUA_MAP[cell.key]}</span>
                   </div>
 
-                  <div className="absolute right-2 top-2 text-sm font-semibold">
+                  <div className="absolute right-2 top-2 max-w-[42px] truncate text-[9px] font-semibold md:right-3 md:top-3 md:max-w-none md:text-sm">
                     <span className={bashenStyle}>{bashenLabel || ''}</span>
                   </div>
 
-                  <div className="absolute left-2 top-10 flex flex-col items-start gap-1 text-lg">
-                    <span className={`${tpColor} font-semibold`}>
+                  <div className="absolute left-2 top-8 flex flex-col items-start gap-0.5 text-base md:left-3 md:top-11 md:text-2xl">
+                    <span className={`${tpColor} font-bold`}>
                       {tpStem || '-'}
                     </span>
-                    <span className="text-[11px] text-stone-400">天盘</span>
+                    <span className="hidden font-sans text-[10px] text-stone-400 md:inline">天盘</span>
                   </div>
 
-                  <div className="absolute left-2 bottom-3 flex flex-col items-start gap-1 text-lg">
-                    <span className={`${dpColor} font-semibold`}>
+                  <div className="absolute bottom-2 left-2 flex flex-col items-start gap-0.5 text-base md:bottom-3 md:left-3 md:text-2xl">
+                    <span className={`${dpColor} font-bold`}>
                       {dpStem || '-'}
                     </span>
-                    <span className="text-[11px] text-stone-400">地盘</span>
+                    <span className="hidden font-sans text-[10px] text-stone-400 md:inline">地盘</span>
                   </div>
 
-                  <div className="absolute inset-x-0 top-[34%] flex flex-col items-center gap-1">
-                    <span className="text-xl font-semibold">
+                  <div className="absolute inset-x-5 top-[38%] flex flex-col items-center gap-0.5 md:inset-x-0 md:top-[31%]">
+                    <span className="max-w-full truncate text-xs font-semibold text-stone-600 md:text-xl">
                       {pData.tianpan?.jiuxing || '-'}
                     </span>
                     <span
-                      className={`text-2xl font-bold ${
+                      className={`text-xl font-bold md:text-3xl ${
                         ['开', '休', '生'].includes(pData.renpan?.bamen)
                           ? 'text-emerald-600'
-                          : 'text-stone-900'
+                          : ['死', '惊', '伤'].includes(pData.renpan?.bamen)
+                            ? 'text-red-600'
+                            : 'text-stone-900'
                       }`}
                     >
                       {pData.renpan?.bamen || '-'}
                     </span>
+                    <span className="hidden font-sans text-[8px] tracking-widest text-stone-400 md:inline">星 · 门</span>
                   </div>
 
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center text-6xl text-stone-900 opacity-[0.03]">
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-5xl text-stone-900 opacity-[0.025] md:text-8xl md:opacity-[0.035]">
                     {BAGUA_MAP[cell.key]}
                   </div>
 
                   {isKong && (
-                    <div className="absolute top-2 right-2 translate-y-6 rounded-full border border-stone-300/70 bg-white/70 px-1 text-[10px] text-stone-400 backdrop-blur-md">
+                    <div className="absolute right-2 top-2 translate-y-6 rounded-full border border-stone-300/70 bg-white/70 px-1 text-[9px] text-stone-400 backdrop-blur-md md:right-3 md:top-3">
                       空
                     </div>
                   )}
 
                   {isMa && (
-                    <div className="absolute bottom-2 right-2 text-xs text-red-600">
+                    <div className="absolute bottom-2 right-2 text-[10px] font-bold text-red-600 md:bottom-3 md:right-3 md:text-xs">
                       马
                     </div>
                   )}
@@ -233,7 +242,7 @@ const QimenGrid: React.FC<Props> = ({ data }) => {
               );
             })}
           </div>
-        </div>
+        </ChartSurface>
       </div>
     </div>
   );

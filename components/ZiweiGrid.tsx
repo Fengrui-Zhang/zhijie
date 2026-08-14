@@ -6,9 +6,11 @@ import {
 import { toZiweiHoroscopeJson } from 'taibu-core/ziwei-horoscope';
 import { ZiweiResponse } from '../types';
 import { getWuxingColor } from '../utils/wuxing';
+import { ChartMasthead, ChartSectionTitle, ChartSurface, FourPillarsStrip } from './DivinationVisualSystem';
 
 interface Props {
   data: ZiweiResponse;
+  embedded?: boolean;
 }
 
 type CanonicalPalace = {
@@ -61,17 +63,18 @@ const daysInMonth = (year: number, month: number) => new Date(year, month, 0).ge
 
 const Star = ({ star, type }: { star: { 星名: string; 亮度?: string; 四化?: string }; type: 'major' | 'minor' | 'misc' }) => {
   const color = type === 'major' ? 'text-blue-700' : type === 'minor' ? 'text-rose-600' : 'text-stone-500';
+  const transformColor = star.四化 === '禄' ? 'bg-emerald-100 text-emerald-700' : star.四化 === '权' ? 'bg-red-100 text-red-700' : star.四化 === '科' ? 'bg-sky-100 text-sky-700' : 'bg-stone-200 text-stone-700';
   return (
-    <span className={`mr-1 inline-flex items-center gap-0.5 text-xs font-semibold ${color}`}>
+    <span className={`mr-1 items-center gap-0.5 text-xs font-semibold ${color} ${type === 'misc' ? 'hidden md:inline-flex' : 'inline-flex'}`}>
       {star.星名}
-      {star.四化 && <span className="rounded bg-amber-100/90 px-0.5 text-[10px] text-amber-700">{star.四化}</span>}
+      {star.四化 && <span className={`rounded px-0.5 text-[10px] ${transformColor}`}>{star.四化}</span>}
       {star.亮度 && <span className="text-[10px] text-stone-400">{star.亮度}</span>}
     </span>
   );
 };
 
 const FlowBadge = ({ label, value, className }: { label: string; value?: string; className: string }) => {
-  if (!value) return null;
+  if (!label && !value) return null;
   return (
     <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${className}`}>
       {label}{value}
@@ -117,25 +120,28 @@ const PalaceCard = ({
   onClick: () => void;
 }) => {
   const highlight = selected
-    ? 'border-amber-300 bg-amber-50/75 shadow-[0_14px_34px_rgba(245,158,11,0.14)]'
+    ? 'z-10 border-amber-400 bg-amber-50/85 shadow-[0_10px_28px_rgba(180,119,31,0.13)]'
     : square
-      ? 'border-emerald-300 bg-emerald-50/60'
+      ? 'border-emerald-300 bg-emerald-50/55'
       : flowTypes.length
         ? 'border-purple-300 bg-purple-50/60'
-        : 'border-white/60 bg-white/35 hover:bg-white/65';
+        : 'border-stone-200/70 bg-white/80 hover:bg-white';
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex min-h-[132px] flex-col rounded-2xl border p-2.5 text-left transition backdrop-blur-xl ${highlight}`}
+      className={`relative flex min-h-[132px] flex-col border p-2.5 text-left transition backdrop-blur-xl md:min-h-[150px] ${highlight}`}
     >
       <div className="mb-1 flex items-center justify-between">
-        <div className="text-sm font-bold text-stone-900">
+        <div className="whitespace-nowrap text-xs font-bold text-stone-900 md:text-sm">
           {palace.宫位}
-          {palace.是否身宫 === '是' && <span className="ml-1 rounded bg-orange-100 px-1 py-0.5 text-[10px] text-orange-600">身宫</span>}
-          {palace.是否来因宫 === '是' && <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] text-amber-700">来因宫</span>}
+          {palace.是否身宫 === '是' && <span className="ml-0.5 rounded bg-orange-100 px-0.5 py-0.5 text-[9px] text-orange-600 md:ml-1 md:px-1 md:text-[10px]"><span className="md:hidden">身</span><span className="hidden md:inline">身宫</span></span>}
+          {palace.是否来因宫 === '是' && <span className="ml-0.5 rounded bg-amber-100 px-0.5 py-0.5 text-[9px] text-amber-700 md:ml-1 md:px-1 md:text-[10px]"><span className="md:hidden">因</span><span className="hidden md:inline">来因宫</span></span>}
         </div>
-        <div className="text-xs text-stone-500">{palace.干支}</div>
+        <div className="font-['STKaiti','KaiTi','Songti_SC','serif'] text-base font-bold">
+          <span className={getWuxingColor(palace.干支?.charAt(0))}>{palace.干支?.charAt(0)}</span>
+          <span className={getWuxingColor(palace.干支?.charAt(1))}>{palace.干支?.charAt(1)}</span>
+        </div>
       </div>
       <div className="flex-1 leading-5">
         {(palace.主星及四化 || []).map((star, index) => <Star key={`m-${index}`} star={star} type="major" />)}
@@ -150,12 +156,12 @@ const PalaceCard = ({
           {flowTypes.includes('daily') && <FlowBadge label="日" value="" className="bg-orange-100 text-orange-600" />}
         </div>
       )}
-      {palace.神煞?.length ? <div className="mt-1 text-[10px] text-stone-500">神煞：{palace.神煞.join('、')}</div> : null}
+      {palace.神煞?.length ? <div className="mt-1 hidden text-[10px] text-stone-500 md:block">神煞：{palace.神煞.join('、')}</div> : null}
     </button>
   );
 };
 
-const ZiweiGrid: React.FC<Props> = ({ data }) => {
+const ZiweiGrid: React.FC<Props> = ({ data, embedded = false }) => {
   const canonical = data.taibuJson as CanonicalChart | undefined;
   const palaces = canonical?.十二宫位 || [];
   const basic = canonical?.基本信息 || {};
@@ -255,50 +261,53 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
   }
 
   return (
-    <div className="mx-auto my-6 w-full max-w-6xl rounded-[30px] border border-white/60 bg-white/35 p-4 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:p-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">紫微斗数</div>
-          <h3 className="mt-1 text-2xl font-bold text-stone-900">{data.base_info.name || '命盘'}（{data.base_info.sex || '—'}）</h3>
+    <div className={embedded ? 'w-full' : 'glass-panel mx-auto my-6 w-full max-w-6xl overflow-hidden rounded-[28px] border border-white/75 p-4 md:p-6'}>
+      {!embedded ? (
+        <ChartMasthead
+          title="紫微斗数"
+          subtitle={`${data.base_info.name || '命盘'}（${data.base_info.sex || '—'}）· ${basic.五行局 || data.base_info.mingju || '—'}`}
+          date={basic.阳历 || data.base_info.gongli}
+          meta={`命主 ${basic.命主 || data.base_info.mingzhu || '—'} · 身主 ${basic.身主 || data.base_info.shenzhu || '—'}`}
+          symbol="紫"
+          actions={(
+            <button type="button" onClick={() => setShowMisc((value) => !value)} className="rounded-xl border border-stone-200/70 bg-white/58 px-3 py-2 text-xs font-semibold text-stone-600 transition hover:bg-white">
+              {showMisc ? '隐藏杂曜' : '显示杂曜'}
+            </button>
+          )}
+        />
+      ) : (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-bold text-stone-800">十二宫专业盘</div>
+            <div className="mt-0.5 text-xs text-stone-400">点击宫位查看三方四正，向下选择大限与流年。</div>
+          </div>
+          <button type="button" onClick={() => setShowMisc((value) => !value)} className="rounded-xl border border-stone-200/70 bg-white/70 px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-white">
+            {showMisc ? '隐藏杂曜' : '显示杂曜'}
+          </button>
         </div>
-        <button type="button" onClick={() => setShowMisc((value) => !value)} className="glass-chip rounded-2xl border border-white/60 px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-white/75">
-          {showMisc ? '隐藏杂曜' : '显示杂曜'}
-        </button>
-      </div>
+      )}
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className={`${embedded ? '' : 'mt-5'} grid grid-cols-4 gap-px overflow-hidden rounded-[22px] border border-amber-900/25 bg-stone-300/70 shadow-[0_18px_45px_rgba(73,56,35,0.07)]`}>
         {GRID_LAYOUT.map((row, rowIndex) => row.map((branch, colIndex) => {
           if (branch === -1) {
             if (rowIndex === 1 && colIndex === 1) {
               const pillars = String(basic.四柱 || '').split(/\s+/);
               return (
-                <div key="center" className="glass-panel-soft col-span-2 row-span-2 flex flex-col justify-center rounded-2xl border border-white/60 p-3 text-center">
-                  <div className="mb-3 grid grid-cols-4 gap-2 text-xs">
-                    {['年柱', '月柱', '日柱', '时柱'].map((label, index) => {
-                      const value = pillars[index] || data.base_info.gongli?.split(' ')[index] || '';
-                      return (
-                        <div key={label}>
-                          <div className="text-stone-400">{label}</div>
-                          <div className="text-base font-bold">
-                            <span className={getWuxingColor(value.charAt(0))}>{value.charAt(0) || '*'}</span>
-                            <span className={getWuxingColor(value.charAt(1))}>{value.charAt(1) || '*'}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="border-t border-white/60 py-2 text-sm text-stone-700">
+                <div key="center" className="relative col-span-2 row-span-2 flex flex-col justify-center overflow-hidden bg-[radial-gradient(circle,rgba(249,239,210,0.82),rgba(255,255,255,0.62)_68%)] p-3 text-center">
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center font-['STKaiti','KaiTi','Songti_SC','serif'] text-[130px] text-stone-900/[0.025]">紫微</div>
+                  <div className="relative mb-3"><FourPillarsStrip pillars={pillars} compact /></div>
+                  <div className="relative border-t border-stone-200/65 py-2 text-xs text-stone-600 md:text-sm">
                     <div>阳历 {basic.阳历 || data.base_info.gongli}</div>
                     <div>农历 {basic.农历 || data.base_info.nongli}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="relative grid grid-cols-2 gap-2 text-xs md:text-sm">
                     <div>命主：<span className="font-bold text-purple-600">{basic.命主 || data.base_info.mingzhu}</span></div>
                     <div>身主：<span className="font-bold">{basic.身主 || data.base_info.shenzhu}</span></div>
                     <div>命宫：<span className="text-amber-700">{data.base_info.minggong}</span></div>
                     <div>身宫：<span className="text-orange-500">{data.base_info.shengong}</span></div>
                   </div>
                   {basic.真太阳时 && <div className="mt-2 text-xs text-amber-700">真太阳时 {basic.真太阳时.真太阳时}</div>}
-                  <div className="mt-2"><span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{basic.五行局 || data.base_info.mingju}</span></div>
+                  <div className="relative mt-2"><span className="rounded-full border border-amber-200/70 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{basic.五行局 || data.base_info.mingju}</span></div>
                 </div>
               );
             }
@@ -321,7 +330,9 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
         }))}
       </div>
 
-      <div className="mt-5 space-y-4 border-t border-stone-100/80 pt-4">
+      <ChartSurface className="mt-5">
+        <ChartSectionTitle title="运限推演" note="大限 → 流年 → 流月 → 流日" />
+        <div className="space-y-4">
         <section>
           <div className="mb-2 text-sm font-bold text-stone-800">大限</div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -388,7 +399,8 @@ const ZiweiGrid: React.FC<Props> = ({ data }) => {
             </div>
           </section>
         )}
-      </div>
+        </div>
+      </ChartSurface>
     </div>
   );
 };

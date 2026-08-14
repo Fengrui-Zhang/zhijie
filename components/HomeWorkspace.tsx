@@ -8,10 +8,8 @@ type PrimaryCase = {
 };
 
 type Props = {
-  isLoggedIn: boolean;
   primaryCase?: PrimaryCase;
   hasBaziCase: boolean;
-  onLogin: () => void;
   onOpenCase: () => void;
   onCreateBazi: () => void;
   onCreateZiwei: () => void;
@@ -35,10 +33,8 @@ const TaskIcon = ({ name }: { name: IconName }) => {
 };
 
 export default function HomeWorkspace({
-  isLoggedIn,
   primaryCase,
   hasBaziCase,
-  onLogin,
   onOpenCase,
   onCreateBazi,
   onCreateZiwei,
@@ -60,50 +56,54 @@ export default function HomeWorkspace({
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 pb-4">
-      <section className="glass-panel overflow-hidden rounded-[28px] border border-white/60 px-5 py-7 shadow-sm md:px-10 md:py-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight text-stone-900 md:text-5xl">今天想从哪里开始？</h2>
+      <section className="glass-panel overflow-hidden rounded-[30px] border border-white/70 px-5 py-7 md:px-9 md:py-9">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-2xl">
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-amber-700/70">元分 · 智解</div>
+            <h2 className="display-title text-3xl font-bold leading-tight text-stone-900 md:text-[2.8rem]">今天想从哪里开始？</h2>
           </div>
-          {!isLoggedIn ? (
-            <button type="button" onClick={onLogin} className="glass-panel-dark rounded-2xl px-5 py-2.5 text-sm font-bold text-amber-200">登录 / 注册</button>
-          ) : null}
         </div>
 
         {primaryCase ? (
-          <button type="button" onClick={onOpenCase} className="mt-7 flex w-full items-center gap-4 rounded-[22px] border border-stone-100 bg-white/62 px-5 py-4 text-left shadow-sm transition hover:bg-white/85 md:px-7">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700"><TaskIcon name="record" /></span>
+          <button type="button" onClick={onOpenCase} className="group mt-7 flex w-full items-center gap-4 rounded-[20px] border border-white/75 bg-white/54 px-4 py-4 text-left shadow-[0_8px_24px_rgba(28,25,23,0.04)] hover:bg-white/78 md:px-6">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-amber-50 text-amber-700"><TaskIcon name="record" /></span>
             <span className="min-w-0 flex-1">
+              <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-stone-400">继续上次</span>
               <span className="block truncate text-lg font-bold text-stone-900">{primaryCase.title}</span>
               <span className="mt-1 block text-sm text-stone-500">{primaryCase.summary}{primaryCase.detail ? ` · ${primaryCase.detail}` : ''}</span>
             </span>
-            <span className="text-xl text-stone-400">›</span>
+            <span className="text-xl text-stone-400 group-hover:translate-x-0.5 group-hover:text-amber-700">›</span>
           </button>
         ) : (
-          <div className="mt-7 border-y border-stone-100 py-5">
-            <div className="text-base font-bold text-stone-800">三步开始使用</div>
-            <div className="mt-3 grid gap-3 text-sm text-stone-500 sm:grid-cols-3">
-              <span>1. 输入出生信息</span><span>2. 生成命盘</span><span>3. 按需请求解读</span>
+          <div className="mt-7 rounded-[20px] border border-white/70 bg-white/42 px-5 py-4">
+            <div className="text-sm font-bold text-stone-700">三步开始使用</div>
+            <div className="mt-3 grid gap-2 text-sm text-stone-500 sm:grid-cols-3">
+              {['输入出生信息', '生成并保存命盘', '按需请求解读'].map((label, index) => (
+                <span key={label} className="flex items-center gap-2"><b className="flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-[10px] font-bold text-amber-100">{index + 1}</b>{label}</span>
+              ))}
             </div>
           </div>
         )}
 
-        <div className="mt-7 grid grid-cols-2 gap-3 md:gap-x-10">
+        <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-3">
           {tasks.map((task) => (
-            <button key={task.key} type="button" onClick={task.action} className="group relative flex min-h-36 flex-col items-start gap-4 rounded-[22px] border border-stone-100 bg-white/55 p-4 text-left shadow-sm transition hover:border-amber-200 hover:bg-white/80 md:min-h-0 md:flex-row md:items-center md:rounded-none md:border-x-0 md:border-t-0 md:bg-transparent md:px-1 md:py-5 md:shadow-none">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50/70 text-amber-700"><TaskIcon name={task.key} /></span>
+            <button key={task.key} type="button" onClick={task.action} aria-expanded={task.key === 'divination' ? divinationOpen : undefined} className={`group relative flex min-h-36 flex-col items-start gap-4 rounded-[20px] border p-4 text-left md:min-h-44 md:p-5 ${task.key === 'divination' && divinationOpen ? 'border-amber-200/80 bg-amber-50/70 shadow-[0_10px_30px_rgba(180,119,31,0.08)]' : 'border-white/75 bg-white/46 hover:border-amber-200/70 hover:bg-white/72'}`}>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-amber-100/80 bg-amber-50/80 text-amber-700"><TaskIcon name={task.key} /></span>
               <span className="min-w-0 flex-1">
-                <span className="block text-lg font-bold text-stone-900">{task.title}</span>
+                <span className="block text-base font-bold text-stone-900 md:text-lg">{task.title}</span>
                 <span className="mt-1 hidden text-sm leading-6 text-stone-500 sm:block">{task.description}</span>
               </span>
-              <span className="absolute bottom-4 right-4 text-xl text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-amber-700 md:static">›</span>
+              <span className={`absolute bottom-4 right-4 text-xl text-stone-400 group-hover:text-amber-700 ${task.key === 'divination' && divinationOpen ? 'rotate-90' : 'group-hover:translate-x-0.5'}`}>›</span>
             </button>
           ))}
         </div>
 
         {divinationOpen && (
-          <div className="mt-5 rounded-[22px] border border-stone-100 bg-white/62 p-4">
-            <div className="mb-3 text-sm font-bold text-stone-700">选择占测方式</div>
+          <div className="materialize-in mt-4 rounded-[22px] border border-white/75 bg-white/58 p-4 md:p-5" style={{ '--material-origin': '50% 0%' } as React.CSSProperties}>
+            <div className="mb-3">
+              <div className="text-sm font-bold text-stone-800">选择占测方式</div>
+              <div className="mt-1 text-xs text-stone-500">按问题的性质选择，不确定时可先用梅花易数快速判断。</div>
+            </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 ['qimen', '奇门遁甲', '适合具体决策、方向与时机'],
@@ -113,9 +113,9 @@ export default function HomeWorkspace({
                 ['taiyi', '太乙神数', '适合趋势与大局分析'],
                 ['xiaoliuren', '小六壬', '适合日常事情快速判断'],
               ].map(([type, label, description]) => (
-                <button key={type} type="button" onClick={() => onOpenDivination(type as Parameters<Props['onOpenDivination']>[0])} className="rounded-2xl border border-stone-100 bg-white/70 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-white">
+                <button key={type} type="button" onClick={() => onOpenDivination(type as Parameters<Props['onOpenDivination']>[0])} className="group rounded-[16px] border border-stone-200/60 bg-white/64 px-4 py-3 text-left hover:border-amber-200 hover:bg-white">
                   <span className="block text-sm font-bold text-stone-800">{label}</span>
-                  <span className="mt-1 block text-xs leading-5 text-stone-500">{description}</span>
+                  <span className="mt-1 flex items-end gap-2 text-xs leading-5 text-stone-500"><span className="flex-1">{description}</span><span className="text-stone-300 group-hover:translate-x-0.5 group-hover:text-amber-700">›</span></span>
                 </button>
               ))}
             </div>
@@ -124,8 +124,8 @@ export default function HomeWorkspace({
 
         {!primaryCase && (
           <div className="mt-5 flex flex-wrap gap-2">
-            <button type="button" onClick={onCreateBazi} className="glass-panel-dark rounded-2xl px-5 py-2.5 text-sm font-bold text-amber-200">建立八字命盘</button>
-            <button type="button" onClick={onCreateZiwei} className="rounded-2xl border border-stone-200 bg-white/70 px-5 py-2.5 text-sm font-bold text-stone-700">建立紫微命盘</button>
+            <button type="button" onClick={onCreateBazi} className="glass-panel-dark rounded-[14px] px-5 py-2.5 text-sm font-bold text-amber-100">建立八字命盘</button>
+            <button type="button" onClick={onCreateZiwei} className="rounded-[14px] border border-stone-200/80 bg-white/64 px-5 py-2.5 text-sm font-bold text-stone-700 hover:bg-white">建立紫微命盘</button>
           </div>
         )}
       </section>

@@ -6,7 +6,7 @@ import {
   GenericTaibuResponse,
   ModelType, LiuyaoMode 
 } from '../types';
-import { buildZiweiAnalysisPrompt } from '../lib/ziwei-prompt';
+import { formatZiweiChartContext } from '../lib/ziwei-prompt';
 
 async function fetchChart<T>(modelType: ModelType, params: Record<string, unknown>): Promise<T> {
   try {
@@ -147,9 +147,7 @@ export const fetchMonthlyFortune = async (params: BaseParams) => {
 
 export const formatQimenPrompt = (data: QimenResponse, question: string) => {
   if (data.taibuText) {
-    return `【任务要求】
-你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。
-
+    return `【奇门遁甲排盘】
 ${data.taibuText}
 
 【用户问题】
@@ -195,8 +193,7 @@ ${question.trim() || '无'}`;
 - 马星：${normalizeFlag(gong.is_maxing)}`;
   }).join('\n\n');
 
-  return `【任务要求】
-你是精通奇门遁甲的大师。请基于排盘，用通俗专业语言解答用户疑惑。关注用神、时令、吉凶。
+  return `【奇门遁甲排盘】
 
 【用户信息】
 姓名：${fmt(name)}
@@ -293,7 +290,7 @@ ${data.taibuText}
 };
 
 export const formatZiweiPrompt = (data: ZiweiResponse) => {
-  return buildZiweiAnalysisPrompt(data);
+  return formatZiweiChartContext(data);
 };
 
 export const formatMeihuaPrompt = (data: MeihuaResponse, question: string) => {
@@ -302,8 +299,7 @@ export const formatMeihuaPrompt = (data: MeihuaResponse, question: string) => {
 ${data.taibuText}
 
 用户求测: "${question}"
-
-请利用梅花易数体用生克之理，分析事情成败、应期及建议。`;
+`;
   }
   const { gua_info, dongyao } = data;
   return `
@@ -315,8 +311,6 @@ ${data.taibuText}
   动爻: ${dongyao || '无'}
 
   用户求测: "${question}"
-
-  请利用梅花易数体用生克之理，分析事情成败、应期及建议。
   `;
 };
 
@@ -326,8 +320,7 @@ export const formatLiuyaoPrompt = (data: LiuyaoResponse, question: string) => {
 ${data.taibuText}
 
 用户问题: "${question}"
-
-请基于六亲、六神、世应及五行生克，结合变卦与空亡神煞，详细推断吉凶成败。`;
+`;
   }
   const { gua_info, sizhu_info, shensha_info, kongwang } = data;
   const ben = gua_info.bengua;
@@ -347,14 +340,11 @@ ${data.taibuText}
   世应: 世爻在${ben.gua_yao_info.shiying.shi_yao_position}爻, 应爻在${ben.gua_yao_info.shiying.ying_yao_position}爻
   
   用户问题: "${question}"
-  
-  请基于六亲、六神、世应及五行生克，结合变卦与空亡神煞，详细推断吉凶成败。
   `;
 };
 
 const formatGenericTaibuPrompt = (
   title: string,
-  roleInstruction: string,
   data: GenericTaibuResponse,
   question: string
 ) => {
@@ -363,15 +353,12 @@ const formatGenericTaibuPrompt = (
 ${data.taibuText || JSON.stringify(data.taibuJson || data.detail_info || data.base_info, null, 2)}
 
 【用户问题】
-${userQuestion}
-
-${roleInstruction}`;
+${userQuestion}`;
 };
 
 export const formatDaliurenPrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '大六壬排盘',
-    '请以大六壬体系为基础，重点参考四课三传、天将、课体、神煞与所问事项，判断吉凶、趋势和应期。',
     data,
     question
   );
@@ -379,7 +366,6 @@ export const formatDaliurenPrompt = (data: GenericTaibuResponse, question: strin
 export const formatTaiyiPrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '太乙神数排盘',
-    '请以太乙神数体系为基础，结合局式、主客、星神、格局信号和所问事项做结构化判断。',
     data,
     question
   );
@@ -387,7 +373,6 @@ export const formatTaiyiPrompt = (data: GenericTaibuResponse, question: string) 
 export const formatXiaoliurenPrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '小六壬排盘',
-    '请以小六壬六宫课体为基础，结合所落宫位、五行属性、诗诀和用户问题做直接判断。',
     data,
     question
   );
@@ -395,7 +380,6 @@ export const formatXiaoliurenPrompt = (data: GenericTaibuResponse, question: str
 export const formatAlmanacPrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '黄历择日',
-    '请结合黄历宜忌、日课干支、神煞、冲煞和用户要做的事情，给出是否适合、注意事项与替代建议。',
     data,
     question
   );
@@ -403,7 +387,6 @@ export const formatAlmanacPrompt = (data: GenericTaibuResponse, question: string
 export const formatDailyFortunePrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '每日运势',
-    '请结合命局日主、当日干支和分类运势，给出今日重点、风险提醒和可执行建议，不要输出重要日期提醒。',
     data,
     question
   );
@@ -411,7 +394,6 @@ export const formatDailyFortunePrompt = (data: GenericTaibuResponse, question: s
 export const formatMonthlyFortunePrompt = (data: GenericTaibuResponse, question: string) =>
   formatGenericTaibuPrompt(
     '每月运势',
-    '请结合命局日主、月度趋势和分类运势，给出本月重点、节奏安排和可执行建议，不要输出重要日期提醒。',
     data,
     question
   );

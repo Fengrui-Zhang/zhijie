@@ -10,6 +10,7 @@ import {
 } from '../lib/bazi-basic-analysis-prompts';
 import { formatPromptCopyMessages } from '../lib/chat-prompt-copy';
 import MarkdownContent from './MarkdownContent';
+import { ChartMasthead } from './DivinationVisualSystem';
 
 interface Props {
   data: BaziResponse;
@@ -900,17 +901,14 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
 
   return (
     <div className="mx-auto my-5 w-full max-w-6xl space-y-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-stone-100/80 pb-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400">四柱八字</div>
-          <h3 className="mt-1 text-2xl font-bold text-stone-900">{base_info.name}（{base_info.sex}）</h3>
-        </div>
-        <div className="text-right text-xs leading-6 text-stone-500">
-          <div>{base_info.gongli}{base_info.nongli ? ` · ${base_info.nongli}` : ''}</div>
-          <div>起运：{base_info.qiyun || '—'}</div>
-          {base_info.zhen && <div className="text-amber-700">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</div>}
-        </div>
-      </div>
+      <ChartMasthead
+        title="四柱八字"
+        subtitle={`${base_info.name}（${base_info.sex}）· ${patternText}`}
+        date={base_info.gongli}
+        meta={`${base_info.nongli || '—'} · 起运 ${base_info.qiyun || '—'}`}
+        symbol="八"
+      />
+      {base_info.zhen ? <div className="-mt-2 mb-3 text-right text-[10px] text-amber-700">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</div> : null}
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
         {tabItems.map((item) => (
@@ -998,7 +996,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       )}
 
       {activeTab === 'professional' && (
-        <div className="rounded-[24px] border border-white/60 bg-white/35 p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
+        <div className="rounded-[24px] border border-white/70 bg-[radial-gradient(circle_at_top,rgba(249,239,210,0.46),rgba(255,255,255,0.35)_62%)] p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
       <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[26px]">
         <table className="w-full table-fixed border-separate border-spacing-0 text-center">
           <thead>
