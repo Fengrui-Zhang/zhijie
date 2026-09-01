@@ -6,6 +6,13 @@ import {
 import { prisma } from '../../../lib/prisma';
 import { VISUAL_RESPONSE_INSTRUCTION } from '../../../lib/chat-prompt-copy';
 import { CHAT_TIMEOUT_MESSAGE, friendlyChatError, isTimeoutLike } from '../../../lib/chat-errors';
+import {
+  createDeepSeekStreamObservation,
+  DEFAULT_CHAT_THINKING,
+  EMPTY_MODEL_CONTENT_MESSAGE,
+  hasUsableAssistantContent,
+  observeDeepSeekSse,
+} from '../../../lib/deepseek-response';
 import { formatKnowledgeContext, retrieveKnowledge, type RetrievedChunk } from '../../../utils/knowledge';
 
 export const runtime = 'nodejs';
@@ -113,7 +120,7 @@ export async function POST(request: Request) {
   const requestedModel = resolveChatModel(body.model);
   const timeoutMs = clampInteger(body.timeoutMs, DEFAULT_TIMEOUT_MS, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);
   const maxTokens = clampInteger(body.maxTokens, DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS, MAX_MAX_TOKENS);
-  const thinking = body.thinking === 'disabled' ? 'disabled' : 'enabled';
+  const thinking = body.thinking === 'enabled' ? 'enabled' : DEFAULT_CHAT_THINKING;
   const responseFormat = body.responseFormat === 'json_object' ? 'json_object' : 'text';
   const visualResponse = body.visualResponse !== false;
 
@@ -230,6 +237,11 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     await refundOnce();
+    console.warn('[chat] provider_fetch_failed', {
+      model: requestedModel,
+      durationMs: Date.now() - requestStartedAt,
+      timeout: isTimeoutLike(error),
+    });
     const message = isTimeoutLike(error)
       ? CHAT_TIMEOUT_MESSAGE
       : friendlyChatError(error, '模型服务连接失败，请稍后重试');
@@ -252,6 +264,12 @@ export async function POST(request: Request) {
     const errorText = await response.text();
     await refundOnce();
     const providerMessage = extractErrorMessage(errorText);
+    console.warn('[chat] provider_rejected', {
+      model: requestedModel,
+      status: response.status,
+      durationMs: Date.now() - requestStartedAt,
+      message: (providerMessage || 'unknown').slice(0, 300),
+    });
     return NextResponse.json(
       { error: providerMessage || '模型服务请求失败，请稍后重试' },
       { status: response.status }
@@ -276,6 +294,8 @@ export async function POST(request: Request) {
     }
     const upstreamReader = response.body.getReader();
     const encoder = new TextEncoder();
+    const streamDecoder = new TextDecoder();
+    const observation = createDeepSeekStreamObservation();
     let streamedBytes = 0;
     let streamCompleted = false;
     const bodyStream = new ReadableStream<Uint8Array>({
@@ -283,16 +303,34 @@ export async function POST(request: Request) {
         try {
           const { value, done } = await upstreamReader.read();
           if (done) {
+            observeDeepSeekSse(observation, streamDecoder.decode(), true);
+            if (!hasUsableAssistantContent(observation.content)) {
+              await refundOnce();
+              console.warn('[chat] stream_empty_content', {
+                model: requestedModel,
+                streamedBytes,
+                reasoningChars: observation.reasoning.length,
+                finishReason: observation.finishReason || 'unknown',
+                durationMs: Date.now() - requestStartedAt,
+              });
+              controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: EMPTY_MODEL_CONTENT_MESSAGE })}\n\n`));
+              controller.close();
+              return;
+            }
             streamCompleted = true;
             console.info('[chat] stream_completed', {
               model: requestedModel,
               streamedBytes,
+              contentChars: observation.content.length,
+              reasoningChars: observation.reasoning.length,
+              finishReason: observation.finishReason || 'unknown',
               durationMs: Date.now() - requestStartedAt,
             });
             controller.close();
             return;
           }
           streamedBytes += value.byteLength;
+          observeDeepSeekSse(observation, streamDecoder.decode(value, { stream: true }));
           controller.enqueue(value);
         } catch (error) {
           await refundOnce();
@@ -328,9 +366,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: friendlyChatError(error, '模型返回格式无效，本次请求不会扣除点数。') }, { status: 502 });
   }
   const content = data.choices?.[0]?.message?.content ?? '';
-  if (!content) {
+  if (!hasUsableAssistantContent(content)) {
     await refundOnce();
-    return NextResponse.json({ error: '模型未返回有效内容，本次请求不会扣除点数。' }, { status: 502 });
+    console.warn('[chat] response_empty_content', {
+      model: requestedModel,
+      reasoningChars: String(data.choices?.[0]?.message?.reasoning_content || '').length,
+      finishReason: String(data.choices?.[0]?.finish_reason || 'unknown'),
+      durationMs: Date.now() - requestStartedAt,
+    });
+    return NextResponse.json({ error: EMPTY_MODEL_CONTENT_MESSAGE }, { status: 502 });
   }
 
   const json: { content: string; knowledgeFailed?: string; knowledgeSources?: KnowledgeSourceSummary[] } = { content };

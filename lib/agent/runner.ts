@@ -119,9 +119,17 @@ async function callDeepSeek(
     if (pointReserved) await refundAgentPoint(userId);
     throw new Error(extractProviderError(raw) || '模型服务请求失败');
   }
-  const payload = await response.json() as ProviderResponse;
+  let payload: ProviderResponse;
+  try {
+    payload = await response.json() as ProviderResponse;
+  } catch {
+    if (pointReserved) await refundAgentPoint(userId);
+    throw new Error('模型返回格式无效，本次调用未扣点。');
+  }
   const message = payload.choices?.[0]?.message;
-  if (!message || (typeof message.content !== 'string' && !Array.isArray(message.tool_calls))) {
+  const hasContent = typeof message?.content === 'string' && message.content.trim().length > 0;
+  const hasToolCalls = Array.isArray(message?.tool_calls) && message.tool_calls.length > 0;
+  if (!message || (!hasContent && !hasToolCalls) || (finalCall && !hasContent)) {
     if (pointReserved) await refundAgentPoint(userId);
     throw new Error('模型返回格式无效，本次调用未扣点。');
   }

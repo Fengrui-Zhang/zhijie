@@ -5,6 +5,11 @@ import { auth } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
 import { calculateTaibuChart } from '../../../../lib/taibu-chart';
 import { ModelType } from '../../../../types';
+import { friendlyChatError, isTimeoutLike } from '../../../../lib/chat-errors';
+import { EMPTY_MODEL_CONTENT_MESSAGE, hasUsableAssistantContent } from '../../../../lib/deepseek-response';
+
+export const runtime = 'nodejs';
+export const maxDuration = 180;
 
 type CandidateDay = {
   date: string;
@@ -59,6 +64,8 @@ type SelectionResult = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 60;
+const PROVIDER_TIMEOUT_MS = 150_000;
+const MAX_OUTPUT_TOKENS = 4_096;
 
 const toDateOnly = (date: Date) => {
   const year = date.getFullYear();
@@ -347,11 +354,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `日期范围最多支持 ${MAX_RANGE_DAYS} 天` }, { status: 400 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { quota: true } });
-  if (!user || user.quota <= 0) {
-    return NextResponse.json({ error: '您的提问额度已用完' }, { status: 403 });
-  }
-
   const caseInfo = await pickCaseInfo(typeof body.caseId === 'string' ? body.caseId : '', userId);
   const birthYear = Number((caseInfo as any)?.chartParams?.year);
   const candidates = await Promise.all(
@@ -379,58 +381,113 @@ export async function POST(request: Request) {
     caseInfo ? `命主信息：${JSON.stringify(caseInfo)}` : '命主信息：未选择，按通用黄历择日。',
     `候选日期：${JSON.stringify(scoredCandidates.slice(0, Math.min(scoredCandidates.length, 35)))}`,
   ].join('\n');
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_FLASH_MODEL,
-      temperature: 0.35,
-      messages: [
-        { role: 'system', content: '你负责结构化择日筛选，只输出可解析 JSON。' },
-        { role: 'user', content: prompt },
-      ],
-    }),
+  const reserved = await prisma.user.updateMany({
+    where: { id: userId, quota: { gt: 0 } },
+    data: { quota: { decrement: 1 } },
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    return NextResponse.json({ error: errorText || '智能择吉请求失败，请稍后重试' }, { status: response.status });
+  if (reserved.count !== 1) {
+    return NextResponse.json({ error: '您的提问额度已用完' }, { status: 403 });
   }
 
-  const payload = await response.json();
-  const content = String(payload.choices?.[0]?.message?.content || '');
-  const result = normalizeSelection(extractJson(content), scoredCandidates, matter);
+  let refunded = false;
+  const refundOnce = async () => {
+    if (refunded) return;
+    refunded = true;
+    await prisma.user.update({ where: { id: userId }, data: { quota: { increment: 1 } } });
+  };
+  const requestStartedAt = Date.now();
 
-  await prisma.user.update({ where: { id: userId }, data: { quota: { decrement: 1 } } });
-  const createdSession = await prisma.divinationSession.create({
-    data: {
-      userId,
-      caseId: caseInfo?.id || null,
-      modelType: ModelType.ALMANAC,
-      title: `择吉日 - ${matter.slice(0, 18)}`,
-      chartParams: {
-        matter,
-        startDate: toDateOnly(start),
-        endDate: toDateOnly(requestedEnd),
-        caseId: caseInfo?.id || null,
-      } as Prisma.InputJsonValue,
-      chartData: {
-        selection: result,
-        candidates: scoredCandidates,
-        caseInfo,
-      } as Prisma.InputJsonValue,
-      messages: {
-        create: [
-          { role: 'user', content: `择吉事项：${matter}\n范围：${toDateOnly(start)} 至 ${toDateOnly(requestedEnd)}${caseInfo ? `\n命主：${caseInfo.title}` : ''}` },
-          { role: 'assistant', content: result.summary },
-        ],
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-    },
-  });
+      body: JSON.stringify({
+        model: DEEPSEEK_FLASH_MODEL,
+        temperature: 0.35,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        thinking: { type: 'disabled' },
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: '你负责结构化择日筛选，只输出可解析 JSON。' },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
 
-  return NextResponse.json({ ...result, sessionId: createdSession.id });
+    if (!response.ok) {
+      const errorText = await response.text();
+      await refundOnce();
+      console.warn('[almanac-selection] provider_rejected', {
+        status: response.status,
+        durationMs: Date.now() - requestStartedAt,
+        message: errorText.slice(0, 300),
+      });
+      return NextResponse.json(
+        { error: errorText || '智能择吉请求失败，本次不会扣除点数，请稍后重试' },
+        { status: response.status },
+      );
+    }
+
+    const payload = await response.json();
+    const content = String(payload.choices?.[0]?.message?.content || '');
+    if (!hasUsableAssistantContent(content)) {
+      await refundOnce();
+      console.warn('[almanac-selection] empty_content', {
+        reasoningChars: String(payload.choices?.[0]?.message?.reasoning_content || '').length,
+        finishReason: String(payload.choices?.[0]?.finish_reason || 'unknown'),
+        durationMs: Date.now() - requestStartedAt,
+      });
+      return NextResponse.json({ error: EMPTY_MODEL_CONTENT_MESSAGE }, { status: 502 });
+    }
+    const result = normalizeSelection(extractJson(content), scoredCandidates, matter);
+
+    const createdSession = await prisma.divinationSession.create({
+      data: {
+        userId,
+        caseId: caseInfo?.id || null,
+        modelType: ModelType.ALMANAC,
+        title: `择吉日 - ${matter.slice(0, 18)}`,
+        chartParams: {
+          matter,
+          startDate: toDateOnly(start),
+          endDate: toDateOnly(requestedEnd),
+          caseId: caseInfo?.id || null,
+        } as Prisma.InputJsonValue,
+        chartData: {
+          selection: result,
+          candidates: scoredCandidates,
+          caseInfo,
+        } as Prisma.InputJsonValue,
+        messages: {
+          create: [
+            { role: 'user', content: `择吉事项：${matter}\n范围：${toDateOnly(start)} 至 ${toDateOnly(requestedEnd)}${caseInfo ? `\n命主：${caseInfo.title}` : ''}` },
+            { role: 'assistant', content: result.summary },
+          ],
+        },
+      },
+    });
+
+    console.info('[almanac-selection] completed', {
+      rangeDays,
+      selectedCount: result.selected.length,
+      contentChars: content.length,
+      durationMs: Date.now() - requestStartedAt,
+    });
+    return NextResponse.json({ ...result, sessionId: createdSession.id });
+  } catch (error) {
+    await refundOnce();
+    console.warn('[almanac-selection] failed', {
+      timeout: isTimeoutLike(error),
+      durationMs: Date.now() - requestStartedAt,
+      message: error instanceof Error ? error.message.slice(0, 300) : 'unknown',
+    });
+    const message = isTimeoutLike(error)
+      ? '智能择吉分析超时，本次不会扣除点数，请稍后重试。'
+      : friendlyChatError(error, '智能择吉分析失败，本次不会扣除点数，请稍后重试。');
+    return NextResponse.json({ error: message }, { status: isTimeoutLike(error) ? 504 : 502 });
+  }
 }

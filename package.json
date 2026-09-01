@@ -9,7 +9,7 @@
     "build": "(prisma migrate deploy || true) && next build",
     "start": "next start",
     "lint": "next lint",
-    "test:agent": "tsx --test tests/agent-billing.test.ts tests/agent-time-budget.test.ts tests/agent-time-rules.test.ts tests/agent-tools-contract.test.ts tests/bazi-compatibility.test.ts tests/chat-errors.test.ts tests/kline-request.test.ts tests/prompt-dedup.test.ts tests/ziwei-fengshui.test.ts",
+    "test:agent": "tsx --test tests/agent-billing.test.ts tests/agent-time-budget.test.ts tests/agent-time-rules.test.ts tests/agent-tools-contract.test.ts tests/bazi-compatibility.test.ts tests/chat-errors.test.ts tests/deepseek-response.test.ts tests/kline-request.test.ts tests/prompt-dedup.test.ts tests/ziwei-fengshui.test.ts",
     "ingest:knowledge": "node scripts/ingest-knowledge.mjs",
     "rechart:cases": "npx tsx scripts/rebuild-local-charts.ts",
     "backfill:wuxing-calibration": "npx tsx scripts/backfill-wuxing-calibration.ts",

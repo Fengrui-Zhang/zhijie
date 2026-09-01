@@ -1,6 +1,7 @@
 import { ChatModel } from '../lib/analysis-models';
 import { formatPromptCopyMessages, type PromptCopyMessage } from '../lib/chat-prompt-copy';
 import { friendlyChatError } from '../lib/chat-errors';
+import { EMPTY_MODEL_CONTENT_MESSAGE, hasUsableAssistantContent } from '../lib/deepseek-response';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -111,28 +112,34 @@ export const sendMessageToDeepseek = async (
     throw new Error('Chat session not initialized. Please start a reading first.');
   }
 
+  const previousLength = chatMessages.length;
   chatMessages.push({ role: 'user', content: message });
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: chatMessages,
+        knowledge,
+      }),
+    });
 
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      messages: chatMessages,
-      knowledge,
-    }),
-  });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
+    }
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(extractResponseError(errorText, '模型请求失败，请稍后重试'));
+    const data = await response.json();
+    const content = typeof data.content === 'string' ? data.content : '';
+    if (!hasUsableAssistantContent(content)) throw new Error(EMPTY_MODEL_CONTENT_MESSAGE);
+    chatMessages.push({ role: 'assistant', content });
+    return content;
+  } catch (error) {
+    chatMessages.length = previousLength;
+    throw new Error(friendlyChatError(error));
   }
-
-  const data = await response.json();
-  const content = data.content || '无法获取回复';
-  chatMessages.push({ role: 'assistant', content });
-  return content;
 };
 
 type StreamState = {
@@ -188,7 +195,8 @@ export const sendMessageToDeepseekStream = async (
 
     if (!response.body) {
       const data = await response.json();
-      const content = data.content || '无法获取回复';
+      const content = typeof data.content === 'string' ? data.content : '';
+      if (!hasUsableAssistantContent(content)) throw new Error(EMPTY_MODEL_CONTENT_MESSAGE);
       chatMessages.push({ role: 'assistant', content });
       return {
         reasoning: '',
@@ -243,8 +251,8 @@ export const sendMessageToDeepseekStream = async (
       }
     }
 
-    if (!reasoningText && !contentText) {
-      throw new Error('AI 未返回有效内容，本次请求不会扣除点数，请稍后重试。');
+    if (!hasUsableAssistantContent(contentText)) {
+      throw new Error(EMPTY_MODEL_CONTENT_MESSAGE);
     }
 
     chatMessages.push({ role: 'assistant', content: contentText });
