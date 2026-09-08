@@ -37,12 +37,37 @@ test('自身与坐下根、同地支禄根只记一次', () => {
   assert.ok(result.roots.find((root) => root.pillarKey === 'year')?.tags.includes('禄根'));
 });
 
-test('家内相连同类根合并，年和月保留独立来源', () => {
+test('同气天干不触发家内生扶合并，各柱直接地支根分别计入', () => {
   const result = analyzeBaziCharacter(chart(['甲寅', '乙卯', '甲寅', '乙卯']), target)!;
-  assert.equal(result.finalShares, 3);
+  assert.equal(result.finalShares, 4);
   assert.equal(result.parties.length, 3);
   assert.equal(new Set(result.units.flatMap((unit) => unit.memberKeys)).size, 4);
-  assert.ok(result.units.some((unit) => unit.id === 'home:support'));
+  assert.ok(!result.units.some((unit) => unit.id === 'home:support'));
+  assert.ok(!result.units.flatMap((unit) => unit.paths).some((path) => path.includes('↔')));
+});
+
+test('有根的同五行天干也不计份，同干与异阴阳均只保留同气关系', () => {
+  for (const peer of ['丙', '丁']) {
+    const result = analyzeBaziCharacter(chart(['庚午', `${peer}子`, '丁酉', '辛丑']), target)!;
+    assert.equal(result.finalShares, 2, peer);
+    assert.deepEqual(result.units.map((unit) => unit.id), ['day:column', 'year:column']);
+    assert.deepEqual(result.sources.find((source) => source.id === 'month:peer')!.tags, ['同气明透 · 不计份']);
+    assert.ok(!result.parties.some((party) => party.key === 'month'));
+  }
+});
+
+test('岁运同气天干不加份，岁运地支根仍独立计份并随切换恢复', () => {
+  const natal = chart(['庚午', '壬子', '丁酉', '辛丑']);
+  const baseline = analyzeBaziCharacter(natal, target)!;
+  for (const key of ['dayun', 'liunian']) {
+    const peer = analyzeBaziCharacter([...natal, flow(key, '丙子')], target)!;
+    assert.deepEqual(peer.units, baseline.units);
+    assert.equal(peer.addedUnits.length, 0);
+    const rooted = analyzeBaziCharacter([...natal, flow(key, '丙午')], target)!;
+    assert.equal(rooted.finalShares, baseline.finalShares + 1);
+    assert.deepEqual(rooted.addedUnits[0].sourceLabels, [`${key === 'dayun' ? '大运' : '流年'}地支午`]);
+  }
+  assert.deepEqual(analyzeBaziCharacter(natal, target)!.units, baseline.units);
 });
 
 test('无根无气仍有自身虚浮落点，不冒充有效力量', () => {

@@ -119,7 +119,9 @@ function countSourceUnits(columns: readonly AnalysisPillar[], selection: Charact
     countedSourceIds.add(source.id);
   }
 
-  for (const source of sources.filter((item) => item.category !== 'root')) {
+  // Same-element visible stems are relationships, never roots or share donors.
+  // Only generating sources enter this expansion; branch roots were counted above.
+  for (const source of sources.filter((item) => item.category === 'support')) {
     const column = columns.find((item) => item.key === source.pillarKey)!;
     const sameColumn = column.key === target.key;
     const adjacent = column.kind === 'natal' && target.kind === 'natal' && Math.abs(natal.indexOf(column) - natal.indexOf(target)) === 1;
@@ -140,10 +142,9 @@ function countSourceUnits(columns: readonly AnalysisPillar[], selection: Charact
     const donorStem = column.ganZhi[0];
     const donorRoots = rootsOf(donorStem);
     if (!donorRoots.length) continue;
-    const relationship = source.category === 'peer' ? '同类帮扶' : '生扶';
     const connectedRoots = donorRoots.filter((root) => root.key === column.key || (isHome(column) && isHome(root)));
     const evidenceRoots = connectedRoots.length ? connectedRoots : donorRoots;
-    add(column, 'stem', source.path, `${involvesFlow ? '岁运介入' : sameColumn ? '同柱' : homeContact ? '家内来源' : '相邻天干'}${relationship}，供方有明确根基才参与。同柱与家内相连来源分别合并。`, true);
+    add(column, 'stem', source.path, `${involvesFlow ? '岁运介入' : sameColumn ? '同柱' : homeContact ? '家内来源' : '相邻天干'}生扶，供方有明确根基才参与。同柱与家内相连来源分别合并。`, true);
     for (const donorRoot of evidenceRoots) {
       const path = `${donorRoot.title}${donorRoot.ganZhi[1]}（${rootRelation(donorStem, donorRoot.ganZhi[1])}）→ ${column.title}${donorStem} → ${target.title}${stem}`;
       if (connectedRoots.includes(donorRoot)) {
@@ -255,7 +256,7 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
       id: `${column.key}:peer`, pillarKey: column.key, layer: column.kind, category: 'peer',
       label: `${column.title}天干${gan}`, tags: [gan === stem ? '同干明透' : '同类明透'],
       path: `${column.title}${gan} ↔ ${targetName}`,
-      note: '同类明透不等于地支根；符合位置规则且供方有根时才参与，重合来源合并。',
+      note: '同五行天干仅记录同气关系，不作为根源或份额供方，也不经它展开根源。地支根独立判断。',
     });
   }
 
@@ -296,6 +297,10 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
   }
   for (const source of sources) {
     if (source.category === 'root') continue;
+    if (source.category === 'peer') {
+      source.tags = ['同气明透 · 不计份'];
+      continue;
+    }
     const counted = ledger.countedSourceIds.has(source.id);
     const sourceColumn = validColumns.find((column) => column.key === source.pillarKey)!;
     const hiddenFeedOnly = source.id.endsWith('support-branch') && stemElement(HIDDEN_STEMS[sourceColumn.ganZhi[1]][0]) !== supportElement;
@@ -305,12 +310,12 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
       continue;
     }
     const mergedViaOtherPath = ledger.units.some((unit) => unit.memberKeys.includes(source.pillarKey));
-    source.tags = [counted ? source.category === 'support' ? '生扶参与' : '同类参与' : mergedViaOtherPath ? '来源已合并' : source.category === 'support' ? '生扶线索 · 未计份' : '同类线索 · 未计份'];
+    source.tags = [counted ? '生扶参与' : mergedViaOtherPath ? '来源已合并' : '生扶线索 · 未计份'];
     source.note = counted ? `${source.note}已按来源单位计入，重复路径不重复加份。`
       : mergedViaOtherPath ? '此条线索本身不额外计份；同柱已作为自身、根源或家内生扶计入，详见份额明细，不能再拆出一份。'
         : `${source.note}此处未满足参与条件，暂不加份。`;
   }
-  const rootStatus = roots.length ? '有根系可查' : support.some((source) => ledger.countedSourceIds.has(source.id)) ? '无根 · 有生扶' : support.length ? '无根 · 生扶待核' : peers.length ? '无根 · 同类待核' : '无根无气';
+  const rootStatus = roots.length ? '有根系可查' : support.some((source) => ledger.countedSourceIds.has(source.id)) ? '无根 · 有生扶' : support.length ? '无根 · 生扶待核' : peers.length ? '无根 · 同气明透' : '无根无气';
   return {
     target, selection, char, stem, branch, element, dayMaster, location,
     polarity: (selection.kind === 'branch' ? BRANCHES.indexOf(branch) : STEMS.indexOf(stem)) % 2 === 0 ? '阳' : '阴',

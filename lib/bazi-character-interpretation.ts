@@ -19,7 +19,7 @@ export function describeCharacterSource(analysis: CharacterAnalysis, source: Cha
     return `${source.label}${meaning}。${lu}`;
   }
   if (source.category === 'peer') {
-    return `${source.label}与${target}同属${analysis.element}，呈同气相助之象。`;
+    return `${source.label}与${target}同属${analysis.element}，为天干同气关系。`;
   }
   const donorElement = stemElement(char);
   if (donorElement) return `${source.label}属${donorElement}，${donorElement}生${analysis.element}，与${target}形成生扶关系。`;
@@ -58,5 +58,5 @@ export function describeShareUnit(analysis: CharacterAnalysis, unit: ShareUnit):
       : `${analysis.location}是所查之字的自身落点，为其中一份。`;
   }
   if (roots.length) return `${roots.map((root) => root.label).join('、')}承接${target}的根气，构成这一份根源。`;
-  return `${labels}通过下方的生扶或同气联系参与${target}，构成这一份来源。`;
+  return `${labels}通过下方的生扶联系参与${target}，构成这一份来源。`;
 }
