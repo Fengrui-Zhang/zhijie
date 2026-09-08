@@ -13,6 +13,8 @@ import MarkdownContent from './MarkdownContent';
 import { ChartMasthead } from './DivinationVisualSystem';
 import { tenGodKnowledge } from '../lib/bazi-character-knowledge';
 import { BaziCharacterInspector } from './BaziCharacterInspector';
+import BaziLayoutSettings from './BaziLayoutSettings';
+import { orderBaziColumns, useBaziLayout } from '../hooks/useBaziLayout';
 import { analyzeBaziCharacter, characterTenGod, HIDDEN_STEMS, type CharacterSelection } from '../lib/bazi-character-analysis';
 
 interface Props {
@@ -236,7 +238,7 @@ const HiddenStemStack = ({ value, onSelect, selectedStem }: { value?: string; on
     <div className="flex flex-col items-center gap-1">
       {pairs.map((item, index) => (
         <div key={`${item.stem}-${item.tenGod}-${index}`} className="flex items-center justify-center gap-1 whitespace-nowrap">
-          <button type="button" onClick={() => onSelect(item.stem)} aria-label={`查看藏干${item.stem}的来源与份额`} aria-pressed={selectedStem === item.stem}
+          <button type="button" onClick={() => onSelect(item.stem)} aria-label={`查看藏干${item.stem}的含义`} aria-pressed={selectedStem === item.stem}
             className={`flex min-h-7 min-w-7 items-center justify-center rounded-lg text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 md:text-sm ${getWuxingColor(item.stem)} ${selectedStem === item.stem ? 'bg-amber-100 ring-1 ring-amber-400' : 'hover:bg-white/90 hover:ring-1 hover:ring-amber-200'}`}>{item.stem}</button>
           {item.tenGod && (
             <>
@@ -548,6 +550,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [shenShaExpanded, setShenShaExpanded] = useState(false);
+  const { layout } = useBaziLayout();
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterSelection | null>(null);
   const closeCharacter = React.useCallback(() => setSelectedCharacter(null), []);
   const chartIdentity = `${caseId || ''}:${bazi_info.bazi.join('|')}:${base_info.gongli || ''}`;
@@ -691,7 +694,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     { key: 'ai', label: 'AI解读' },
     { key: 'notes', label: '断事笔记' },
   ];
-  const tableColumns = useMemo(() => {
+  const analysisColumns = useMemo(() => {
     const natalColumns = pillars.map((pillar) => ({
       kind: 'natal' as const,
       key: pillar.label,
@@ -784,7 +787,8 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     return [...natalColumns, ...flowColumns];
   }, [liuriList, liuyueList, pillars, selectedDayItem, selectedDayun, selectedMonthItem, selectedYearItem]);
 
-  const characterAnalysis = useMemo(() => selectedCharacter ? analyzeBaziCharacter(tableColumns, selectedCharacter) : null, [tableColumns, selectedCharacter]);
+  const tableColumns = useMemo(() => orderBaziColumns(analysisColumns, layout), [analysisColumns, layout]);
+  const characterAnalysis = useMemo(() => selectedCharacter ? analyzeBaziCharacter(analysisColumns, selectedCharacter) : null, [analysisColumns, selectedCharacter]);
   // A hidden stem or time layer may disappear when the user changes a period.
   React.useEffect(() => {
     if (selectedCharacter && !characterAnalysis) setSelectedCharacter(null);
@@ -909,9 +913,13 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       {activeTab === 'professional' && (
         <div className="rounded-[24px] border border-white/70 bg-[radial-gradient(circle_at_top,rgba(249,239,210,0.46),rgba(255,255,255,0.35)_62%)] p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
-        <p className="text-[11px] leading-5 text-stone-500">点击天干、地支或藏干，查看象意、根源与份额。</p>
+        <p className="text-[11px] leading-5 text-stone-500">点击单字查看解读；藏干展示五行、十神与宫位象意。</p>
         <div className="text-[10px] leading-5 text-stone-500">{periodLabel}</div>
       </div>
+      <details className="mb-3 rounded-2xl border border-white/70 bg-white/60 px-3 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-stone-600">排盘设置</summary>
+        <div className="max-w-md pb-2 pt-3"><BaziLayoutSettings /></div>
+      </details>
       <div className="glass-panel-soft overflow-x-auto rounded-[20px] border border-white/60 md:rounded-[26px]">
         <table className="w-full table-fixed border-separate border-spacing-0 text-center" style={{ minWidth: 44 + tableColumns.length * 64 }}>
           <thead>
@@ -959,7 +967,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                       : characterKind && content !== '—' ? <button type="button"
                           aria-label={`查看${column.title}${row}${content}的来源与份额`} aria-pressed={activeCharacter}
                           onClick={() => setSelectedCharacter({ columnKey: column.key, kind: characterKind })}
-                          className={`mx-auto flex h-10 w-full max-w-12 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 md:h-12 ${activeCharacter ? 'bg-amber-100 ring-1 ring-amber-400 shadow-sm' : 'hover:bg-white/90 hover:ring-1 hover:ring-amber-200'} ${row === '地支' && characterAnalysis?.roots.some((root) => root.pillarKey === column.key) ? 'underline decoration-amber-500/50 decoration-dotted underline-offset-8' : ''}`}>
+                          className={`mx-auto flex h-10 w-full max-w-12 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 md:h-12 ${activeCharacter ? 'bg-amber-100 ring-1 ring-amber-400 shadow-sm' : 'hover:bg-white/90 hover:ring-1 hover:ring-amber-200'} ${row === '地支' && selectedCharacter?.kind !== 'hidden' && characterAnalysis?.roots.some((root) => root.pillarKey === column.key) ? 'underline decoration-amber-500/50 decoration-dotted underline-offset-8' : ''}`}>
                           {content}
                         </button> : content;
                   return (

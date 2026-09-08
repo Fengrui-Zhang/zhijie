@@ -116,6 +116,7 @@ import AuthForm from './components/AuthForm';
 import SessionSidebar, { type SessionItem } from './components/SessionSidebar';
 import AdminPanel from '@/components/AdminPanel';
 import AccountSettingsModal from '@/components/AccountSettingsModal';
+import BaziLayoutSettings from '@/components/BaziLayoutSettings';
 import UserMenuPopup from './components/UserMenuPopup';
 import ChangePasswordModal from './components/ChangePasswordModal';
 
@@ -8680,6 +8681,7 @@ const App: React.FC<AppProps> = ({
                     {appPreferences.historyEnabled ? '已开启' : '已关闭'}
                   </button>
                 </div>
+                <div className="px-5 py-4"><BaziLayoutSettings /></div>
                 <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <div className="text-sm font-bold text-stone-700">排盘问答参考古籍</div>

@@ -7,6 +7,7 @@ import { useDialogFocus } from '../hooks/useDialogFocus';
 import { ELEMENT_MEANINGS, type CharacterAnalysis, type CharacterSelection, type CharacterSource } from '../lib/bazi-character-analysis';
 import { tenGodKnowledge } from '../lib/bazi-character-knowledge';
 import { describeCharacterSource, describeShareUnit } from '../lib/bazi-character-interpretation';
+import { CHARACTER_SYMBOLISM, TEN_GOD_SYMBOLISM, palaceSymbolism, type SymbolismGroup } from '../lib/bazi-character-symbolism';
 import { getWuxingColor } from '../utils/wuxing';
 
 interface Props {
@@ -43,6 +44,15 @@ function SourceList({ sources, analysis }: { sources: CharacterSource[]; analysi
   </div>;
 }
 
+function MeaningGroups({ groups }: { groups: SymbolismGroup[] }) {
+  return <dl className="mt-3 space-y-3 rounded-2xl border border-stone-200/60 bg-white/60 p-3">
+    {groups.map((group) => <div key={group.label}>
+      <dt className="mb-1 text-[10px] font-semibold tracking-wide text-amber-900/70">{group.label}</dt>
+      <dd className="text-[11px] leading-5 text-stone-600">{group.text}</dd>
+    </div>)}
+  </dl>;
+}
+
 export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSelect, onClose }: Props) {
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1199px)').matches);
   const headingId = useId();
@@ -71,6 +81,8 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
 
   const element = ELEMENT_MEANINGS[analysis.element];
   const god = tenGodKnowledge[analysis.tenGod];
+  const hiddenOnly = analysis.selection.kind === 'hidden';
+  const palace = palaceSymbolism(analysis);
   const natalSupport = analysis.sources.filter((source) => source.layer === 'natal' && source.category !== 'root');
   const delta = analysis.natalShares === null ? null : analysis.finalShares - analysis.natalShares;
   if (typeof document === 'undefined') return null;
@@ -84,18 +96,18 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
         <div className="flex items-start gap-3">
           <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white bg-white/80 font-serif text-4xl shadow-sm ${getWuxingColor(analysis.char)}`}>{analysis.char}</div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold tracking-[0.18em] text-amber-800/60">一字溯源</div>
+            <div className="text-[10px] font-semibold tracking-[0.18em] text-amber-800/60">{hiddenOnly ? '藏干释义' : '一字溯源'}</div>
             <h2 id={headingId} className="mt-1 text-base font-semibold text-stone-900">{analysis.location}</h2>
             <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-stone-600">
               <span>{analysis.polarity}{analysis.element}</span><span aria-hidden="true">·</span>
               <span>{analysis.isDayMaster ? '日主' : analysis.selection.kind === 'branch' ? `本气${analysis.stem} · ${analysis.tenGod}` : analysis.tenGod}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭一字溯源" className="-mr-2 -mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl text-stone-500 transition hover:bg-stone-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700">×</button>
+          <button type="button" onClick={onClose} aria-label="关闭单字解读" className="-mr-2 -mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl text-stone-500 transition hover:bg-stone-200/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700">×</button>
         </div>
         <div className="mt-3 flex items-start gap-2 text-[11px] leading-5 text-stone-600" aria-live="polite" aria-atomic="true">
           <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600" />
-          <span>{periodLabel} · {analysis.finalShares}份{delta !== null && dayunValue !== null ? ` · 较本命${delta >= 0 ? '+' : ''}${delta}` : ''}</span>
+          <span>{periodLabel}{!hiddenOnly && <> · {analysis.finalShares}份{delta !== null && dayunValue !== null ? ` · 较本命${delta >= 0 ? '+' : ''}${delta}` : ''}</>}</span>
         </div>
       </header>
 
@@ -104,13 +116,15 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
           <p className="text-xs leading-6 text-stone-700">{analysis.imagery}</p>
           <p className="mt-1 text-[11px] leading-5 text-stone-500">{element.text}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{element.images.map((image) => <span key={image} className="rounded-md bg-stone-100 px-2 py-1 text-[10px] text-stone-600">{image}</span>)}</div>
+          {CHARACTER_SYMBOLISM[analysis.char] && <MeaningGroups groups={CHARACTER_SYMBOLISM[analysis.char]} />}
         </DetailSection>
 
         <DetailSection number="02" title="十神关系" aside={`以日主${analysis.dayMaster}为参照`}>
           <div className="flex items-baseline gap-2"><span className="text-sm font-semibold text-stone-800">{analysis.isDayMaster ? '日主 · 自身' : analysis.tenGod}</span><span className="text-[10px] text-stone-500">{analysis.isDayMaster ? '十神参照' : god?.element}</span></div>
           <p className="mt-1.5 text-xs leading-6 text-stone-600">{analysis.isDayMaster ? '日干是十神判断的参照点。其他干与日干的五行生克、阴阳异同，共同确定十神。' : god?.meaning}</p>
+          {!analysis.isDayMaster && TEN_GOD_SYMBOLISM[analysis.tenGod] && <MeaningGroups groups={TEN_GOD_SYMBOLISM[analysis.tenGod]} />}
           {analysis.selection.kind !== 'stem' && <div className="mt-3">
-            <div className="mb-2 text-[10px] leading-5 text-stone-500">地支含多个藏干，十神分别判断。点击切换藏干溯源：</div>
+            <div className="mb-2 text-[10px] leading-5 text-stone-500">各藏干的十神与含义：</div>
             <div className="flex flex-wrap gap-2">{analysis.hidden.map((item) => <button key={item.stem} type="button" onClick={() => onSelect({ columnKey: analysis.target.key, kind: 'hidden', hiddenStem: item.stem })}
               aria-pressed={analysis.selection.kind === 'hidden' && analysis.stem === item.stem}
               className={`rounded-xl border px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 ${analysis.stem === item.stem ? 'border-amber-300 bg-amber-50' : 'border-stone-200 bg-white hover:bg-stone-50'}`}>
@@ -119,7 +133,13 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
           </div>}
         </DetailSection>
 
-        <DetailSection number="03" title="寻根基 · 找出处" aside={analysis.rootStatus}>
+        <DetailSection number="03" title="宫位象意" aside={palace.title}>
+          <p className="text-xs leading-6 text-stone-700">{palace.meaning}</p>
+          <MeaningGroups groups={palace.groups} />
+        </DetailSection>
+
+        {!hiddenOnly && <>
+        <DetailSection number="04" title="寻根基 · 找出处" aside={analysis.rootStatus}>
           {analysis.selection.kind === 'branch' && <p className="mb-2 text-[11px] leading-5 text-stone-500">当前按地支本气{analysis.stem}查来源；其他藏干可在上方分别查看。</p>}
           <div className="mb-2 text-[10px] font-semibold text-stone-500">本命根源 · {analysis.natalRoots.length}处</div>
           {analysis.natalRoots.length ? <SourceList sources={analysis.natalRoots} analysis={analysis} /> : <p className="rounded-xl border border-dashed border-stone-300 p-3 text-xs leading-6 text-stone-500">原局未见{analysis.element}的长生、同五行根或墓库根。{analysis.roots.length ? '当前岁运带入了根系，见下方岁运来源。' : '有无生扶，另看下面的作用路径。'}</p>}
@@ -134,7 +154,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
           </div>}
         </DetailSection>
 
-        <DetailSection number="04" title="定份额">
+        <DetailSection number="05" title="定份额">
           <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white p-4">
             <div className="flex items-end justify-between gap-2">
               <div><div className="text-[10px] text-amber-900/70">当前来源份额</div><div className="mt-1 text-4xl font-semibold tracking-tight text-stone-900">{analysis.finalShares}<span className="ml-1.5 text-sm font-normal text-stone-500">份</span></div></div>
@@ -163,6 +183,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
             </div>
           </details>
         </DetailSection>
+        </>}
       </div>
 
     </div>
