@@ -16,7 +16,8 @@
     "seed": "npx tsx prisma/seed.ts",
     "experiment:bazi": "node --experimental-strip-types ./实验/cli.ts",
     "experiment:casebook": "node --experimental-strip-types ./实验/casebook.ts",
-    "experiment:build-raw-index": "node --experimental-strip-types ./实验/build_raw_index.ts"
+    "experiment:build-raw-index": "node --experimental-strip-types ./实验/build_raw_index.ts",
+    "test:bazi-sources": "node --import tsx --test tests/bazi-character-analysis.test.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

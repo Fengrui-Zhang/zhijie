@@ -11,6 +11,9 @@ import {
 import { formatPromptCopyMessages } from '../lib/chat-prompt-copy';
 import MarkdownContent from './MarkdownContent';
 import { ChartMasthead } from './DivinationVisualSystem';
+import { tenGodKnowledge } from '../lib/bazi-character-knowledge';
+import { BaziCharacterInspector } from './BaziCharacterInspector';
+import { analyzeBaziCharacter, characterTenGod, HIDDEN_STEMS, type CharacterSelection } from '../lib/bazi-character-analysis';
 
 interface Props {
   data: BaziResponse;
@@ -86,117 +89,6 @@ const dayMasterDescriptions: Record<string, string> = {
   癸: '癸水如雨露泉水，细腻聪慧，善观察与渗透。得金水则灵性充足，土火过重时需要补充安全感和恢复力。',
 };
 
-const tenGodKnowledge: Record<string, {
-  alias: string;
-  element: string;
-  shortDesc: string;
-  meaning: string;
-  represent: string[];
-  character: string[];
-  career: string;
-  relationship: string;
-}> = {
-  比肩: {
-    alias: '比劫、兄弟',
-    element: '与日主同五行、同阴阳',
-    shortDesc: '代表兄弟、朋友、同辈',
-    meaning: '比肩代表独立、自主和平等竞争，也象征同辈之间的支持与较量。',
-    represent: ['兄弟', '朋友', '同事', '合作伙伴', '同辈'],
-    character: ['独立自主', '坚强', '重义气', '竞争意识强'],
-    career: '适合自主性强、需要协作或竞争意识的领域。',
-    relationship: '关系中重平等和尊重，不宜过度控制或依附。',
-  },
-  劫财: {
-    alias: '败财、阳刃',
-    element: '与日主同五行、异阴阳',
-    shortDesc: '代表竞争、消耗、行动力',
-    meaning: '劫财代表争夺、破局和行动冲劲，用得好是胆识，用偏则成冲动消耗。',
-    represent: ['竞争者', '对手', '朋友', '破财', '机会争夺'],
-    character: ['好胜', '直接', '敢冲', '重情义'],
-    career: '适合开拓、销售、竞技、创业等需要胆量的工作。',
-    relationship: '需注意冲动表达和第三方干扰，感情中要减少较劲。',
-  },
-  食神: {
-    alias: '寿星、爵星',
-    element: '日主所生、同阴阳',
-    shortDesc: '代表才华、福气、表达',
-    meaning: '食神代表自然流露的才华、口福、享受和温和的创造力。',
-    represent: ['才艺', '表达', '口福', '创造力', '子女'],
-    character: ['温和', '乐观', '有审美', '会表达'],
-    career: '适合教育、内容、餐饮、艺术、服务等领域。',
-    relationship: '感情中体贴轻松，适合细水长流。',
-  },
-  伤官: {
-    alias: '伤星',
-    element: '日主所生、异阴阳',
-    shortDesc: '代表创意、锋芒、突破',
-    meaning: '伤官代表强表达、创新和挑战规则的力量，才华明显但也容易锋芒外露。',
-    represent: ['才华', '创新', '表现欲', '突破', '子女'],
-    character: ['聪明', '不服管', '表达强', '追求自由'],
-    career: '适合创意、设计、传播、技术突破和个人品牌。',
-    relationship: '容易挑剔，需要被理解和欣赏。',
-  },
-  偏财: {
-    alias: '横财',
-    element: '日主所克、同阴阳',
-    shortDesc: '代表机会财、人脉、父亲',
-    meaning: '偏财代表流动资源、机会、人情往来和非固定收入。',
-    represent: ['投资', '客户', '父亲', '偏财', '资源'],
-    character: ['慷慨', '会交际', '机会感强', '灵活'],
-    career: '适合经营、投资、市场、商务和资源整合。',
-    relationship: '异性缘和社交机会较多，需守住边界。',
-  },
-  正财: {
-    alias: '财星',
-    element: '日主所克、异阴阳',
-    shortDesc: '代表稳定收入、现实经营',
-    meaning: '正财代表稳定收益、务实经营和对现实生活的掌控。',
-    represent: ['工资', '资产', '妻子', '稳定财源', '生活秩序'],
-    character: ['务实', '谨慎', '守信', '重结果'],
-    career: '适合财务、运营、管理、银行、实业等稳定领域。',
-    relationship: '重责任和长期建设，表达可能偏实际。',
-  },
-  七杀: {
-    alias: '偏官、七煞',
-    element: '克日主、同阴阳',
-    shortDesc: '代表压力、权威、竞争',
-    meaning: '七杀代表挑战、压力、纪律和强竞争环境，制化得宜则有魄力。',
-    represent: ['压力', '上司', '权威', '风险', '丈夫'],
-    character: ['果断', '有冲劲', '抗压', '强势'],
-    career: '适合管理、军警、法律、竞技、创业攻坚。',
-    relationship: '需处理强弱关系，避免压迫式沟通。',
-  },
-  正官: {
-    alias: '官星',
-    element: '克日主、异阴阳',
-    shortDesc: '代表规则、事业、名誉',
-    meaning: '正官代表秩序、责任、规范和正向约束，是社会角色与名誉的象征。',
-    represent: ['职位', '规则', '上司', '丈夫', '名誉'],
-    character: ['自律', '负责', '守规矩', '重名声'],
-    career: '适合体制、管理、法律、行政和标准化行业。',
-    relationship: '重承诺和责任，适合正式稳定关系。',
-  },
-  偏印: {
-    alias: '枭神、枭印',
-    element: '生日主、同阴阳',
-    shortDesc: '代表独特思维、偏门学问',
-    meaning: '偏印代表非主流知识、灵感、内在保护和独特理解力。',
-    represent: ['研究', '艺术', '宗教', '玄学', '继母'],
-    character: ['独立', '敏感', '钻研', '不随俗'],
-    career: '适合研究、咨询、艺术、技术、玄学和小众专业。',
-    relationship: '需要精神理解，容易显得疏离。',
-  },
-  正印: {
-    alias: '印绶、印星',
-    element: '生日主、异阴阳',
-    shortDesc: '代表学习、贵人、母亲',
-    meaning: '正印代表稳定支持、正统学习、保护力和贵人资源。',
-    represent: ['母亲', '学历', '贵人', '证书', '房产'],
-    character: ['温和', '重学问', '有包容', '重安全'],
-    career: '适合教育、学术、医疗、咨询、文化和服务领域。',
-    relationship: '照顾欲强，但需避免过度保护。',
-  },
-};
 
 const hiddenText = (stems?: string, gods?: string) => {
   const stemList = splitList(stems);
@@ -337,14 +229,15 @@ const FlowRail = ({ title, meta, children }: { title: string; meta?: string; chi
   </section>
 );
 
-const HiddenStemStack = ({ value }: { value?: string }) => {
+const HiddenStemStack = ({ value, onSelect, selectedStem }: { value?: string; onSelect: (stem: string) => void; selectedStem?: string }) => {
   const pairs = parseHiddenStemPairs(value);
   if (!pairs.length) return <span className="text-stone-400">—</span>;
   return (
     <div className="flex flex-col items-center gap-1">
       {pairs.map((item, index) => (
         <div key={`${item.stem}-${item.tenGod}-${index}`} className="flex items-center justify-center gap-1 whitespace-nowrap">
-          <span className={`text-xs font-bold md:text-sm ${getWuxingColor(item.stem)}`}>{item.stem}</span>
+          <button type="button" onClick={() => onSelect(item.stem)} aria-label={`查看藏干${item.stem}的来源与份额`} aria-pressed={selectedStem === item.stem}
+            className={`flex min-h-7 min-w-7 items-center justify-center rounded-lg text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 md:text-sm ${getWuxingColor(item.stem)} ${selectedStem === item.stem ? 'bg-amber-100 ring-1 ring-amber-400' : 'hover:bg-white/90 hover:ring-1 hover:ring-amber-200'}`}>{item.stem}</button>
           {item.tenGod && (
             <>
               <span className="text-[10px] text-stone-300">·</span>
@@ -655,6 +548,17 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [shenShaExpanded, setShenShaExpanded] = useState(false);
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterSelection | null>(null);
+  const closeCharacter = React.useCallback(() => setSelectedCharacter(null), []);
+  const chartIdentity = `${caseId || ''}:${bazi_info.bazi.join('|')}:${base_info.gongli || ''}`;
+  React.useEffect(() => {
+    setSelectedCharacter(null);
+    setSelectedDayunIndex(null);
+    setSelectedYear(null);
+    setSelectedMonth(null);
+    setSelectedDay(null);
+  }, [chartIdentity]);
+  React.useEffect(() => { if (activeTab !== 'professional') setSelectedCharacter(null); }, [activeTab]);
 
   React.useEffect(() => {
     onTabChange?.(activeTab);
@@ -880,6 +784,13 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
     return [...natalColumns, ...flowColumns];
   }, [liuriList, liuyueList, pillars, selectedDayItem, selectedDayun, selectedMonthItem, selectedYearItem]);
 
+  const characterAnalysis = useMemo(() => selectedCharacter ? analyzeBaziCharacter(tableColumns, selectedCharacter) : null, [tableColumns, selectedCharacter]);
+  // A hidden stem or time layer may disappear when the user changes a period.
+  React.useEffect(() => {
+    if (selectedCharacter && !characterAnalysis) setSelectedCharacter(null);
+  }, [characterAnalysis, selectedCharacter]);
+  const periodLabel = ['本命', selectedDayun ? `${selectedDayun.ganZhi}大运` : '', selectedYearItem ? `${selectedYearItem.year}年${selectedYearItem.ganZhi}` : '', selectedMonthItem ? `${selectedMonthItem.ganZhi}流月` : '', selectedDayItem ? `${selectedDayItem.date}流日` : ''].filter(Boolean).join(' · ');
+
   const selectDayun = (index: number) => {
     const next = selectedDayunIndex === index ? null : index;
     setSelectedDayunIndex(next);
@@ -900,7 +811,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
   };
 
   return (
-    <div className="mx-auto my-5 w-full max-w-6xl space-y-5">
+    <div className={`mx-auto my-5 w-full max-w-6xl space-y-5 ${activeTab === 'professional' && characterAnalysis ? 'min-[1200px]:max-w-none min-[1200px]:pr-[430px]' : ''}`}>
       <ChartMasthead
         title="四柱八字"
         subtitle={`${base_info.name}（${base_info.sex}）· ${patternText}`}
@@ -997,8 +908,13 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
 
       {activeTab === 'professional' && (
         <div className="rounded-[24px] border border-white/70 bg-[radial-gradient(circle_at_top,rgba(249,239,210,0.46),rgba(255,255,255,0.35)_62%)] p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
-      <div className="glass-panel-soft overflow-hidden rounded-[20px] border border-white/60 md:rounded-[26px]">
-        <table className="w-full table-fixed border-separate border-spacing-0 text-center">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
+        <div><div className="text-sm font-semibold text-stone-800">一字溯源 <span className="ml-1.5 rounded-md bg-amber-100/70 px-1.5 py-0.5 text-[9px] font-medium text-amber-800">即时计算</span></div>
+          <p className="mt-1 text-[11px] leading-5 text-stone-500">点击天干、地支或藏干，查看象意、根源与份额。</p></div>
+        <div className="text-[10px] leading-5 text-stone-500">{periodLabel}</div>
+      </div>
+      <div className="glass-panel-soft overflow-x-auto rounded-[20px] border border-white/60 md:rounded-[26px]">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-center" style={{ minWidth: 44 + tableColumns.length * 64 }}>
           <thead>
             <tr>
               <th className="w-11 border-b border-white/60 bg-white/35 p-1.5 text-[10px] font-semibold text-stone-400 md:w-20 md:p-3 md:text-xs">四柱</th>
@@ -1033,11 +949,20 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                 {tableColumns.map((column) => {
                   const content = column.values[row as keyof typeof column.values] || '—';
                   const colorClass = row === '天干' || row === '地支' ? getWuxingColor(String(content)) : 'text-stone-700';
+                  const characterKind = row === '天干' ? 'stem' : row === '地支' ? 'branch' : null;
+                  const activeCharacter = selectedCharacter?.columnKey === column.key && selectedCharacter?.kind === characterKind;
                   const cellContent = row === '藏干'
-                    ? <HiddenStemStack value={String(content)} />
+                    ? <HiddenStemStack value={(HIDDEN_STEMS[column.ganZhi?.[1]] || []).map((stem) => `${stem}(${characterTenGod(dayMaster, stem) || ''})`).join(' ')}
+                        selectedStem={selectedCharacter?.columnKey === column.key && selectedCharacter.kind === 'hidden' ? selectedCharacter.hiddenStem : undefined}
+                        onSelect={(stem) => setSelectedCharacter({ columnKey: column.key, kind: 'hidden', hiddenStem: stem })} />
                     : row === '神煞'
                       ? <ShenShaList value={String(content)} expanded={shenShaExpanded} />
-                      : content;
+                      : characterKind && content !== '—' ? <button type="button"
+                          aria-label={`查看${column.title}${row}${content}的来源与份额`} aria-pressed={activeCharacter}
+                          onClick={() => setSelectedCharacter({ columnKey: column.key, kind: characterKind })}
+                          className={`mx-auto flex h-10 w-full max-w-12 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-700 md:h-12 ${activeCharacter ? 'bg-amber-100 ring-1 ring-amber-400 shadow-sm' : 'hover:bg-white/90 hover:ring-1 hover:ring-amber-200'} ${row === '地支' && characterAnalysis?.roots.some((root) => root.pillarKey === column.key) ? 'underline decoration-amber-500/50 decoration-dotted underline-offset-8' : ''}`}>
+                          {content}
+                        </button> : content;
                   return (
                     <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-1 align-middle md:p-3">
                       <div
@@ -1121,6 +1046,19 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       {activeTab === 'notes' && (
         <CaseNotes storageKey={notesKey} />
       )}
+      {activeTab === 'professional' && characterAnalysis && <BaziCharacterInspector
+        analysis={characterAnalysis}
+        periodLabel={periodLabel}
+        dayunOptions={visibleDayunList.map((item, index) => ({ value: index, label: `${item.ganZhi}大运 · ${item.startYear}年` }))}
+        yearOptions={(selectedDayun?.liunianList || []).map((item) => ({ value: item.year, label: `${item.year}年 · ${item.ganZhi}` }))}
+        dayunValue={selectedDayunIndex}
+        yearValue={selectedYear}
+        onDayunChange={(value) => { setSelectedDayunIndex(value); setSelectedYear(null); setSelectedMonth(null); setSelectedDay(null); }}
+        onYearChange={(value) => { setSelectedYear(value); setSelectedMonth(null); setSelectedDay(null); }}
+        onSelect={setSelectedCharacter}
+        onClose={closeCharacter}
+      />}
+
     </div>
   );
 };
