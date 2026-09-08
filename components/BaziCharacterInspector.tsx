@@ -121,7 +121,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
         <DetailSection number="03" title="寻根基 · 找出处" aside={analysis.rootStatus}>
           {analysis.selection.kind === 'branch' && <p className="mb-2 text-[11px] leading-5 text-stone-500">当前按地支本气{analysis.stem}查来源；其他藏干可在上方分别查看。</p>}
           <div className="mb-2 text-[10px] font-semibold text-stone-500">本命根源 · {analysis.natalRoots.length}处</div>
-          {analysis.natalRoots.length ? <SourceList sources={analysis.natalRoots} /> : <p className="rounded-xl border border-dashed border-stone-300 p-3 text-xs leading-6 text-stone-500">原局未见{analysis.element}的同五行藏根或禄根。{analysis.roots.length ? '当前岁运带入了根系，见下方岁运来源。' : '有无生扶，另看下面的作用路径。'}</p>}
+          {analysis.natalRoots.length ? <SourceList sources={analysis.natalRoots} /> : <p className="rounded-xl border border-dashed border-stone-300 p-3 text-xs leading-6 text-stone-500">原局未见{analysis.element}的长生、同五行根或墓库根。{analysis.roots.length ? '当前岁运带入了根系，见下方岁运来源。' : '有无生扶，另看下面的作用路径。'}</p>}
           {natalSupport.length > 0 && <details className="mt-3">
             <summary className="cursor-pointer text-[11px] font-medium leading-6 text-stone-600">生扶与同类路径 · {natalSupport.length}条</summary>
             <div className="mt-2"><SourceList sources={natalSupport} /></div>
@@ -157,7 +157,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
             <div className="mt-2 space-y-2 text-[11px] leading-5 text-stone-500">
               <p>{analysis.shareReason}</p><p>{analysis.expansionNote}</p>
               {analysis.parties.map((party) => <p key={party.key}><strong className="font-medium text-stone-700">{party.label}：</strong>{party.evidence.join('；')}</p>)}
-              <p>参与方仅按自身落点与直接根系归组；生扶展开详见份额路径。岁运单列，不划入本命家内家外。</p>
+              <p>参与方包含自身、根基与已计入的生扶来源；家内相连生扶在份额中合并。岁运单列，不划入本命家内家外。</p>
               <p>{analysis.scopeNote}</p>
               <p>这是可调整的默认计份口径。份数不等于旺衰、实际人数、财产比例或最终所得；传统象意用于命理学习与参考。</p>
             </div>

@@ -1,7 +1,7 @@
 /**
  * Browser-only, deterministic source tracing. Rules: skills/analyze-bazi-fene.md.
  * The user authorized filling missing counting rules. The application's explicit
- * source-unit-v1 policy is documented in docs/bazi-source-units.md. These nominal
+ * source-unit-v2 policy is documented in docs/bazi-source-units.md. These nominal
  * source units are not strength weights, party counts, ownership or predictions.
  */
 export const STEMS = '甲乙丙丁戊己庚辛壬癸';
@@ -17,8 +17,20 @@ export const HIDDEN_STEMS: Record<string, readonly string[]> = {
 };
 const QI = ['本气', '中气', '余气'];
 const LU: Record<string, string> = { 甲: '寅', 乙: '卯', 丙: '巳', 丁: '午', 戊: '巳', 己: '午', 庚: '申', 辛: '酉', 壬: '亥', 癸: '子' };
-// Earth storage conventions vary; do not infer a universal earth storehouse.
-const STORAGE: Partial<Record<Element, string>> = { 木: '未', 火: '戌', 金: '丑', 水: '辰' };
+// Explicit root relationships, not a search for a hidden generating element.
+// Fire follows the user's 寅、巳、午、未、戌 rule; other element defaults are
+// documented separately so an analogy is not presented as a user-specified rule.
+export const ROOT_RELATIONS: Record<Element, Readonly<Record<string, string>>> = {
+  木: { 亥: '长生根', 寅: '同五行根', 卯: '同五行根', 辰: '库中余气根', 未: '墓库根' },
+  火: { 寅: '长生根', 巳: '同五行根', 午: '同五行根', 未: '墓库根', 戌: '墓库根' },
+  土: { 寅: '长生根（寄火）', 巳: '寄火禄根', 午: '寄火禄刃根', 辰: '同五行根', 未: '同五行根', 戌: '同五行根', 丑: '同五行根' },
+  金: { 巳: '长生根', 申: '同五行根', 酉: '同五行根', 丑: '墓库根', 戌: '库中余气根' },
+  水: { 申: '长生根', 亥: '同五行根', 子: '同五行根', 辰: '墓库根', 丑: '库中余气根' },
+};
+export function rootRelation(stem: string, branch: string): string | null {
+  const element = stemElement(stem);
+  return element ? ROOT_RELATIONS[element][branch] || null : null;
+}
 const CLASH = ['子午', '丑未', '寅申', '卯酉', '辰戌', '巳亥'];
 const COMBINE = ['子丑', '寅亥', '卯戌', '辰酉', '巳申', '午未'];
 
@@ -70,68 +82,98 @@ export interface ShareUnit {
   id: string;
   label: string;
   layer: 'natal' | 'flow';
+  memberKeys: string[];
+  sourceLabels: string[];
   paths: string[];
   reasons: string[];
 }
 
-/** Finite source expansion: direct donor -> donor roots; no recursive donors. */
+/** Same-column deduplication first, then merge connected household support. */
 function countSourceUnits(columns: readonly AnalysisPillar[], selection: CharacterSelection, stem: string, sources: CharacterSource[]) {
   const target = columns.find((column) => column.key === selection.columnKey)!;
-  const element = stemElement(stem)!;
   const units = new Map<string, ShareUnit>();
   const countedSourceIds = new Set<string>();
-  const rootsOf = (value: string) => columns.filter((column) => HIDDEN_STEMS[column.ganZhi[1]].some((hidden) => stemElement(hidden) === stemElement(value)));
-  const add = (column: AnalysisPillar, part: 'stem' | 'branch', path: string, reason: string) => {
-    const id = `${column.key}:${part}`;
+  const natal = columns.filter((column) => column.kind === 'natal');
+  const isHome = (column: AnalysisPillar) => column.kind === 'natal' && natal.indexOf(column) >= 2;
+  const homeSupport = new Set<string>();
+  const rootsOf = (value: string) => columns.filter((column) => rootRelation(value, column.ganZhi[1]));
+  const add = (column: AnalysisPillar, part: 'stem' | 'branch', path: string, reason: string, support = false) => {
+    const id = `${column.key}:column`;
+    const label = `${column.title}${part === 'stem' ? '天干' : '地支'}${column.ganZhi[part === 'stem' ? 0 : 1]}`;
     const existing = units.get(id);
     if (existing) {
       if (!existing.paths.includes(path)) existing.paths.push(path);
       if (!existing.reasons.includes(reason)) existing.reasons.push(reason);
+      if (!existing.sourceLabels.includes(label)) existing.sourceLabels.push(label);
     } else units.set(id, {
-      id, label: `${column.title}${part === 'stem' ? '天干' : '地支'}${column.ganZhi[part === 'stem' ? 0 : 1]}`,
-      layer: column.kind, paths: [path], reasons: [reason],
+      id, label, layer: column.kind, memberKeys: [column.key], sourceLabels: [label], paths: [path], reasons: [reason],
     });
+    if (support && isHome(column)) homeSupport.add(column.key);
   };
-  const ownRoot = HIDDEN_STEMS[target.ganZhi[1]].some((hidden) => stemElement(hidden) === element);
-  add(target, selection.kind !== 'stem' || ownRoot ? 'branch' : 'stem', `${target.title}${selection.kind === 'branch' ? target.ganZhi[1] : stem} → 自身落点`,
-    selection.kind === 'stem' && ownRoot ? '自身与坐下同五行根按通根连体合为一份。' : '自身落点记一份；无根时只表示虚浮落点，不代表有效力量。');
+  add(target, selection.kind === 'stem' ? 'stem' : 'branch', `${target.title}${selection.kind === 'branch' ? target.ganZhi[1] : stem} → 自身落点`,
+    '自身落点记一份；同柱坐下即使有根或生扶也合在这一份中。无根时只是虚浮落点，不代表有效力量。');
 
   for (const source of sources.filter((item) => item.category === 'root')) {
     const column = columns.find((item) => item.key === source.pillarKey)!;
-    add(column, 'branch', source.path, '同一地支的藏根、禄与库中藏气合记一份；不按藏干数量拆份。');
+    add(column, 'branch', source.path, '长生、同五行根或墓库按明确根表确认；同柱天干与地支合记一份，禄与藏气不再拆份。');
     countedSourceIds.add(source.id);
   }
 
   for (const source of sources.filter((item) => item.category !== 'root')) {
     const column = columns.find((item) => item.key === source.pillarKey)!;
     const sameColumn = column.key === target.key;
-    const natalColumns = columns.filter((item) => item.kind === 'natal');
-    const adjacent = column.kind === 'natal' && target.kind === 'natal' && Math.abs(natalColumns.indexOf(column) - natalColumns.indexOf(target)) === 1;
+    const adjacent = column.kind === 'natal' && target.kind === 'natal' && Math.abs(natal.indexOf(column) - natal.indexOf(target)) === 1;
     const involvesFlow = column.kind === 'flow' || target.kind === 'flow';
+    // A rooted household donor can participate as a household, not merely as
+    // the immediately adjacent stem. This covers 月丁 <- 时乙 + 日卯.
+    const homeContact = isHome(column);
     if (source.id.endsWith('support-branch')) {
-      // Hidden stems in other branches are merely potential feeds. Within one
-      // branch, do not invent an internal self-feeding path for a hidden target.
-      if (selection.kind !== 'stem' || !sameColumn) continue;
-      add(column, 'branch', source.path, '同柱坐下藏干生扶天干，记来源地支一份；与已有根源重合时合并。');
+      const mainElement = stemElement(HIDDEN_STEMS[column.ganZhi[1]][0]);
+      const supportingElement = ELEMENTS[(ELEMENTS.indexOf(stemElement(stem)!) + 4) % 5];
+      if (mainElement !== supportingElement || selection.kind !== 'stem' || !(sameColumn || adjacent || homeContact || involvesFlow)) continue;
+      add(column, 'branch', source.path, '地支本气五行生扶，按实际位置参与；不是因杂气藏干中有生我之物便立根或另加份。同柱并入自身，家内相连生扶合看。', true);
       countedSourceIds.add(source.id);
       continue;
     }
-    const hasContact = selection.kind === 'stem' ? adjacent || involvesFlow : sameColumn;
+    const hasContact = selection.kind === 'stem' ? sameColumn || adjacent || homeContact || involvesFlow : sameColumn;
     if (!hasContact) continue;
     const donorStem = column.ganZhi[0];
     const donorRoots = rootsOf(donorStem);
     if (!donorRoots.length) continue;
-    const donorOwnRoot = donorRoots.some((item) => item.key === column.key);
     const relationship = source.category === 'peer' ? '同类帮扶' : '生扶';
-    add(column, donorOwnRoot ? 'branch' : 'stem', source.path, `${involvesFlow ? '岁运介入' : sameColumn ? '同柱' : '相邻天干'}${relationship}，供方有根才参与；供方通根连体合并。`);
-    for (const donorRoot of donorRoots) {
-      const hidden = HIDDEN_STEMS[donorRoot.ganZhi[1]].filter((item) => stemElement(item) === stemElement(donorStem));
-      add(donorRoot, 'branch', `${donorRoot.title}${donorRoot.ganZhi[1]} → 藏${hidden.join('、')} → ${column.title}${donorStem} → ${target.title}${stem}`,
-        '供方来源展开至地支根，每个实际来源只记一次；在藏气处终止，不继续递归生扶。');
+    const connectedRoots = donorRoots.filter((root) => root.key === column.key || (isHome(column) && isHome(root)));
+    const evidenceRoots = connectedRoots.length ? connectedRoots : donorRoots;
+    add(column, 'stem', source.path, `${involvesFlow ? '岁运介入' : sameColumn ? '同柱' : homeContact ? '家内来源' : '相邻天干'}${relationship}，供方有明确根基才参与。同柱与家内相连来源分别合并。`, true);
+    for (const donorRoot of evidenceRoots) {
+      const path = `${donorRoot.title}${donorRoot.ganZhi[1]}（${rootRelation(donorStem, donorRoot.ganZhi[1])}）→ ${column.title}${donorStem} → ${target.title}${stem}`;
+      if (connectedRoots.includes(donorRoot)) {
+        add(donorRoot, 'branch', path, '只展开供方同柱或家内相连根基；日时的这条生扶链合记一份，不重复拆出干、支。', true);
+      } else {
+        // External roots establish a donor's grounding, not automatic transfer
+        // of all those roots' shares to the target.
+        add(column, 'stem', path, '外部根仅作为供方有根的依据；没有进一步传份关系时，不把供方全盘根基自动叠加到目标。', true);
+      }
     }
     countedSourceIds.add(source.id);
   }
-  return { units: [...units.values()], countedSourceIds };
+
+  let result = [...units.values()];
+  if (homeSupport.size > 1) {
+    const members = result.filter((unit) => homeSupport.has(unit.memberKeys[0]));
+    const sourceLabels = [...new Set(members.flatMap((unit) => unit.sourceLabels))]
+      .sort((a, b) => Number(b.includes('天干')) - Number(a.includes('天干')));
+    const containsTarget = members.some((unit) => unit.memberKeys.includes(target.key));
+    const merged: ShareUnit = {
+      id: 'home:support', label: `${containsTarget ? '自身与' : ''}家内生扶（${sourceLabels.map((label) => label.replace(/天干|地支/g, '')).join('、')}）`,
+      layer: 'natal', memberKeys: members.flatMap((unit) => unit.memberKeys), sourceLabels,
+      paths: [...new Set(members.flatMap((unit) => unit.paths))],
+      reasons: ['日时家内有实际联系的生扶来源合看为一份；不把家内天干和根支拆开重复计份。', ...new Set(members.flatMap((unit) => unit.reasons))],
+    };
+    const first = result.indexOf(members[0]);
+    result = result.filter((unit) => !members.includes(unit));
+    result.splice(first, 0, merged);
+  }
+  return { units: result, countedSourceIds };
 }
 
 export function stemElement(stem: string): Element | null {
@@ -173,35 +215,41 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
     const contents = HIDDEN_STEMS[zhi];
     const matching = contents.filter((item) => stemElement(item) === element);
     const ownHost = column.key === target.key && selection.kind !== 'stem';
-    if (matching.length) {
-      const tags = matching.map((item) => `${QI[contents.indexOf(item)]}${item}${item === stem ? ' · 同干根' : ' · 同五行根'}`);
+    const relation = rootRelation(stem, zhi);
+    if (relation) {
+      const tags = [relation, ...matching.map((item) => `${QI[contents.indexOf(item)]}${item}`)];
       if (zhi === LU[stem]) tags.push('禄根');
-      if (zhi === STORAGE[element]) tags.push('墓库线索');
       sources.push({
         id: `${column.key}:branch`, pillarKey: column.key, layer: column.kind, category: 'root',
         label: `${column.title}${zhi}`, tags,
-        path: `${column.title}${zhi} → 藏${matching.join('、')} → ${targetName}`,
-        note: [ownHost ? '这是目标的藏气落点，不另拆为自身之外的一份。' : '藏干说明根系联系；本、中、余气不视作等量力量。',
-          zhi === LU[stem] ? '禄根与此处藏根是同一来源，不重复列份。' : '',
-          zhi === STORAGE[element] ? '藏气已按根源单位计入；开库及取得条件另判，不追加库份。' : '',
-          column.kind === 'flow' ? '岁运引入的直接根系，按本页来源单位制参与，单列来源。' : '',
+        path: `${column.title}${zhi} → ${element}的${relation} → ${targetName}`,
+        note: [ownHost ? '这是目标所在位置，同柱不另拆份。' : '根按长生、同五行根和墓库对应表确认；藏干只补充气性，不因相生藏干便立根。',
+          column.key === target.key ? '坐下根与目标同柱，合为一份。' : '',
+          zhi === LU[stem] ? '禄与此根是同一来源，不重复列份。' : '',
+          relation.includes('库') ? '墓库根可确认，开库及取得另判，不追加库份。' : '',
+          column.kind === 'flow' ? '岁运根单列，仍遵守同柱合并。' : '',
         ].filter(Boolean).join(''),
       });
     }
     const feed = contents.filter((item) => stemElement(item) === supportElement);
-    if (feed.length) sources.push({
-      id: `${column.key}:support-branch`, pillarKey: column.key, layer: column.kind, category: 'support',
-      label: `${column.title}${zhi}`, tags: ['生扶待核'],
-      path: `${column.title}${zhi} → 藏${feed.join('、')}（${supportElement}）→ 生${stem}（${element}）`,
-      note: '其他柱的藏干相生先作线索，须符合本页位置规则才参与；若与根源同柱，合算前核重。',
-    });
+    if (feed.length) {
+      const mainFeeds = stemElement(contents[0]) === supportElement;
+      sources.push({
+        id: `${column.key}:support-branch`, pillarKey: column.key, layer: column.kind, category: 'support',
+        label: `${column.title}${zhi}`, tags: ['生扶待核'],
+        path: mainFeeds ? `${column.title}${zhi}（${supportElement}，本气${contents[0]}）→ 生${stem}（${element}）`
+          : `${column.title}${zhi} → 藏${feed.join('、')}（${supportElement}）· 仅藏干相生线索`,
+        note: mainFeeds ? '地支本气五行相生，按位置与家内生扶关系判断是否计入，同柱不重复计份。'
+          : '仅杂气藏干中有生我之物，不能据此立根或计为独立生扶份额。',
+      });
+    }
     // A hidden target may be related to the visible stem in its own column.
     if (selection.kind === 'stem' && column.key === target.key) continue;
     if (stemElement(gan) === supportElement) sources.push({
       id: `${column.key}:support-stem`, pillarKey: column.key, layer: column.kind, category: 'support',
       label: `${column.title}天干${gan}`, tags: ['生扶待核'],
       path: `${column.title}${gan}（${supportElement}）→ 生${stem}（${element}）`,
-      note: '存在五行相生关系；符合相邻天干、同柱或岁运介入规则且供方有根时才计入。',
+      note: '存在五行相生关系；供方有明确根基，并符合相邻、同柱、家内来源或岁运介入关系时参与。',
     });
     if (stemElement(gan) === element) sources.push({
       id: `${column.key}:peer`, pillarKey: column.key, layer: column.kind, category: 'peer',
@@ -243,13 +291,23 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
   const peers = sources.filter((source) => source.category === 'peer');
   const ledger = countSourceUnits(validColumns, selection, stem, sources);
   const natalLedger = target.kind === 'natal' ? countSourceUnits(natal, selection, stem, sources.filter((source) => source.layer === 'natal')) : null;
+  for (const unit of ledger.units) for (const key of unit.memberKeys) {
+    if (natal.some((column) => column.key === key)) addParty(key, `${unit.label} · 已计来源`);
+  }
   for (const source of sources) {
     if (source.category === 'root') continue;
     const counted = ledger.countedSourceIds.has(source.id);
-    const mergedViaOtherPath = source.id.endsWith('support-branch') && ledger.units.some((unit) => unit.id === `${source.pillarKey}:branch`);
+    const sourceColumn = validColumns.find((column) => column.key === source.pillarKey)!;
+    const hiddenFeedOnly = source.id.endsWith('support-branch') && stemElement(HIDDEN_STEMS[sourceColumn.ganZhi[1]][0]) !== supportElement;
+    if (hiddenFeedOnly) {
+      source.tags = ['藏干相生 · 不计份'];
+      source.note = '仅杂气藏干中有生我之物，不据此立根，也不计为独立生扶。该柱若另有自身或明确根源参与，只按相应路径计一次。';
+      continue;
+    }
+    const mergedViaOtherPath = ledger.units.some((unit) => unit.memberKeys.includes(source.pillarKey));
     source.tags = [counted ? source.category === 'support' ? '生扶参与' : '同类参与' : mergedViaOtherPath ? '来源已合并' : source.category === 'support' ? '生扶线索 · 未计份' : '同类线索 · 未计份'];
     source.note = counted ? `${source.note}已按来源单位计入，重复路径不重复加份。`
-      : mergedViaOtherPath ? '此条直接生扶未满足位置条件；同一地支已通过其他根源或供方展开路径计入，详见份额明细，不重复加份。'
+      : mergedViaOtherPath ? '此条线索本身不额外计份；同柱已作为自身、根源或家内生扶计入，详见份额明细，不能再拆出一份。'
         : `${source.note}此处未满足参与条件，暂不加份。`;
   }
   const rootStatus = roots.length ? '有根系可查' : support.some((source) => ledger.countedSourceIds.has(source.id)) ? '无根 · 有生扶' : support.length ? '无根 · 生扶待核' : peers.length ? '无根 · 同类待核' : '无根无气（当前口径）';
@@ -264,10 +322,10 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
     finalShares: ledger.units.length,
     natalShares: natalLedger?.units.length ?? null,
     natalUnits: natalLedger?.units ?? [],
-    addedUnits: natalLedger ? ledger.units.filter((unit) => !natalLedger.units.some((original) => original.id === unit.id)) : [],
-    shareReason: '按来源单位计份：自身、直接根源与符合条件的生扶展开来源计入，同一来源多路径合并。每份是一个来源单位，不是等量力量。',
-    scopeNote: '按同五行藏干、禄根及生扶线索查根气；未将月令旺衰、合化与制化折算成分数。无根无气仅指本页未检出上述线索。',
-    expansionNote: '生扶与同类供方只展开一层到地支根，根处终止。日时合并用于参与方归属，不把家内不同来源压成一份；冲合只标记条件，不直接增减份数。',
+    addedUnits: natalLedger ? ledger.units.filter((unit) => unit.memberKeys.some((key) => !natalLedger.units.some((original) => original.memberKeys.includes(key)))) : [],
+    shareReason: '自身与坐下同柱只计一份；根须符合长生、同五行根或墓库对应关系。家内相连生扶合看一份，杂气藏干相生不自动计份。每份不代表等量力量。',
+    scopeNote: `当前${stem}${element}按明确根表查${Object.keys(ROOT_RELATIONS[element]).join('、')}，生扶另列。仅杂气藏干相生不能立根。无根无气仅指当前规则未检出相应线索，不等于完整旺衰判断。`,
+    expansionNote: '生扶只展开至供方同柱或家内相连根基，日时这条来源链合记一份；外部根可说明供方有根，但不自动转移其全部份数。不同直接根仍按实际关系计入，不用参与方数量封顶。冲合只提示条件。',
   };
 }
 

@@ -963,7 +963,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                           {content}
                         </button> : content;
                   return (
-                    <td key={`${row}-${column.key}`} className="border-b border-l border-white/60 bg-white/20 p-1 align-middle md:p-3">
+                    <td key={`${row}-${column.key}`} className={`border-b border-l border-white/60 bg-white/20 p-1 md:p-3 ${row === '藏干' ? 'align-top' : 'align-middle'}`}>
                       <div
                         className={`mx-auto max-w-full whitespace-normal break-all text-center ${
                           row === '天干' || row === '地支' ? `text-xl font-bold leading-7 md:text-3xl ${colorClass}` : 'text-[9px] leading-4 text-stone-700 md:text-xs md:leading-5'
