@@ -909,8 +909,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       {activeTab === 'professional' && (
         <div className="rounded-[24px] border border-white/70 bg-[radial-gradient(circle_at_top,rgba(249,239,210,0.46),rgba(255,255,255,0.35)_62%)] p-2 shadow-[0_18px_48px_rgba(28,25,23,0.08)] backdrop-blur-xl md:rounded-[30px] md:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
-        <div><div className="text-sm font-semibold text-stone-800">一字溯源 <span className="ml-1.5 rounded-md bg-amber-100/70 px-1.5 py-0.5 text-[9px] font-medium text-amber-800">即时计算</span></div>
-          <p className="mt-1 text-[11px] leading-5 text-stone-500">点击天干、地支或藏干，查看象意、根源与份额。</p></div>
+        <p className="text-[11px] leading-5 text-stone-500">点击天干、地支或藏干，查看象意、根源与份额。</p>
         <div className="text-[10px] leading-5 text-stone-500">{periodLabel}</div>
       </div>
       <div className="glass-panel-soft overflow-x-auto rounded-[20px] border border-white/60 md:rounded-[26px]">
@@ -1049,12 +1048,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       {activeTab === 'professional' && characterAnalysis && <BaziCharacterInspector
         analysis={characterAnalysis}
         periodLabel={periodLabel}
-        dayunOptions={visibleDayunList.map((item, index) => ({ value: index, label: `${item.ganZhi}大运 · ${item.startYear}年` }))}
-        yearOptions={(selectedDayun?.liunianList || []).map((item) => ({ value: item.year, label: `${item.year}年 · ${item.ganZhi}` }))}
         dayunValue={selectedDayunIndex}
-        yearValue={selectedYear}
-        onDayunChange={(value) => { setSelectedDayunIndex(value); setSelectedYear(null); setSelectedMonth(null); setSelectedDay(null); }}
-        onYearChange={(value) => { setSelectedYear(value); setSelectedMonth(null); setSelectedDay(null); }}
         onSelect={setSelectedCharacter}
         onClose={closeCharacter}
       />}

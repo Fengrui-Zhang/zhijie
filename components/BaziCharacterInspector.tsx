@@ -11,12 +11,7 @@ import { getWuxingColor } from '../utils/wuxing';
 interface Props {
   analysis: CharacterAnalysis;
   periodLabel: string;
-  dayunOptions: { value: number; label: string }[];
-  yearOptions: { value: number; label: string }[];
   dayunValue: number | null;
-  yearValue: number | null;
-  onDayunChange: (value: number | null) => void;
-  onYearChange: (value: number | null) => void;
   onSelect: (selection: CharacterSelection) => void;
   onClose: () => void;
 }
@@ -47,7 +42,7 @@ function SourceList({ sources }: { sources: CharacterSource[] }) {
   </div>;
 }
 
-export function BaziCharacterInspector({ analysis, periodLabel, dayunOptions, yearOptions, dayunValue, yearValue, onDayunChange, onYearChange, onSelect, onClose }: Props) {
+export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSelect, onClose }: Props) {
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 1199px)').matches);
   const headingId = useId();
   const dialogRef = useDialogFocus<HTMLDivElement>(mobile, onClose);
@@ -170,13 +165,6 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunOptions, ye
         </DetailSection>
       </div>
 
-      <footer className="shrink-0 border-t border-stone-200/80 bg-white/90 px-5 py-3">
-        <div className="mb-2 flex items-center justify-between text-[10px] text-stone-500"><span>切换岁运，立即重算</span><span>本地计算 · 不消耗点数</span></div>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="min-w-0"><span className="sr-only">溯源大运</span><select value={dayunValue ?? ''} onChange={(event) => onDayunChange(event.target.value === '' ? null : Number(event.target.value))} className="h-10 w-full min-w-0 rounded-xl border border-stone-200 bg-stone-50 px-2 text-xs text-stone-700 outline-offset-2 focus:outline-amber-700"><option value="">仅本命</option>{dayunOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          <label className="min-w-0"><span className="sr-only">溯源流年</span><select value={yearValue ?? ''} disabled={dayunValue === null} onChange={(event) => onYearChange(event.target.value === '' ? null : Number(event.target.value))} className="h-10 w-full min-w-0 rounded-xl border border-stone-200 bg-stone-50 px-2 text-xs text-stone-700 outline-offset-2 disabled:opacity-50 focus:outline-amber-700"><option value="">不叠加流年</option>{yearOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        </div>
-      </footer>
     </div>
   </div>, document.body);
 }
