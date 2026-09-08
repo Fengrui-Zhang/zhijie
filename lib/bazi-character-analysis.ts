@@ -284,7 +284,7 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
     for (const original of natal.filter((column) => relatedKeys.has(column.key))) {
       const a = flow.ganZhi[1], b = original.ganZhi[1];
       const relation = isPair(CLASH, a, b) ? '六冲' : isPair(COMBINE, a, b) ? '六合' : null;
-      if (relation) interactions.push({ id: `${flow.key}:${original.key}`, text: `${flow.title}${a}与${original.title}${b}${relation}。涉及目标或根源位置，标记作用条件变化；不直接认定冲断根、开库或合化成功。` });
+      if (relation) interactions.push({ id: `${flow.key}:${original.key}`, text: `${flow.title}${a}与${original.title}${b}${relation}。` });
     }
   }
   const support = sources.filter((source) => source.category === 'support');
@@ -310,7 +310,7 @@ export function analyzeBaziCharacter(columns: readonly AnalysisPillar[], selecti
       : mergedViaOtherPath ? '此条线索本身不额外计份；同柱已作为自身、根源或家内生扶计入，详见份额明细，不能再拆出一份。'
         : `${source.note}此处未满足参与条件，暂不加份。`;
   }
-  const rootStatus = roots.length ? '有根系可查' : support.some((source) => ledger.countedSourceIds.has(source.id)) ? '无根 · 有生扶' : support.length ? '无根 · 生扶待核' : peers.length ? '无根 · 同类待核' : '无根无气（当前口径）';
+  const rootStatus = roots.length ? '有根系可查' : support.some((source) => ledger.countedSourceIds.has(source.id)) ? '无根 · 有生扶' : support.length ? '无根 · 生扶待核' : peers.length ? '无根 · 同类待核' : '无根无气';
   return {
     target, selection, char, stem, branch, element, dayMaster, location,
     polarity: (selection.kind === 'branch' ? BRANCHES.indexOf(branch) : STEMS.indexOf(stem)) % 2 === 0 ? '阳' : '阴',

@@ -29,16 +29,15 @@ function DetailSection({ number, title, aside, children }: { number: string; tit
 
 function SourceList({ sources }: { sources: CharacterSource[] }) {
   return <div className="space-y-2">
-    {sources.map((source) => <details key={source.id} className="group rounded-xl border border-stone-200/80 bg-white/70 px-3 py-2.5">
-      <summary className="cursor-pointer list-none text-xs marker:hidden">
+    {sources.map((source) => <div key={source.id} className="rounded-xl border border-stone-200/80 bg-white/70 px-3 py-2.5">
+      <div className="text-xs">
         <div className="flex items-start justify-between gap-2">
           <span className="font-semibold text-stone-800">{source.label}</span>
-          <span className="text-right text-[10px] leading-4 text-stone-500">{source.tags.join(' · ')} <span aria-hidden="true" className="inline-block transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span></span>
+          <span className="text-right text-[10px] leading-4 text-stone-500">{source.tags.join(' · ')}</span>
         </div>
         <div className="mt-1.5 break-words text-[11px] leading-5 text-stone-600">{source.path}</div>
-      </summary>
-      <p className="mt-2 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-500">{source.note}</p>
-    </details>)}
+      </div>
+    </div>)}
   </div>;
 }
 
@@ -106,7 +105,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
         </DetailSection>
 
         <DetailSection number="02" title="十神关系" aside={`以日主${analysis.dayMaster}为参照`}>
-          <div className="flex items-baseline gap-2"><span className="text-sm font-semibold text-stone-800">{analysis.isDayMaster ? '日主 · 自身' : analysis.tenGod}</span><span className="text-[10px] text-stone-500">{analysis.isDayMaster ? '日干自身不另称比肩' : god?.element}</span></div>
+          <div className="flex items-baseline gap-2"><span className="text-sm font-semibold text-stone-800">{analysis.isDayMaster ? '日主 · 自身' : analysis.tenGod}</span><span className="text-[10px] text-stone-500">{analysis.isDayMaster ? '十神参照' : god?.element}</span></div>
           <p className="mt-1.5 text-xs leading-6 text-stone-600">{analysis.isDayMaster ? '日干是十神判断的参照点。其他干与日干的五行生克、阴阳异同，共同确定十神。' : god?.meaning}</p>
           {analysis.selection.kind !== 'stem' && <div className="mt-3">
             <div className="mb-2 text-[10px] leading-5 text-stone-500">地支含多个藏干，十神分别判断。点击切换藏干溯源：</div>
@@ -133,7 +132,7 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
           </div>}
         </DetailSection>
 
-        <DetailSection number="04" title="定份额" aside="来源单位制">
+        <DetailSection number="04" title="定份额">
           <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50 to-white p-4">
             <div className="flex items-end justify-between gap-2">
               <div><div className="text-[10px] text-amber-900/70">当前来源份额</div><div className="mt-1 text-4xl font-semibold tracking-tight text-stone-900">{analysis.finalShares}<span className="ml-1.5 text-sm font-normal text-stone-500">份</span></div></div>
@@ -149,17 +148,13 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
                 {analysis.addedUnits.some((added) => added.id === unit.id) && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] text-emerald-700">新增</span>}
                 <span className="ml-auto whitespace-nowrap text-[10px] text-stone-500">1份 <span aria-hidden="true">›</span></span>
               </summary>
-              <div className="mt-2 space-y-1 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-600">{unit.paths.map((path) => <p key={path}>{path}</p>)}{unit.reasons.map((reason) => <p key={reason} className="text-stone-500">{reason}</p>)}</div>
+              <div className="mt-2 space-y-1 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-600">{unit.paths.map((path) => <p key={path}>{path}</p>)}</div>
             </details>
           </li>)}</ol>
           <details className="mt-3 rounded-xl bg-stone-100/70 p-3">
-            <summary className="cursor-pointer text-[11px] font-medium text-stone-600">计份口径与归属 · {analysis.parties.length}方参与</summary>
+            <summary className="cursor-pointer text-[11px] font-medium text-stone-600">来源归属 · {analysis.parties.length}方参与</summary>
             <div className="mt-2 space-y-2 text-[11px] leading-5 text-stone-500">
-              <p>{analysis.shareReason}</p><p>{analysis.expansionNote}</p>
               {analysis.parties.map((party) => <p key={party.key}><strong className="font-medium text-stone-700">{party.label}：</strong>{party.evidence.join('；')}</p>)}
-              <p>参与方包含自身、根基与已计入的生扶来源；家内相连生扶在份额中合并。岁运单列，不划入本命家内家外。</p>
-              <p>{analysis.scopeNote}</p>
-              <p>这是可调整的默认计份口径。份数不等于旺衰、实际人数、财产比例或最终所得；传统象意用于命理学习与参考。</p>
             </div>
           </details>
         </DetailSection>
