@@ -6,6 +6,7 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { ELEMENT_MEANINGS, type CharacterAnalysis, type CharacterSelection, type CharacterSource } from '../lib/bazi-character-analysis';
 import { tenGodKnowledge } from '../lib/bazi-character-knowledge';
+import { describeCharacterSource, describeShareUnit } from '../lib/bazi-character-interpretation';
 import { getWuxingColor } from '../utils/wuxing';
 
 interface Props {
@@ -27,7 +28,7 @@ function DetailSection({ number, title, aside, children }: { number: string; tit
   </section>;
 }
 
-function SourceList({ sources }: { sources: CharacterSource[] }) {
+function SourceList({ sources, analysis }: { sources: CharacterSource[]; analysis: CharacterAnalysis }) {
   return <div className="space-y-2">
     {sources.map((source) => <div key={source.id} className="rounded-xl border border-stone-200/80 bg-white/70 px-3 py-2.5">
       <div className="text-xs">
@@ -36,6 +37,7 @@ function SourceList({ sources }: { sources: CharacterSource[] }) {
           <span className="text-right text-[10px] leading-4 text-stone-500">{source.tags.join(' · ')}</span>
         </div>
         <div className="mt-1.5 break-words text-[11px] leading-5 text-stone-600">{source.path}</div>
+        <p className="mt-2 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-500">{describeCharacterSource(analysis, source)}</p>
       </div>
     </div>)}
   </div>;
@@ -120,14 +122,14 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
         <DetailSection number="03" title="寻根基 · 找出处" aside={analysis.rootStatus}>
           {analysis.selection.kind === 'branch' && <p className="mb-2 text-[11px] leading-5 text-stone-500">当前按地支本气{analysis.stem}查来源；其他藏干可在上方分别查看。</p>}
           <div className="mb-2 text-[10px] font-semibold text-stone-500">本命根源 · {analysis.natalRoots.length}处</div>
-          {analysis.natalRoots.length ? <SourceList sources={analysis.natalRoots} /> : <p className="rounded-xl border border-dashed border-stone-300 p-3 text-xs leading-6 text-stone-500">原局未见{analysis.element}的长生、同五行根或墓库根。{analysis.roots.length ? '当前岁运带入了根系，见下方岁运来源。' : '有无生扶，另看下面的作用路径。'}</p>}
+          {analysis.natalRoots.length ? <SourceList sources={analysis.natalRoots} analysis={analysis} /> : <p className="rounded-xl border border-dashed border-stone-300 p-3 text-xs leading-6 text-stone-500">原局未见{analysis.element}的长生、同五行根或墓库根。{analysis.roots.length ? '当前岁运带入了根系，见下方岁运来源。' : '有无生扶，另看下面的作用路径。'}</p>}
           {natalSupport.length > 0 && <details className="mt-3">
             <summary className="cursor-pointer text-[11px] font-medium leading-6 text-stone-600">生扶与同类路径 · {natalSupport.length}条</summary>
-            <div className="mt-2"><SourceList sources={natalSupport} /></div>
+            <div className="mt-2"><SourceList sources={natalSupport} analysis={analysis} /></div>
           </details>}
           {dayunValue !== null && <div className="mt-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 p-3">
             <div className="mb-2 text-[11px] font-semibold text-amber-900">岁运来源与作用变化</div>
-            {analysis.flowSources.length ? <SourceList sources={analysis.flowSources} /> : <p className="text-[11px] leading-5 text-stone-500">所选岁运未检出新的同五行根或生扶、同类线索。</p>}
+            {analysis.flowSources.length ? <SourceList sources={analysis.flowSources} analysis={analysis} /> : <p className="text-[11px] leading-5 text-stone-500">所选岁运未检出新的同五行根或生扶、同类线索。</p>}
             {analysis.interactions.map((item) => <p key={item.id} className="mt-2 text-[11px] leading-5 text-amber-900/80">{item.text}</p>)}
           </div>}
         </DetailSection>
@@ -148,7 +150,10 @@ export function BaziCharacterInspector({ analysis, periodLabel, dayunValue, onSe
                 {analysis.addedUnits.some((added) => added.id === unit.id) && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] text-emerald-700">新增</span>}
                 <span className="ml-auto whitespace-nowrap text-[10px] text-stone-500">1份 <span aria-hidden="true">›</span></span>
               </summary>
-              <div className="mt-2 space-y-1 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-600">{unit.paths.map((path) => <p key={path}>{path}</p>)}</div>
+              <div className="mt-2 space-y-2 border-t border-stone-100 pt-2 text-[11px] leading-5 text-stone-600">
+                <p className="text-stone-700">{describeShareUnit(analysis, unit)}</p>
+                <div className="space-y-1 border-l-2 border-amber-200/70 pl-2.5 text-stone-500">{unit.paths.map((path) => <p key={path}>{path}</p>)}</div>
+              </div>
             </details>
           </li>)}</ol>
           <details className="mt-3 rounded-xl bg-stone-100/70 p-3">
