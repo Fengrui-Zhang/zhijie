@@ -97,12 +97,17 @@ body::after {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* iOS Safari zooms the page when a focused form control is smaller than 16px. */
-@media (max-width: 767px) {
-  .app-shell input,
-  .app-shell select,
-  .app-shell textarea {
-    font-size: 16px;
+/* Keep editable controls at iOS's focus-zoom threshold, including body portals
+   and standalone pages. Coarse pointers also cover landscape phones and iPads.
+   Override compact/responsive utility sizes without restricting pinch zoom. */
+@media (max-width: 767px), (any-pointer: coarse) {
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+  select,
+  textarea,
+  [contenteditable=""],
+  [contenteditable="true"],
+  [contenteditable="plaintext-only"] {
+    font-size: 16px !important;
   }
 }
 
