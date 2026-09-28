@@ -493,9 +493,11 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 .case-library-sex { flex-shrink:0; font-size:12px; color:#78716c; }
 .case-library-pillars { grid-column:1; display:flex; gap:16px; font-size:15px; letter-spacing:.08em; color:#57534e; font-variant-numeric:tabular-nums; }
 .case-library-chevron { grid-column:2; grid-row:1 / 3; width:20px; height:20px; color:#a8a29e; }
-.case-library-open { align-self:center; min-width:0; width:100%; }
-.app-shell button.tactile-button-cap:not(:disabled),[data-dialog-root] button.tactile-button-cap:not(:disabled) { transition:none; }
-.case-library-open .tactile-button-cap:focus-visible { outline:2px solid #a68c59; outline-offset:4px; }
+.case-library-open { align-self:center; min-width:0; width:100%; min-height:42px; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600; line-height:20px; }
+.glass-cta.case-library-open { background:var(--glass-dark); box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.glass-cta.case-library-open:not(:disabled):hover { background:var(--ink); box-shadow:none; filter:none; }
+.app-shell button.case-library-open:not(:disabled) { transition-property:background-color,border-color,color; }
+.case-library-open:focus-visible { outline:2px solid #a68c59; outline-offset:3px; }
 .case-library-reveal { overflow:hidden; }
 .case-library-detail { display:grid; grid-template-columns:minmax(220px,1fr) minmax(0,1.9fr); align-items:stretch; gap:24px; padding:20px; border-top:1px solid #e8e3d9; }
 .case-library-meta { display:grid; min-width:0; grid-template-rows:auto 1fr auto; gap:18px; }
@@ -514,9 +516,7 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
   .case-library-identity { grid-column:1; }
   .case-library-pillars { grid-column:1; gap:12px; font-size:13px; }
   .case-library-chevron { grid-column:2; grid-row:1 / 3; }
-  .case-library-open { grid-area:open; align-self:start; min-width:0; }
-  .case-library-open .tactile-button-cap { min-height:64px; gap:6px; padding:10px 8px 14px; }
-  .case-library-open .tactile-button-label { font-size:13px; line-height:20px; }
+  .case-library-open { grid-area:open; align-self:start; min-height:62px; padding:10px 8px; }
   .case-library-open-reading { display:block; }
   .case-library-detail { grid-template-columns:1fr; gap:16px; padding:14px; }
   .case-library-meta { grid-template-columns:minmax(0,1fr) 100px; grid-template-rows:auto auto; grid-template-areas:"dates open" "actions open"; gap:14px 12px; }

@@ -7,7 +7,6 @@ import { getCaseCardPreview } from '../../lib/case-card-preview';
 import { getWuxingColor } from '../../utils/wuxing';
 import { useInteractionTransition } from '../InteractionMotion';
 import DeleteButton from './DeleteButton';
-import { TactileButton } from './TactileButton';
 
 type Props = { items: CaseItem[]; onOpen: (id: string) => void; onEdit: (id: string) => void; onDelete: (id: string) => Promise<void | boolean>; };
 type Entry = { item: CaseItem; preview: ReturnType<typeof getCaseCardPreview> };
@@ -70,9 +69,10 @@ function CaseDetails({ id, labelledBy, entry: { item, preview }, onOpen, onEdit,
           {preview.location && <div><dt>出生地</dt><dd>{preview.location}</dd></div>}
           <div><dt>排盘时间</dt><dd>{new Date(preview.chartTime).toLocaleString('zh-CN', { hour12: false })}</dd></div>
         </dl>
-        <TactileButton disabled={!present} className="case-library-open" size="sm" fullWidth aria-label={`查看${preview.name}专业排盘与解读`} onClick={() => onOpen(item.id)}>
+        <motion.button type="button" disabled={!present} className="glass-cta case-library-open text-amber-300" aria-label={`查看${preview.name}专业排盘与解读`} onClick={() => onOpen(item.id)}
+          whileTap={motionPreference.duration ? { scale: .98 } : undefined} transition={motionPreference}>
           专业排盘<span className="case-library-open-reading">与解读</span>
-        </TactileButton>
+        </motion.button>
         <div className="case-library-actions">
           <DeleteButton disabled={!present} onDelete={() => onDelete(item.id)} neutral countdown={3} />
           <button type="button" onClick={() => onEdit(item.id)} className="case-library-edit">编辑</button>
