@@ -1,3 +1,4 @@
+import { formatAgentCaseIdentity } from './selected-context';
 import { Prisma } from '@prisma/client';
 import { ModelType, LiuyaoMode, type BaseParams, type BaziResponse } from '../../types';
 import { formatBaziCompatibilityChart } from '../bazi-compatibility';
@@ -469,7 +470,7 @@ export function buildAgentTools(options: { knowledgeEnabled: boolean }): AgentTo
         const baseline = item.initialAnalysisData && typeof item.initialAnalysisData === 'object'
           ? String((item.initialAnalysisData as Record<string, unknown>).content || '').slice(0, 4_000)
           : '';
-        return { summary: `已读取命例“${item.title}”`, content: `【${item.title}｜${item.modelType}】\n${text}${baseline ? `\n【基线分析】\n${baseline}` : ''}`, detail: item.title, divinationMode: 'case' };
+        return { summary: `已读取命例“${item.title}”`, content: `${formatAgentCaseIdentity(item)}\n${text}${baseline ? `\n【基线分析】\n${baseline}` : ''}`, detail: item.title, divinationMode: 'case' };
       },
     },
     {

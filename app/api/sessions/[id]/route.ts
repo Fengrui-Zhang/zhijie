@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { restoreAgentSessionContext } from '../../../../lib/agent/session-context';
 import { auth } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
 
@@ -24,7 +25,7 @@ export async function GET(
     return NextResponse.json({ error: '会话不存在' }, { status: 404 });
   }
 
-  return NextResponse.json(divSession);
+  return NextResponse.json(divSession.modelType === 'chat' ? { ...divSession, chartParams: restoreAgentSessionContext(divSession.chartParams, divSession.messages) } : divSession);
 }
 
 export async function DELETE(

@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { formatSelectedAgentContext } from './selected-context';
 import { revisionMatches, type prepareMessageRevision } from './message-revision';
 import { DEEPSEEK_PRO_MODEL } from '../analysis-models';
 import { prisma } from '../prisma';
@@ -57,7 +58,6 @@ type RunAgentTurnInput = {
 type CallState = { aiCalls: number; pointsUsed: number };
 
 const MAX_HISTORY_MESSAGES = 24;
-const MAX_CONTEXT_TEXT = 18_000;
 const AGENT_MAX_OUTPUT_TOKENS = 4_096;
 
 const toJsonValue = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
@@ -158,11 +158,7 @@ async function buildSelectedContext(userId: string, caseIds: string[], sessionId
         })
       : Promise.resolve([]),
   ]);
-  const blocks = [
-    ...cases.map((item) => `【用户手动引用命例｜${item.title}｜${item.modelType}｜ID ${item.id}】\n${JSON.stringify(item.chartData)}`),
-    ...sessions.map((item) => `【用户手动引用会话｜${item.title}｜ID ${item.id}】\n${item.messages.map((message) => `${message.role}：${message.content}`).join('\n')}`),
-  ];
-  return blocks.join('\n\n').slice(0, MAX_CONTEXT_TEXT);
+  return formatSelectedAgentContext({ caseIds, sessionIds, cases, sessions });
 }
 
 async function executeToolCall(
@@ -275,7 +271,12 @@ async function persistFinal(
       where: { id: input.turnId },
       data: { status, aiCallCount: state.aiCalls, pointsUsed: state.pointsUsed, completedAt: new Date() },
     });
-    await tx.divinationSession.update({ where: { id: input.sessionId }, data: { updatedAt: new Date() } });
+    const savedSession = await tx.divinationSession.findUnique({ where: { id: input.sessionId }, select: { chartParams: true } });
+    const savedParams = savedSession?.chartParams && typeof savedSession.chartParams === 'object' && !Array.isArray(savedSession.chartParams) ? savedSession.chartParams : {};
+    await tx.divinationSession.update({ where: { id: input.sessionId }, data: {
+      updatedAt: new Date(),
+      chartParams: { ...savedParams, type: 'agent_chat', sourceCaseIds: input.selectedCaseIds, sourceSessionIds: input.selectedSessionIds, knowledgeEnabled: input.knowledgeEnabled } as Prisma.InputJsonValue,
+    } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
