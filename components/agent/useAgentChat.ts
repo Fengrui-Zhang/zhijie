@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import type { MessageRevision } from '../../lib/agent/message-revision';
 
 export type AgentToolCard = {
   id: string;
@@ -26,6 +27,7 @@ export type AgentTurnResult = AgentTurnUsage & {
 
 type RunInput = {
   sessionId?: string | null;
+  revision?: MessageRevision;
   message: string;
   selectedCaseIds: string[];
   selectedSessionIds: string[];

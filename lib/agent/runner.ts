@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { revisionMatches, type prepareMessageRevision } from './message-revision';
 import { DEEPSEEK_PRO_MODEL } from '../analysis-models';
 import { prisma } from '../prisma';
 import { calculateAgentPoints, MAX_AGENT_AI_CALLS, shouldReserveAgentPoint } from './billing';
@@ -49,6 +50,7 @@ type RunAgentTurnInput = {
   selectedSessionIds: string[];
   knowledgeEnabled: boolean;
   personalizationPrompt?: string;
+  revision?: ReturnType<typeof prepareMessageRevision>;
   emit: (event: AgentEvent) => void;
 };
 
@@ -240,8 +242,18 @@ async function persistFinal(
     orderBy: { startedAt: 'asc' },
     select: { id: true, toolName: true, status: true, resultSummary: true, errorCode: true, divinationMode: true, timeBucketKey: true, startedAt: true, completedAt: true },
   });
-  await prisma.$transaction([
-    prisma.chatMessage.create({
+  await prisma.$transaction(async (tx) => {
+    if (input.revision) {
+      const current = await tx.chatMessage.findMany({ where: { sessionId: input.sessionId }, orderBy: { createdAt: 'asc' }, select: { id: true, role: true, content: true } });
+      if (!revisionMatches(current, input.revision.snapshot)) throw new Error('对话已变化，原记录已保留，请刷新后重试');
+      await tx.chatMessage.deleteMany({ where: { sessionId: input.sessionId, id: { in: input.revision.replacedIds } } });
+      await tx.chatMessage.create({ data: {
+        sessionId: input.sessionId, agentTurnId: input.turnId, role: 'user', content: input.message,
+        createdAt: new Date(Date.now() - 1),
+        metadata: { selectedCaseIds: input.selectedCaseIds, selectedSessionIds: input.selectedSessionIds } as Prisma.InputJsonValue,
+      } });
+    }
+    await tx.chatMessage.create({
       data: {
         sessionId: input.sessionId,
         agentTurnId: input.turnId,
@@ -258,13 +270,13 @@ async function persistFinal(
           })),
         } as unknown as Prisma.InputJsonValue,
       },
-    }),
-    prisma.agentTurn.update({
+    });
+    await tx.agentTurn.update({
       where: { id: input.turnId },
       data: { status, aiCallCount: state.aiCalls, pointsUsed: state.pointsUsed, completedAt: new Date() },
-    }),
-    prisma.divinationSession.update({ where: { id: input.sessionId }, data: { updatedAt: new Date() } }),
-  ]);
+    });
+    await tx.divinationSession.update({ where: { id: input.sessionId }, data: { updatedAt: new Date() } });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function runAgentTurn(input: RunAgentTurnInput) {
@@ -286,8 +298,8 @@ export async function runAgentTurn(input: RunAgentTurnInput) {
   }
 
   const [history, selectedContext] = await Promise.all([
-    prisma.chatMessage.findMany({
-      where: { sessionId: input.sessionId, agentTurnId: { not: input.turnId } },
+    input.revision ? Promise.resolve(input.revision.history.slice(-MAX_HISTORY_MESSAGES).reverse()) : prisma.chatMessage.findMany({
+      where: { sessionId: input.sessionId, OR: [{ agentTurnId: { not: input.turnId } }, { agentTurnId: null }] },
       orderBy: { createdAt: 'desc' },
       take: MAX_HISTORY_MESSAGES,
     }),

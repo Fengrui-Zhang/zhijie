@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import DeleteButton from './interactive/DeleteButton';
 
 const MODEL_LABELS: Record<string, string> = {
   chat: '聊天',
@@ -53,7 +54,7 @@ interface SessionSidebarProps {
   sessions: SessionItem[];
   activeSessionId: string | null;
   onSelect: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | boolean | Promise<void | boolean>;
   onNewSession: () => void;
   collapsed: boolean;
   onToggle: () => void;
@@ -105,7 +106,6 @@ export default function SessionSidebar({
   onToggle,
   mobile = false,
 }: SessionSidebarProps) {
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   if (collapsed) {
     return (
@@ -201,28 +201,7 @@ export default function SessionSidebar({
                       <span>{MODEL_LABELS[item.modelType] || item.modelType}</span>
                     </div>
                   </div>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (confirmDelete === item.id) {
-                        onDelete(item.id);
-                        setConfirmDelete(null);
-                      } else {
-                        setConfirmDelete(item.id);
-                        setTimeout(() => setConfirmDelete(null), 3000);
-                      }
-                    }}
-                    className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${
-                      confirmDelete === item.id
-                        ? 'text-red-500 bg-red-50'
-                        : 'text-stone-300 hover:text-red-400 opacity-0 group-hover:opacity-100'
-                    }`}
-                    title={confirmDelete === item.id ? '再次点击确认删除' : '删除'}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
-                      <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.31l.461 6.15A1.5 1.5 0 005.02 13h5.96a1.5 1.5 0 001.499-1.35l.46-6.15h.311a.75.75 0 000-1.5H11v-.75A1.75 1.75 0 009.25 1.5h-2.5A1.75 1.75 0 005 3.25zm1.5 0a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V4h-3v-.75z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  <DeleteButton onDelete={() => onDelete(item.id)} />
                 </div>
               ))}
             </div>

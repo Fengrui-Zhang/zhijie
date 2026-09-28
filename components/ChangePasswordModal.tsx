@@ -1,5 +1,6 @@
 'use client';
 
+import SaveButton from './interactive/SaveButton';
 import React, { useState } from 'react';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -22,15 +23,15 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
     setError('');
     if (!oldPassword || !newPassword || !confirmPassword) {
       setError('请填写所有字段');
-      return;
+      return false;
     }
     if (newPassword.length < 6) {
       setError('新密码至少需要6位');
-      return;
+      return false;
     }
     if (newPassword !== confirmPassword) {
       setError('两次输入的新密码不一致');
-      return;
+      return false;
     }
     setLoading(true);
     try {
@@ -44,9 +45,11 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
         onSuccess();
       } else {
         setError(data.error || '修改失败');
+        return false;
       }
     } catch {
       setError('网络错误');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -104,14 +107,7 @@ export default function ChangePasswordModal({ onClose, onSuccess }: Props) {
           >
             取消
           </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="glass-panel-dark flex-1 rounded-2xl py-2.5 text-sm text-amber-200 hover:brightness-105 disabled:opacity-50"
-          >
-            {loading ? '提交中...' : '确认'}
-          </button>
+          <SaveButton onSave={handleSubmit} disabled={loading} label="确认" pendingLabel="更新中" successLabel="已更新" className="flex-1" />
         </div>
       </div>
     </div>

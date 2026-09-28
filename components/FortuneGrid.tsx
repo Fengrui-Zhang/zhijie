@@ -1,5 +1,6 @@
 'use client';
 
+import SaveButton from './interactive/SaveButton';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
@@ -760,9 +761,7 @@ const ShareDialog = ({
         </DialogBody>
 
         <div className="grid shrink-0 gap-2 border-t border-stone-100 px-4 py-3 sm:grid-cols-3 md:px-5">
-          <button type="button" onClick={handleDownload} className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-700 transition hover:bg-stone-50">
-            保存图片
-          </button>
+          <SaveButton onSave={handleDownload} label="保存图片" pendingLabel="生成图片中" successLabel="已发起下载" secondary />
           <button type="button" onClick={handleShare} className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100">
             {shared ? '已分享' : '系统分享'}
           </button>

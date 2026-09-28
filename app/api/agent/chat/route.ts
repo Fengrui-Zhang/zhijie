@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { prepareMessageRevision, type MessageRevision } from '../../../../lib/agent/message-revision';
 import { NextResponse } from 'next/server';
 import { auth } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
@@ -11,6 +12,7 @@ export const maxDuration = 300;
 
 type AgentRequest = {
   sessionId?: string;
+  revision?: MessageRevision;
   message?: string;
   selectedCaseIds?: string[];
   selectedSessionIds?: string[];
@@ -38,9 +40,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: '请求格式无效' }, { status: 400 });
   }
-  const message = typeof body.message === 'string' ? body.message.trim().slice(0, 4_000) : '';
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+  if (message.length > 4_000) return NextResponse.json({ error: '问题请控制在4000字以内' }, { status: 400 });
   if (!message) return NextResponse.json({ error: '请输入问题' }, { status: 400 });
 
+  if (body.revision && !body.sessionId) return NextResponse.json({ error: '请先保存会话后再编辑' }, { status: 400 });
   let chatSession;
   if (body.sessionId) {
     chatSession = await prisma.divinationSession.findFirst({ where: { id: body.sessionId, userId } });
@@ -69,15 +73,22 @@ export async function POST(request: Request) {
     await prisma.agentTurn.update({ where: { id: turn.id }, data: { status: 'failed', errorCode: 'TURN_IN_PROGRESS', completedAt: new Date() } });
     return NextResponse.json({ error: '上一轮 Agent 仍在运行，请等待完成后再发送', code: 'TURN_IN_PROGRESS' }, { status: 409 });
   }
-  await prisma.chatMessage.create({
-    data: {
-      sessionId: chatSession.id,
-      agentTurnId: turn.id,
-      role: 'user',
-      content: message,
-      metadata: { selectedCaseIds: safeIds(body.selectedCaseIds), selectedSessionIds: safeIds(body.selectedSessionIds) } as Prisma.InputJsonValue,
-    },
-  });
+  let revision: ReturnType<typeof prepareMessageRevision> | undefined;
+  try {
+    if (body.revision) {
+      const messages = await prisma.chatMessage.findMany({ where: { sessionId: chatSession.id }, orderBy: { createdAt: 'asc' }, select: { id: true, role: true, content: true } });
+      revision = prepareMessageRevision(messages, body.revision);
+    } else {
+      await prisma.chatMessage.create({ data: {
+        sessionId: chatSession.id, agentTurnId: turn.id, role: 'user', content: message,
+        metadata: { selectedCaseIds: safeIds(body.selectedCaseIds), selectedSessionIds: safeIds(body.selectedSessionIds) } as Prisma.InputJsonValue,
+      } });
+    }
+  } catch (error) {
+    await prisma.agentTurn.update({ where: { id: turn.id }, data: { status: 'failed', errorCode: 'REVISION_CONFLICT', completedAt: new Date() } }).catch(() => undefined);
+    await releaseAgentLock(userId, turn.id);
+    return NextResponse.json({ error: error instanceof Error ? error.message : '无法修改该问题' }, { status: 409 });
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -88,9 +99,10 @@ export async function POST(request: Request) {
         userId,
         sessionId: chatSession.id,
         turnId: turn.id,
+        revision,
         message,
         selectedCaseIds: safeIds(body.selectedCaseIds),
-        selectedSessionIds: safeIds(body.selectedSessionIds),
+        selectedSessionIds: safeIds(body.selectedSessionIds).filter((id) => id !== chatSession.id),
         knowledgeEnabled: body.knowledgeEnabled !== false,
         personalizationPrompt: typeof body.personalizationPrompt === 'string' ? body.personalizationPrompt.slice(0, 2_000) : undefined,
         emit,

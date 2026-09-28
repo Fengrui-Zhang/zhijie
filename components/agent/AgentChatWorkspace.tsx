@@ -1,7 +1,8 @@
 'use client';
 
-import { useLayoutEffect, useRef, type FormEvent, type KeyboardEvent } from 'react';
-import { SmoothCollapse, TransitionText } from '../InteractionMotion';
+import { type FormEvent } from 'react';
+import PromptBox from '../interactive/PromptBox';
+import InlinePromptEdit from '../interactive/InlinePromptEdit';
 import MarkdownContent from '../MarkdownContent';
 import { ChatWorkspace } from '../WorkspacePanels';
 import { AgentToolCards } from './AgentToolCards';
@@ -45,6 +46,7 @@ type Props = {
   onSelectSession: (id: string) => void;
   onRemoveSession: (id: string) => void;
   onCopyPrompt: () => void;
+  onEditMessage: (id: string, value: string) => Promise<void | boolean>;
 };
 
 const STARTER_PROMPTS = [
@@ -55,32 +57,12 @@ const STARTER_PROMPTS = [
 ];
 
 export default function AgentChatWorkspace(props: Props) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    const previousHeight = input.getBoundingClientRect().height;
-    const previousTransition = input.style.transition;
-    input.style.transition = 'none';
-    input.style.height = 'auto';
-    const height = Math.min(144, Math.max(48, input.scrollHeight));
-    input.style.height = `${previousHeight}px`;
-    void input.offsetHeight;
-    input.style.transition = previousTransition;
-    input.style.height = `${height}px`;
-  }, [props.input]);
   const contextCount = props.selectedCases.length + props.selectedSessions.length;
   const showOrb = useDelayedBusy(props.loading);
   const runningTool = props.liveTools.find((tool) => tool.status === 'running');
   const orbState = runningTool && /search|retriev|knowledge|检索|搜索/i.test(`${runningTool.toolName} ${runningTool.label}`)
     ? 'searching'
     : 'working';
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
-      event.preventDefault();
-      if (!props.loading && props.input.trim()) props.onSubmit();
-    }
-  };
   return (
     <ChatWorkspace>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-6 py-4 md:px-8">
@@ -89,37 +71,9 @@ export default function AgentChatWorkspace(props: Props) {
             <div className="text-2xl font-bold text-stone-800">问智解</div>
             <div className="mt-0.5 text-xs text-stone-400">AI 自动选择并调用合适的命理与占卜工具</div>
           </div>
-          <button type="button" onClick={props.onNewChat} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/70 text-lg font-semibold text-stone-600 transition hover:bg-white" aria-label="新建问答">+</button>
+          <button type="button" disabled={props.loading} onClick={props.onNewChat} className="ml-1 flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 bg-white/70 text-lg font-semibold text-stone-600 transition hover:bg-white" aria-label="新建问答">+</button>
         </div>
-        <button type="button" onClick={props.onToggleContext} aria-expanded={props.contextOpen} className="rounded-2xl border border-stone-200 bg-white/70 px-4 py-2 text-sm font-semibold text-stone-600 transition hover:bg-white">
-          添加上下文{contextCount ? ` · ${contextCount}` : ''}
-        </button>
       </div>
-
-      <SmoothCollapse open={props.contextOpen}>
-        <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
-          <label>
-            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
-            <select value={props.caseSelectValue} onChange={(event) => props.onSelectCase(event.target.value)} disabled={!props.availableCases.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
-              <option value="">{props.availableCases.length ? '引用命例' : '暂无命例'}</option>
-              {props.availableCases.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用历史会话</span>
-            <select value={props.sessionSelectValue} onChange={(event) => props.onSelectSession(event.target.value)} disabled={!props.availableSessions.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
-              <option value="">{props.availableSessions.length ? '引用会话' : '暂无会话'}</option>
-              {props.availableSessions.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
-            </select>
-          </label>
-          <div>
-            <span className="mb-1.5 block text-xs font-bold text-stone-500">参考资料</span>
-            <button type="button" role="switch" aria-checked={props.knowledgeEnabled} onClick={props.onToggleKnowledge} className={`w-full rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${props.knowledgeEnabled ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-stone-200 bg-white/70 text-stone-500'}`}>
-              {props.knowledgeEnabled ? '允许 Agent 检索知识库' : '不使用知识库'}
-            </button>
-          </div>
-        </div>
-      </SmoothCollapse>
 
       {contextCount ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-100/80 bg-white/42 px-6 py-3 md:px-8">
@@ -144,7 +98,7 @@ export default function AgentChatWorkspace(props: Props) {
               <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {message.role === 'model' ? <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70 text-xs font-bold text-stone-500">解</div> : null}
                 <div className={`max-w-[86%] rounded-[22px] px-4 py-3 text-sm leading-7 shadow-sm ${message.role === 'user' ? 'rounded-tr-md bg-stone-900 text-white' : 'rounded-tl-md border border-white/65 bg-white/72 text-stone-800'}`}>
-                  <MarkdownContent content={message.content} />
+                  {message.role === 'user' ? <InlinePromptEdit value={message.content} disabled={props.loading} onSave={(value) => props.onEditMessage(message.id, value)} /> : <MarkdownContent content={message.content} />}
                   {message.role === 'model' && message.agentMeta ? <AgentToolCards tools={message.agentMeta.tools || []} usage={message.agentMeta.usage} /> : null}
                 </div>
                 {message.role === 'user' ? <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-stone-900 text-xs font-bold text-amber-200">我</div> : null}
@@ -164,13 +118,35 @@ export default function AgentChatWorkspace(props: Props) {
       </div>
 
       {props.error ? <div className="border-t border-red-100 bg-red-50/70 px-4 py-2 text-xs text-red-600">{props.error}</div> : null}
-      <form onSubmit={(event) => { event.preventDefault(); if (!props.loading && props.input.trim()) props.onSubmit(event); }} className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-xl xl:pb-4">
-        <div className="interaction-composer mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
-          <textarea ref={inputRef} value={props.input} onChange={(event) => props.onInputChange(event.target.value)} onKeyDown={handleKeyDown} placeholder="输入问题，Agent 会自动选择所需工具..." rows={1} className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400" />
-          <button type="button" disabled={props.loading} onClick={props.onCopyPrompt} className="hidden shrink-0 rounded-2xl border border-stone-200 bg-white/70 px-3 py-3 text-xs font-semibold text-stone-500 transition hover:bg-white disabled:opacity-45 sm:inline-flex"><TransitionText value={String(props.copied)}>{props.copied ? '已复制' : '复制AI提示词'}</TransitionText></button>
-          <button type="submit" aria-busy={props.loading} disabled={!props.input.trim() || props.loading} className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><TransitionText value={String(props.loading)}>{props.loading ? '执行中' : '发送'}</TransitionText></button>
+      <div className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] xl:pb-4">
+        <PromptBox value={props.input} onChange={props.onInputChange} onSubmit={() => props.onSubmit()} busy={props.loading}
+          placeholder="输入问题，Agent 会自动选择所需工具..." onCopy={props.onCopyPrompt} copied={props.copied}
+          maxLength={4000} contextOpen={props.contextOpen} contextCount={contextCount} onToggleContext={props.onToggleContext}
+          context={
+        <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
+          <label>
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
+            <select value={props.caseSelectValue} onChange={(event) => props.onSelectCase(event.target.value)} disabled={props.loading || !props.availableCases.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
+              <option value="">{props.availableCases.length ? '引用命例' : '暂无命例'}</option>
+              {props.availableCases.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">引用历史会话</span>
+            <select value={props.sessionSelectValue} onChange={(event) => props.onSelectSession(event.target.value)} disabled={props.loading || !props.availableSessions.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
+              <option value="">{props.availableSessions.length ? '引用会话' : '暂无会话'}</option>
+              {props.availableSessions.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
+            </select>
+          </label>
+          <div>
+            <span className="mb-1.5 block text-xs font-bold text-stone-500">参考资料</span>
+            <button type="button" role="switch" aria-checked={props.knowledgeEnabled} onClick={props.onToggleKnowledge} className={`w-full rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${props.knowledgeEnabled ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-stone-200 bg-white/70 text-stone-500'}`}>
+              {props.knowledgeEnabled ? '允许 Agent 检索知识库' : '不使用知识库'}
+            </button>
+          </div>
         </div>
-      </form>
+          } />
+      </div>
     </ChatWorkspace>
   );
 }

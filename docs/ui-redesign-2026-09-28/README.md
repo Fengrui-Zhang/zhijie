@@ -1,5 +1,7 @@
 # 智解交互细节优化（修正版）
 
+最新一轮：用户指定 Delete Button、Prompt Box、Inline Edit、Rolling Card Stack、Save Button，并允许调整对应布局与结构。见 [第二轮接入记录](./implementation-round2.md)。下方为上一轮的约束与实施记录。
+
 以用户 2026-09-28 的纠正为准：保留原项目的内容、布局、结构、配色、控件位置和文案，只改善交互的连续性与反馈。此前页面重设计和 preview.html 已撤回，不作为实现目标。
 
 ## 从 useLayouts 选用的交互

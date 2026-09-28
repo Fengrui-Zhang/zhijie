@@ -1,6 +1,7 @@
 
 'use client';
 
+import SaveButton from './components/interactive/SaveButton';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useSession, signOut } from 'next-auth/react';
@@ -119,6 +120,10 @@ import AccountSettingsModal from '@/components/AccountSettingsModal';
 import BaziLayoutSettings from '@/components/BaziLayoutSettings';
 import UserMenuPopup from './components/UserMenuPopup';
 import { SelectionGroup, SelectionHighlight } from './components/InteractionMotion';
+import DeleteButton from './components/interactive/DeleteButton';
+import PromptBox from './components/interactive/PromptBox';
+import InlinePromptEdit from './components/interactive/InlinePromptEdit';
+import CaseCardStack from './components/interactive/CaseCardStack';
 import ChangePasswordModal from './components/ChangePasswordModal';
 
 // Types
@@ -1898,13 +1903,10 @@ const App: React.FC<AppProps> = ({
 
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null);
-  const [editingUserMessageId, setEditingUserMessageId] = useState<string | null>(null);
-  const [editingUserMessageDraft, setEditingUserMessageDraft] = useState('');
   const [messageVersionMap, setMessageVersionMap] = useState<Record<string, MessageVersionState>>({});
   const [openVersionMenuId, setOpenVersionMenuId] = useState<string | null>(null);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
   const [showInitialAnalysisRegenerateConfirm, setShowInitialAnalysisRegenerateConfirm] = useState(false);
-  const [confirmCaseSessionDeleteId, setConfirmCaseSessionDeleteId] = useState<string | null>(null);
   const [initialAnalysisBusy, setInitialAnalysisBusy] = useState(false);
   const [knowledgeHint, setKnowledgeHint] = useState<string | null>(null);
   const [messageSourceMap, setMessageSourceMap] = useState<Record<string, KnowledgeSourceSummary[]>>({});
@@ -2035,11 +2037,7 @@ const App: React.FC<AppProps> = ({
     if (openVersionMenuId && !messageIds.has(openVersionMenuId)) {
       setOpenVersionMenuId(null);
     }
-    if (editingUserMessageId && !messageIds.has(editingUserMessageId)) {
-      setEditingUserMessageId(null);
-      setEditingUserMessageDraft('');
-    }
-  }, [chatHistory, editingUserMessageId, openVersionMenuId]);
+  }, [chatHistory, openVersionMenuId]);
 
   useEffect(() => {
     setSelectedCaseRelationId(null);
@@ -2718,7 +2716,7 @@ const App: React.FC<AppProps> = ({
     caseAId: string,
     caseBId: string,
     relations: EditableCaseRelationDraft[]
-  ): Promise<CaseRelationItem[]> => {
+  ): Promise<CaseRelationItem[] | null> => {
     try {
       const res = await fetch('/api/case-relations', {
         method: 'POST',
@@ -2729,10 +2727,10 @@ const App: React.FC<AppProps> = ({
           relations,
         }),
       });
-      if (!res.ok) return [];
+      if (!res.ok) return null;
       return normalizeCaseRelationItems(await res.json());
     } catch {
-      return [];
+      return null;
     }
   };
 
@@ -2885,20 +2883,12 @@ const App: React.FC<AppProps> = ({
     }
   };
 
-  const replaceMessagesInDb = async (
-    sessionId: string | null,
-    messages: PersistedChatMessage[]
-  ) => {
+  const replaceMessagesInDb = async (sessionId: string | null, messages: PersistedChatMessage[]) => {
     if (!isLoggedIn || !sessionId) return;
-    try {
-      await fetch(`/api/sessions/${sessionId}/messages`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messages),
-      });
-    } catch {
-      // silently ignore
-    }
+    const response = await fetch(`/api/sessions/${sessionId}/messages`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(messages),
+    });
+    if (!response.ok) throw new Error('保存对话失败，请重试');
   };
 
   const updateSessionInDb = async (
@@ -2919,7 +2909,8 @@ const App: React.FC<AppProps> = ({
 
   const handleDeleteSession = async (id: string) => {
     try {
-      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('删除记录失败，请重试');
       setSavedSessions(prev => prev.filter(s => s.id !== id));
       if (activeCase && isLoggedIn) {
         const detailRes = await fetch(`/api/cases/${activeCase.id}`);
@@ -2932,8 +2923,9 @@ const App: React.FC<AppProps> = ({
         setActiveSessionId(null);
         handleReset();
       }
-    } catch {
-      // silently ignore
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '删除记录失败，请重试');
+      return false;
     }
   };
 
@@ -4104,29 +4096,33 @@ const App: React.FC<AppProps> = ({
     ], '新聊天AI提示词');
   };
 
-  const handleStandaloneChatSubmit = async (event?: React.FormEvent) => {
+  const handleStandaloneChatSubmit = async (event?: React.FormEvent, edit?: { id: string; content: string }) => {
     event?.preventDefault();
-    const content = standaloneChatInput.trim();
-    if (!content || standaloneChatLoading) return;
+    const content = (edit?.content ?? standaloneChatInput).trim();
+    if (!content || standaloneChatLoading) return false;
     if (!isLoggedIn) {
       setShowAuth(true);
       return;
     }
+    const originalMessages = standaloneChatMessages;
+    const editIndex = edit ? originalMessages.findIndex((message) => message.id === edit.id && message.role === 'user') : -1;
+    if (edit && editIndex < 0) return false;
     setStandaloneChatError('');
-    setStandaloneChatInput('');
+    if (!edit) setStandaloneChatInput('');
     const userMsg: ChatMessage = {
-      id: `standalone-u-${Date.now()}`,
+      id: edit?.id || `standalone-u-${Date.now()}`,
       role: 'user',
       content,
       timestamp: new Date(),
     };
-    const nextMessages = [...standaloneChatMessages, userMsg];
-    setStandaloneChatMessages(nextMessages);
+    const nextMessages = [...(edit ? originalMessages.slice(0, editIndex) : originalMessages), userMsg];
+    if (!edit) setStandaloneChatMessages(nextMessages);
     setStandaloneChatLoading(true);
     try {
       try {
         const agentResult = await agentChat.runTurn({
           sessionId: standaloneSessionId,
+          revision: edit ? { index: editIndex, expectedContent: originalMessages[editIndex].content, expectedMessageCount: originalMessages.length } : undefined,
           message: content,
           selectedCaseIds: standaloneSelectedCaseIds,
           selectedSessionIds: standaloneSelectedSessionIds,
@@ -4147,7 +4143,7 @@ const App: React.FC<AppProps> = ({
             },
           },
         };
-        setStandaloneChatMessages((prev) => [...prev, modelMsg]);
+        setStandaloneChatMessages([...nextMessages, modelMsg]);
         setStandaloneSessionId(agentResult.sessionId);
         setActiveSessionId(agentResult.sessionId);
         setUserQuota(agentResult.remainingQuota);
@@ -4236,7 +4232,7 @@ const App: React.FC<AppProps> = ({
         content: data.content || '暂无回复',
         timestamp: new Date(),
       }, modelSources);
-      setStandaloneChatMessages((prev) => [...prev, modelMsg]);
+      setStandaloneChatMessages([...nextMessages, modelMsg]);
       recordKnowledgeSources(modelMsg.id, modelSources);
       if (isLoggedIn) {
         let targetSessionId = standaloneSessionId;
@@ -4265,10 +4261,14 @@ const App: React.FC<AppProps> = ({
           );
           setStandaloneSessionId(targetSessionId);
         }
-        await saveMessagesToDb(targetSessionId, [
-          { role: 'user', content },
-          { role: 'model', content: modelMsg.content, knowledgeSources: modelMsg.knowledgeSources },
-        ]);
+        if (edit) {
+          await replaceMessagesInDb(targetSessionId, toPersistedMessages([...nextMessages, modelMsg]));
+        } else {
+          await saveMessagesToDb(targetSessionId, [
+            { role: 'user', content },
+            { role: 'model', content: modelMsg.content, knowledgeSources: modelMsg.knowledgeSources },
+          ]);
+        }
         fetchSessions();
       }
       if (data.knowledgeFailed) {
@@ -4277,7 +4277,9 @@ const App: React.FC<AppProps> = ({
       await fetchUserProfile();
     } catch (err) {
       setStandaloneChatError(err instanceof Error ? err.message : '发送失败，请稍后再试');
+      if (edit) { setStandaloneChatMessages(originalMessages); throw err; }
       setStandaloneChatInput(content);
+      setStandaloneChatMessages(originalMessages);
     } finally {
       setStandaloneChatLoading(false);
     }
@@ -4303,8 +4305,7 @@ const App: React.FC<AppProps> = ({
 
   const handleDeleteCaseSessionEntry = useCallback((id: string) => {
     if (isLoggedIn) {
-      void handleDeleteSession(id);
-      return;
+      return handleDeleteSession(id);
     }
     handleDeleteGuestSession(id);
   }, [handleDeleteGuestSession, isLoggedIn]);
@@ -5066,7 +5067,7 @@ const App: React.FC<AppProps> = ({
   }, [buildBaziCompatibilitySummaryTitle, buildCompatBirthChartParams, compatPersonA, compatPersonB, fetchCaseRelationsForPairInDb, fetchLoggedCaseDetail, findProfessionalMatchingCase, getGuestCaseDetail, isLoggedIn, persistProfessionalPlainCase, professionalCaseOptions, readGuestCaseRelations, requireLoginIfGuestModeDisabled]);
 
   const handleConfirmCompatibilityRelations = useCallback(async (skip: boolean) => {
-    if (!pendingCompatibilityData || !pendingCompatibilityData.caseAId || !pendingCompatibilityData.caseBId) return;
+    if (!pendingCompatibilityData || !pendingCompatibilityData.caseAId || !pendingCompatibilityData.caseBId) return false;
 
     const normalizedDrafts = compatRelationDrafts
       .map((item) => ({
@@ -5080,11 +5081,15 @@ const App: React.FC<AppProps> = ({
     let finalRelations = skip ? (hasExistingRelations ? normalizedDrafts : []) : normalizedDrafts;
 
     if (!skip && isLoggedIn) {
-      await saveCaseRelationsInDb(
+      const savedRelations = await saveCaseRelationsInDb(
         pendingCompatibilityData.caseAId,
         pendingCompatibilityData.caseBId,
         normalizedDrafts
       );
+      if (savedRelations === null) {
+        setError('保存关系标签失败，请稍后重试');
+        return false;
+      }
       if (activeCase && (activeCase.id === pendingCompatibilityData.caseAId || activeCase.id === pendingCompatibilityData.caseBId)) {
         const detail = await fetchLoggedCaseDetail(activeCase.id);
         if (detail) setActiveCase(detail);
@@ -5114,7 +5119,7 @@ const App: React.FC<AppProps> = ({
       const ok = await deleteCaseInDb(activeCase.id);
       if (!ok) {
         setError('删除命例失败，请稍后重试');
-        return;
+        return false;
       }
       await hydrateCasesForModel(activeCase.modelType);
       fetchSessions();
@@ -5159,7 +5164,7 @@ const App: React.FC<AppProps> = ({
       const ok = await deleteCaseInDb(caseId);
       if (!ok) {
         setError('删除命例失败，请稍后重试');
-        return;
+        return false;
       }
       await hydrateCasesForModel(modelType);
       fetchSessions();
@@ -5213,7 +5218,7 @@ const App: React.FC<AppProps> = ({
       const ok = await deleteCaseRelationInDb(relationId);
       if (!ok) {
         setError('删除关系标签失败，请稍后重试');
-        return;
+        return false;
       }
       await finishRefresh();
       return;
@@ -5224,7 +5229,7 @@ const App: React.FC<AppProps> = ({
   }, [activeCase, deleteGuestCaseRelation, fetchLoggedCaseDetail, isLoggedIn, refreshGuestActiveCase]);
 
   const handleSaveCaseRelationEdit = useCallback(async () => {
-    if (!activeCase || !editingCaseRelationId) return;
+    if (!activeCase || !editingCaseRelationId) return false;
 
     const nextDraft = {
       labelAToB: caseRelationEditDraft.labelAToB.trim(),
@@ -5232,15 +5237,14 @@ const App: React.FC<AppProps> = ({
     };
 
     if (!nextDraft.labelAToB && !nextDraft.labelBToA) {
-      await handleDeleteCaseRelation(editingCaseRelationId);
-      return;
+      return await handleDeleteCaseRelation(editingCaseRelationId);
     }
 
     if (isLoggedIn) {
       const updated = await updateCaseRelationInDb(editingCaseRelationId, nextDraft);
       if (!updated) {
         setError('修改关系标签失败，请稍后重试');
-        return;
+        return false;
       }
       const detail = await fetchLoggedCaseDetail(activeCase.id);
       if (detail) setActiveCase(detail);
@@ -5255,16 +5259,16 @@ const App: React.FC<AppProps> = ({
   }, [activeCase, caseRelationEditDraft, editingCaseRelationId, fetchLoggedCaseDetail, handleDeleteCaseRelation, isLoggedIn, refreshGuestActiveCase, updateGuestCaseRelation]);
 
   const handleSaveCase = async () => {
-    if (!isCaseModelType(modelType)) return;
-    if (requireLoginIfGuestModeDisabled()) return;
+    if (!isCaseModelType(modelType)) return false;
+    if (requireLoginIfGuestModeDisabled()) return false;
     if (lifeCalendarType === 'pillars') {
       if (!lifePillars.year || !lifePillars.month || !lifePillars.day || !lifePillars.hour) {
         setError('请填写完整四柱');
-        return;
+        return false;
       }
     } else if (!lifeYear || !lifeMonth || !lifeDay) {
       setError('请选择出生日期');
-      return;
+      return false;
     }
 
     try {
@@ -5273,6 +5277,7 @@ const App: React.FC<AppProps> = ({
       const lifeUsesTrueSolar = lifeCalendarType !== 'pillars' && lifeTimeInputMode === 'exact' && lifeUseTrueSolar && Boolean(lifeCoord);
       const chartParams = {
         name: name || '',
+        rechartAt: editingCaseId ? activeCase?.chartParams?.rechartAt : undefined,
         sex: gender,
         year: lifeYear,
         month: lifeMonth,
@@ -5309,6 +5314,7 @@ const App: React.FC<AppProps> = ({
           : await fetchZiwei(chartParams);
 
       const nowIso = new Date().toISOString();
+      chartParams.rechartAt = shouldReuseExistingChart ? activeCase?.chartParams?.rechartAt || activeCase?.createdAt : nowIso;
       let savedCaseId = '';
 
       if (isLoggedIn) {
@@ -5375,6 +5381,7 @@ const App: React.FC<AppProps> = ({
       requestSectionScroll('report');
     } catch (err: any) {
       setError(err.message || '排盘失败，请稍后重试');
+      return false;
     } finally {
       setLoading(false);
       setCaseBusy(false);
@@ -6593,28 +6600,16 @@ const App: React.FC<AppProps> = ({
     }
   };
 
-  const handleStartEditUserMessage = useCallback((messageId: string, content: string) => {
-    if (isTyping) return;
-    setOpenVersionMenuId(null);
-    setEditingUserMessageId(messageId);
-    setEditingUserMessageDraft(content);
-  }, [isTyping]);
-
-  const handleCancelEditUserMessage = useCallback(() => {
-    setEditingUserMessageId(null);
-    setEditingUserMessageDraft('');
-  }, []);
-
-  const handleSubmitEditedUserMessage = async (messageId: string) => {
-    if (!chartData || isTyping) return;
-    const editedContent = editingUserMessageDraft.trim();
+  const handleSubmitEditedUserMessage = async (messageId: string, nextContent: string) => {
+    if (!chartData || isTyping) return false;
+    const editedContent = nextContent.trim();
     if (!editedContent) {
       setError('问题不能为空');
-      return;
+      return false;
     }
     if (isLoggedIn && userQuota !== null && userQuota <= 0) {
       setError('您的提问额度已用完');
-      return;
+      return false;
     }
 
     const userIndex = chatHistory.findIndex((msg) => msg.id === messageId);
@@ -6632,8 +6627,6 @@ const App: React.FC<AppProps> = ({
     setError('');
     setKnowledgeHint(null);
     setIsTyping(true);
-    setEditingUserMessageId(null);
-    setEditingUserMessageDraft('');
 
     try {
       let prompt = '';
@@ -6764,7 +6757,11 @@ const App: React.FC<AppProps> = ({
         refreshGuestActiveCase(activeCase.id);
       }
     } catch (err: any) {
+      setChatHistory(chatHistory);
+      setActiveChartParams(activeChartParams);
+      restoreChatSession(applyPersonalizationToSystemInstruction(buildSystemInstruction(modelType, chartData, activeChartParams), activeChartParams), chatHistory.map(({ role, content }) => ({ role, content })));
       setError(err.message || '修改问题失败，请稍后重试');
+      throw err;
     } finally {
       setIsTyping(false);
     }
@@ -7506,7 +7503,7 @@ const App: React.FC<AppProps> = ({
   };
 
   const handleSaveKline = () => {
-    if (!klineResult) return;
+    if (!klineResult) return false;
     const filename = `kline-${Date.now()}.json`;
     const blob = new Blob([JSON.stringify(klineResult, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -7773,13 +7770,7 @@ const App: React.FC<AppProps> = ({
               >
                 编辑命例
               </button>
-              <button
-                type="button"
-                onClick={handleDeleteCase}
-                className="rounded-full border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:border-red-300 hover:text-red-600"
-              >
-                删除命例
-              </button>
+              <DeleteButton label="删除命例" onDelete={handleDeleteCase} />
             </div>
           )}
         </div>
@@ -7886,30 +7877,10 @@ const App: React.FC<AppProps> = ({
 
         <div>
           <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder={modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
-            className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
-          />
-          <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
-            <PromptCopyButton
-              copied={copiedPromptKey === 'case-analysis'}
-              disabled={loading || isTyping}
-              onClick={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
-            />
-            <button
-              type="button"
-              onClick={handleStartCaseAnalysis}
-              disabled={loading || isTyping}
-              aria-busy={loading || isTyping}
-              className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
-            >
-              {loading || isTyping ? (
-                <AiBusyText active state="solving">分析中…</AiBusyText>
-              ) : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
-            </button>
-          </div>
+          <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleStartCaseAnalysis()}
+            allowEmpty busy={loading || isTyping} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
+            onCopy={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
+            copied={copiedPromptKey === 'case-analysis'} />
         </div>
 
         <div className="space-y-3">
@@ -7947,31 +7918,7 @@ const App: React.FC<AppProps> = ({
                     {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (confirmCaseSessionDeleteId === session.id) {
-                      handleDeleteCaseSessionEntry(session.id);
-                      setConfirmCaseSessionDeleteId(null);
-                    } else {
-                      setConfirmCaseSessionDeleteId(session.id);
-                      setTimeout(() => setConfirmCaseSessionDeleteId((current) => (current === session.id ? null : current)), 3000);
-                    }
-                  }}
-                  className={`flex-shrink-0 rounded-lg p-1.5 transition-colors ${
-                    confirmCaseSessionDeleteId === session.id
-                      ? 'bg-red-50 text-red-500'
-                      : activeSessionId === session.id
-                        ? 'text-amber-100/75 hover:text-red-200'
-                        : 'text-stone-300 opacity-0 group-hover:opacity-100 hover:text-red-400'
-                  }`}
-                  title={confirmCaseSessionDeleteId === session.id ? '再次点击确认删除' : '删除'}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                    <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.31l.461 6.15A1.5 1.5 0 005.02 13h5.96a1.5 1.5 0 001.499-1.35l.46-6.15h.311a.75.75 0 000-1.5H11v-.75A1.75 1.75 0 009.25 1.5h-2.5A1.75 1.75 0 005 3.25zm1.5 0a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V4h-3v-.75z" clipRule="evenodd" />
-                  </svg>
-                </button>
+                <DeleteButton onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
               </div>
             ))}
           </div>
@@ -8256,21 +8203,7 @@ const App: React.FC<AppProps> = ({
                             </div>
                           </button>
                           <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (window.confirm(`确认删除“${item.title}”？删除后无法恢复。`)) {
-                                  void handleDeleteSession(item.id);
-                                }
-                              }}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                                selected
-                                  ? 'border-stone-200/30 text-amber-100/80 hover:bg-white/10'
-                                  : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:bg-white/70'
-                              }`}
-                            >
-                              删除
-                            </button>
+                            <DeleteButton onDelete={() => handleDeleteSession(item.id)} />
                           </div>
                         </div>
                       </div>
@@ -8458,7 +8391,7 @@ const App: React.FC<AppProps> = ({
                     ? 'rounded-tr-md bg-stone-900 text-white'
                     : 'rounded-tl-md border border-white/65 bg-white/72 text-stone-800'
                 }`}>
-                  <MarkdownContent content={msg.content} />
+                  {msg.role === 'user' ? <InlinePromptEdit value={msg.content} disabled={standaloneChatLoading} onSave={(content) => handleStandaloneChatSubmit(undefined, { id: msg.id, content })} /> : <MarkdownContent content={msg.content} />}
                   {msg.role === 'model' && (
                     <KnowledgeSourceSummaryPanel sources={msg.knowledgeSources || messageSourceMap[msg.id]} />
                   )}
@@ -8484,46 +8417,12 @@ const App: React.FC<AppProps> = ({
           {standaloneChatError}
         </div>
       )}
-      <form onSubmit={handleStandaloneChatSubmit} className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-xl xl:pb-4">
-        <div className="mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
-          <textarea
-            value={standaloneChatInput}
-            onChange={(event) => setStandaloneChatInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void handleStandaloneChatSubmit(event as unknown as React.FormEvent<HTMLFormElement>);
-              }
-            }}
-            placeholder="输入你的问题..."
-            rows={1}
-            className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400"
-          />
-          <button
-            type="button"
-            disabled={standaloneChatLoading}
-            onClick={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat'))}
-            className="hidden shrink-0 rounded-2xl border border-stone-200 bg-white/70 px-3 py-3 text-xs font-semibold text-stone-500 transition hover:border-amber-200 hover:bg-white hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-45 sm:inline-flex"
-          >
-            {copiedPromptKey === 'standalone-chat' ? '已复制' : '复制AI提示词'}
-          </button>
-          <button
-            type="submit"
-            disabled={!standaloneChatInput.trim() || standaloneChatLoading}
-            className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            发送 · 1点
-          </button>
-        </div>
-        <button
-          type="button"
-          disabled={standaloneChatLoading}
-          onClick={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat-mobile'))}
-          className="mt-2 inline-flex w-full items-center justify-center rounded-2xl border border-stone-200 bg-white/68 px-3 py-2 text-xs font-semibold text-stone-500 transition hover:bg-white disabled:opacity-45 sm:hidden"
-        >
-          {copiedPromptKey === 'standalone-chat-mobile' ? '已复制' : '复制AI提示词'}
-        </button>
-      </form>
+      <div className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] xl:pb-4">
+        <PromptBox value={standaloneChatInput} onChange={setStandaloneChatInput} busy={standaloneChatLoading}
+          onSubmit={() => void handleStandaloneChatSubmit()} placeholder="输入你的问题..." submitLabel="发送 · 1点"
+          onCopy={() => void buildStandaloneChatPromptCopyText().then((text) => handleCopyPromptText(text, 'standalone-chat'))}
+          copied={copiedPromptKey === 'standalone-chat'} />
+      </div>
     </ChatWorkspace>
   );
 
@@ -8568,6 +8467,7 @@ const App: React.FC<AppProps> = ({
       copied={copiedPromptKey === 'standalone-chat'}
       onInputChange={setStandaloneChatInput}
       onSubmit={(event) => void handleStandaloneChatSubmit(event)}
+      onEditMessage={(id, content) => handleStandaloneChatSubmit(undefined, { id, content })}
       onNewChat={handleNewStandaloneChat}
       onToggleContext={() => setStandaloneContextOpen((current) => !current)}
       onToggleKnowledge={() => setStandaloneChatUseKnowledge((current) => !current)}
@@ -8942,13 +8842,7 @@ const App: React.FC<AppProps> = ({
                   >
                     恢复默认
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSavePersonalization}
-                    className="glass-cta rounded-2xl px-5 py-2.5 text-sm font-semibold text-amber-300"
-                  >
-                    保存设置
-                  </button>
+                  <SaveButton onSave={handleSavePersonalization} label="保存设置" />
                 </div>
               </div>
             </div>
@@ -9945,131 +9839,16 @@ const App: React.FC<AppProps> = ({
                   </div>
                 )}
 
-                {caseItems.length > 0 && (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {caseItems.map((item) => {
-                      const params = normalizeCaseChartParams(item.chartParams);
-                      const pillarPreview = getCasePillarsPreview(item.modelType, item.chartData);
-                      const sexLabel = getCaseSexLabel(item.chartParams);
-                      const specialTags = getCaseSpecialTags(item.chartParams);
-                      const datetimeText = buildCaseDateTimeValue(item.chartParams)
-                        ? buildCaseDateTimeValue(item.chartParams).replace('T', ' ')
-                        : '未填写出生时间';
-                      const solarText = params.province && params.city
-                        ? `真太阳时 · ${params.province}${params.city}`
-                        : '';
-                      return (
-                        <article
-                          key={item.id}
-                          className={`text-left rounded-[24px] border px-4 py-3.5 transition ${
-                            activeCase?.id === item.id
-                              ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_18px_40px_rgba(28,25,23,0.22)]'
-                              : 'glass-panel-soft border-white/60 text-stone-700 hover:bg-white/75'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <button type="button" onClick={() => loadCaseDetail(item.id)} className="min-w-0 flex-1 text-left">
-                              <div className="text-base font-bold">{item.title}</div>
-                              {sexLabel && (
-                                <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-500'}`}>
-                                  {sexLabel}
-                                </div>
-                              )}
-                              {pillarPreview && (
-                                <div className={`mt-1 text-xs font-medium ${activeCase?.id === item.id ? 'text-amber-100/90' : 'text-stone-600'}`}>
-                                  四柱：{pillarPreview}
-                                </div>
-                              )}
-                              <div className={`mt-1 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
-                                {datetimeText}
-                              </div>
-                            </button>
-                            <div className="flex shrink-0 flex-col items-end gap-2">
-                              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                activeCase?.id === item.id
-                                  ? 'border-amber-200/30 text-amber-100'
-                                  : 'border-stone-200 text-stone-500'
-                              }`}>
-                                {specialTags.includes(JOINT_CASE_TAG)
-                                  ? JOINT_CASE_TAG
-                                  : item.modelType === ModelType.BAZI
-                                    ? '八字'
-                                    : '紫微'}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void beginCaseEditFromLibrary(item.id);
-                                  }}
-                                  className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                                    activeCase?.id === item.id
-                                      ? 'border-amber-200/30 text-amber-100 hover:bg-white/10'
-                                      : 'border-stone-200 text-stone-500 hover:border-stone-300 hover:text-stone-800'
-                                  }`}
-                                >
-                                  修改
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleDeleteCaseFromLibrary(item.id);
-                                  }}
-                                  className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                                    activeCase?.id === item.id
-                                      ? 'border-red-200/40 text-red-100 hover:bg-red-500/10'
-                                      : 'border-red-200 text-red-500 hover:border-red-300 hover:text-red-600'
-                                  }`}
-                                >
-                                  删除
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                          {specialTags.length > 0 && !specialTags.includes(JOINT_CASE_TAG) && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {specialTags.map((tag) => (
-                                <span
-                                  key={`${item.id}-${tag}`}
-                                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                    activeCase?.id === item.id
-                                      ? 'border-amber-200/30 bg-white/10 text-amber-100'
-                                      : 'border-amber-200/80 bg-amber-50/90 text-amber-700'
-                                  }`}
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {solarText && (
-                            <div className={`mt-2 text-xs ${activeCase?.id === item.id ? 'text-amber-100/80' : 'text-stone-500'}`}>
-                              {solarText}
-                            </div>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
+                {caseItems.length > 0 && <CaseCardStack items={caseItems}
+                  onOpen={(id) => void loadCaseDetail(id)}
+                  onEdit={(id) => void beginCaseEditFromLibrary(id)}
+                  onDelete={handleDeleteCaseFromLibrary} />}
+
 
               </div>
             ) : (
               <div className="space-y-6 animate-fade-in border-t border-stone-100 pt-6">
-              {/* Question (Divination) */}
-              {!isLifeReading && !isFortuneReading && (
-                <div>
-                  <label className="block text-stone-700 font-bold mb-2">所求何事</label>
-                  <textarea 
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder={modelType === ModelType.QIMEN ? "例如：这次面试能过吗？" : "例如：近期财运如何？"}
-                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[80px]"
-                  />
-                </div>
-              )}
+
 
               {isLifeReading && (
                 <LifeReadingForm
@@ -10362,12 +10141,24 @@ const App: React.FC<AppProps> = ({
                 />
               )}
 
+              {/* Question (Divination) */}
+              {!isLifeReading && !isFortuneReading && (
+                <div>
+                  <label className="block text-stone-700 font-bold mb-2">所求何事</label>
+                  <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleCalculate()}
+                    placeholder={modelType === ModelType.QIMEN ? '例如：这次面试能过吗？' : '例如：近期财运如何？'}
+                    submitLabel="开始排盘" allowEmpty busy={loading} />
+                </div>
+              )}
+
+              {(isLifeReading || isFortuneReading) && (
               <button 
                 onClick={() => handleCalculate()} disabled={loading}
                 className="glass-cta w-full hover:brightness-105 text-amber-300 font-bold py-4 rounded-2xl mt-4 flex justify-center items-center gap-2 transition"
               >
                 {loading ? <Spinner /> : '开始排盘'}
               </button>
+              )}
 
               {!isCaseModel && (
                 <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
@@ -10561,13 +10352,7 @@ const App: React.FC<AppProps> = ({
                     >
                       编辑命例
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteCase}
-                      className="rounded-full border border-red-200 px-3 py-1.5 text-sm text-red-500 hover:border-red-300 hover:text-red-600"
-                    >
-                      删除命例
-                    </button>
+                    <DeleteButton label="删除命例" onDelete={handleDeleteCase} />
                   </div>
                 </div>
 
@@ -10673,30 +10458,10 @@ const App: React.FC<AppProps> = ({
 
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder={activeCase.modelType === ModelType.BAZI ? '例如：事业发展方向如何？' : '例如：未来几年整体运势如何？'}
-                    className="glass-input w-full rounded-2xl p-3 outline-none min-h-[88px]"
-                  />
-                  <div className="mt-4 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
-                    <PromptCopyButton
-                      copied={copiedPromptKey === 'case-analysis-inline'}
-                      disabled={loading || isTyping}
-                      onClick={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis-inline')}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleStartCaseAnalysis}
-                      disabled={loading || isTyping}
-                      aria-busy={loading || isTyping}
-                      className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
-                    >
-                      {loading || isTyping ? (
-                        <AiBusyText active state="solving">分析中…</AiBusyText>
-                      ) : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
-                    </button>
-                  </div>
+                  <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleStartCaseAnalysis()}
+            allowEmpty busy={loading || isTyping} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
+            onCopy={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
+            copied={copiedPromptKey === 'case-analysis'} />
                 </div>
 
                 <div className="space-y-3">
@@ -10734,31 +10499,7 @@ const App: React.FC<AppProps> = ({
                             {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (confirmCaseSessionDeleteId === session.id) {
-                              handleDeleteCaseSessionEntry(session.id);
-                              setConfirmCaseSessionDeleteId(null);
-                            } else {
-                              setConfirmCaseSessionDeleteId(session.id);
-                              setTimeout(() => setConfirmCaseSessionDeleteId((current) => (current === session.id ? null : current)), 3000);
-                            }
-                          }}
-                          className={`flex-shrink-0 rounded-lg p-1.5 transition-colors ${
-                            confirmCaseSessionDeleteId === session.id
-                              ? 'bg-red-50 text-red-500'
-                              : activeSessionId === session.id
-                                ? 'text-amber-100/75 hover:text-red-200'
-                                : 'text-stone-300 opacity-0 group-hover:opacity-100 hover:text-red-400'
-                          }`}
-                          title={confirmCaseSessionDeleteId === session.id ? '再次点击确认删除' : '删除'}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                            <path fillRule="evenodd" d="M5 3.25V4H2.75a.75.75 0 000 1.5h.31l.461 6.15A1.5 1.5 0 005.02 13h5.96a1.5 1.5 0 001.499-1.35l.46-6.15h.311a.75.75 0 000-1.5H11v-.75A1.75 1.75 0 009.25 1.5h-2.5A1.75 1.75 0 005 3.25zm1.5 0a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V4h-3v-.75z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                        <DeleteButton onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
                       </div>
                     ))}
                   </div>
@@ -10865,71 +10606,12 @@ const App: React.FC<AppProps> = ({
                    const copyText = msg.role === 'model' && parsed ? parsed.answer : msg.content;
                    const versionState = messageVersionMap[msg.id];
                    const hasVersionHistory = (versionState?.entries.length ?? 0) > 1;
-                   const isEditingUserMessage = msg.role === 'user' && editingUserMessageId === msg.id;
                    return (
                    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                      <div className={`group max-w-[90%] rounded-[24px] p-4 shadow-sm relative backdrop-blur-xl ${msg.role === 'user' ? 'glass-panel-dark text-white' : 'glass-panel-soft text-stone-800'}`}>
-                        {msg.role === 'user' && !isEditingUserMessage ? (
-                          <div className="flex items-end gap-3">
-                            <div className="min-w-0 flex-1">
-                              <MarkdownContent content={msg.content} className="text-sm leading-relaxed" />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditUserMessage(msg.id, msg.content)}
-                              disabled={isTyping}
-                              title="修改已发送的问题并重新运行该条"
-                              className={`group/action shrink-0 self-center rounded-full border p-2 text-[11px] shadow-sm transition ${
-                                isTyping
-                                  ? 'border-white/10 bg-white/5 text-white/35 cursor-not-allowed'
-                                  : 'border-white/20 bg-white/10 text-white/75 hover:border-white/35 hover:bg-white/15 hover:text-white'
-                              }`}
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <EditIcon className="h-3.5 w-3.5" />
-                                <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/action:max-w-16 group-hover/action:opacity-100">
-                                  修改问题
-                                </span>
-                              </span>
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="text-sm leading-relaxed">
-                            {isEditingUserMessage ? (
-                              <div className="space-y-3">
-                                <textarea
-                                  value={editingUserMessageDraft}
-                                  onChange={(event) => setEditingUserMessageDraft(event.target.value)}
-                                  className="min-h-[96px] w-full rounded-2xl border border-white/25 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/50"
-                                  placeholder="修改后重新提交"
-                                />
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={handleCancelEditUserMessage}
-                                    className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-white/80 transition hover:bg-white/15"
-                                  >
-                                    取消
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleSubmitEditedUserMessage(msg.id)}
-                                    disabled={isTyping}
-                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                                      isTyping
-                                        ? 'bg-white/10 text-white/40 cursor-not-allowed'
-                                        : 'bg-white text-stone-800 hover:bg-amber-50'
-                                    }`}
-                                  >
-                                    提交
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <MarkdownContent content={msg.role === 'model' && parsed ? parsed.answer : msg.content} />
-                            )}
-                          </div>
-                        )}
+                        {msg.role === 'user' ? <InlinePromptEdit value={msg.content} disabled={isTyping}
+                          onSave={(value) => handleSubmitEditedUserMessage(msg.id, value)} />
+                          : <MarkdownContent content={parsed ? parsed.answer : msg.content} />}
                         {msg.role === 'model' && (
                           <KnowledgeSourceSummaryPanel sources={msg.knowledgeSources || messageSourceMap[msg.id]} />
                         )}
@@ -11028,23 +10710,11 @@ const App: React.FC<AppProps> = ({
                  )}
                  <div ref={chatEndRef} />
                </div>
-               <div className="glass-panel-soft p-4 border-t border-white/50 flex flex-wrap gap-2">
-                 <input
-                   type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
-                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!isTyping && !isKlineRunning) handleSendMessage(); } }}
-                   placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && !guestModeEnabled) ? "需要登录后才能使用" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
-                   className="glass-input flex-1 rounded-2xl px-4 py-2"
-                 />
-                 <button
-                   onClick={handleSendMessage}
-                   disabled={isTyping || isKlineRunning || !inputMessage.trim() || (isLoggedIn && userQuota !== null && userQuota <= 0)}
-                   className="glass-cta flex items-center gap-1.5 rounded-2xl p-3 text-amber-300 transition hover:brightness-105 disabled:opacity-50 disabled:hover:brightness-100"
-                   aria-label="发送 · 1点"
-                 >
-                   <SendIcon />
-                   <span className="text-xs font-semibold">1点</span>
-                 </button>
-              </div>
+               <div className="glass-panel-soft border-t border-white/50 p-4">
+                 <PromptBox value={inputMessage} onChange={setInputMessage} onSubmit={() => void handleSendMessage()}
+                   busy={isTyping} disabled={isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
+                   placeholder={isKlineRunning ? 'K线运行中，暂不可发送' : (isLoggedIn && userQuota !== null && userQuota <= 0) ? '额度已用完' : '追问...'} submitLabel="发送 · 1点" />
+               </div>
             </div>
             )}
           </div>
@@ -11131,14 +10801,7 @@ const App: React.FC<AppProps> = ({
           >
             取消
           </button>
-          <button
-            type="button"
-            onClick={handleSaveCase}
-            disabled={loading || caseBusy}
-            className="glass-cta flex items-center justify-center gap-2 rounded-2xl px-5 py-3 font-bold text-amber-300 transition hover:brightness-105 disabled:opacity-50 md:min-w-48"
-          >
-            {loading || caseBusy ? <Spinner /> : '排盘并保存'}
-          </button>
+          <SaveButton onSave={handleSaveCase} disabled={loading || caseBusy} label="排盘并保存" pendingLabel="排盘并保存中" className="md:min-w-48" />
         </div>
       </DialogPortal>
 
@@ -11789,13 +11452,7 @@ const App: React.FC<AppProps> = ({
                     ? '保持当前标签并开始分析'
                     : '跳过并开始分析'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleConfirmCompatibilityRelations(false)}
-                  className="glass-panel-dark rounded-full px-4 py-2 text-sm text-amber-200 hover:brightness-105"
-                >
-                  保存并开始分析
-                </button>
+                <SaveButton onSave={() => handleConfirmCompatibilityRelations(false)} label="保存并开始分析" pendingLabel="保存并开始分析中" />
               </div>
             </div>
           </div>
@@ -11867,20 +11524,8 @@ const App: React.FC<AppProps> = ({
 
                 <div className="glass-panel-soft border-t border-white/50 px-4 py-4 md:px-6">
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteCaseRelation(editingCaseRelationId)}
-                      className="glass-chip rounded-full px-4 py-2 text-sm text-red-500 hover:text-red-600"
-                    >
-                      删除标签
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveCaseRelationEdit()}
-                      className="glass-panel-dark rounded-full px-4 py-2 text-sm text-amber-200 hover:brightness-105"
-                    >
-                      保存修改
-                    </button>
+                    <DeleteButton label="删除标签" onDelete={() => handleDeleteCaseRelation(editingCaseRelationId)} />
+                    <SaveButton onSave={handleSaveCaseRelationEdit} label="保存修改" />
                   </div>
                 </div>
               </div>
@@ -11939,13 +11584,7 @@ const App: React.FC<AppProps> = ({
                       : '状态：未生成'}
                 </span>
                 {klineResult && (
-                  <button
-                    type="button"
-                    onClick={handleSaveKline}
-                    className="glass-chip text-xs px-3 py-1 rounded-full text-stone-600 hover:text-stone-800"
-                  >
-                    保存到本地
-                  </button>
+                  <SaveButton onSave={handleSaveKline} label="保存到本地" successLabel="已发起下载" secondary compact />
                 )}
                 {activeCase?.modelType === ModelType.BAZI && (
                   <PromptCopyButton

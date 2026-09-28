@@ -1,5 +1,7 @@
 'use client';
 
+import SaveButton from './interactive/SaveButton';
+import DeleteButton from './interactive/DeleteButton';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   DEFAULT_SITE_SETTINGS,
@@ -161,7 +163,7 @@ export default function AdminPanel({ onBack }: Props) {
 
   const handleUpdateQuota = async (id: string) => {
     const quota = parseInt(editQuota, 10);
-    if (isNaN(quota) || quota < 0) return;
+    if (isNaN(quota) || quota < 0) throw new Error('请输入有效额度');
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: 'PATCH',
@@ -172,15 +174,15 @@ export default function AdminPanel({ onBack }: Props) {
         setUsers(prev => prev.map(u => u.id === id ? { ...u, quota } : u));
         if (detailUser?.id === id) setDetailUser(prev => prev ? { ...prev, quota } : null);
         setEditingId(null);
-      }
-    } catch { /* ignore */ }
+      } else { throw new Error('额度更新失败，请重试'); }
+    } catch (cause) { throw cause instanceof Error ? cause : new Error('额度更新失败，请重试'); }
   };
 
   const handleChangePassword = async (id: string) => {
     const pwd = newPassword.trim();
     if (pwd.length < 6) {
       setPasswordError('密码至少需要6位');
-      return;
+      return false;
     }
     setPasswordError('');
     try {
@@ -196,19 +198,22 @@ export default function AdminPanel({ onBack }: Props) {
       } else {
         const data = await res.json();
         setPasswordError(data.error || '修改失败');
+        return false;
       }
     } catch {
       setPasswordError('网络错误');
+      return false;
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     try {
       const res = await fetch(`/api/admin/messages/${messageId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('删除失败，请重试');
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== messageId));
       }
-    } catch { /* ignore */ }
+    } catch (cause) { throw cause; }
   };
 
   const handleAddUser = async () => {
@@ -262,14 +267,15 @@ export default function AdminPanel({ onBack }: Props) {
   };
 
   const handleDeleteUser = async (id: string, email: string) => {
-    if (!confirm(`确定删除用户 ${email}？此操作不可撤销。`)) return;
+    if (!confirm(`确定删除用户 ${email}？此操作不可撤销。`)) return false;
     try {
       const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('删除失败，请重试');
       if (res.ok) {
         setUsers(prev => prev.filter(u => u.id !== id));
         if (detailUser?.id === id) setDetailUser(null);
       }
-    } catch { /* ignore */ }
+    } catch (cause) { throw cause; }
   };
 
   const handleAnnouncementItemChange = (index: number, value: string) => {
@@ -319,7 +325,7 @@ export default function AdminPanel({ onBack }: Props) {
       const data = await res.json();
       if (!res.ok) {
         setSettingsError(data.error || '保存站点配置失败');
-        return;
+        return false;
       }
       setSiteSettings({
         ...DEFAULT_SITE_SETTINGS,
@@ -329,6 +335,7 @@ export default function AdminPanel({ onBack }: Props) {
       setSettingsSavedAt(new Date().toLocaleString('zh-CN', { hour12: false }));
     } catch {
       setSettingsError('保存站点配置失败');
+      return false;
     } finally {
       setSettingsSaving(false);
     }
@@ -450,13 +457,7 @@ export default function AdminPanel({ onBack }: Props) {
                           className="glass-input flex-1 rounded-2xl px-3 py-2 text-sm outline-none"
                           placeholder={`条目 ${index + 1}`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAnnouncementItem(index)}
-                          className="glass-chip rounded-full px-3 py-1.5 text-xs text-red-500 hover:text-red-700"
-                        >
-                          删除
-                        </button>
+                        <DeleteButton key={`${index}-${item}`} onDelete={() => handleRemoveAnnouncementItem(index)} />
                       </div>
                     ))}
                   </div>
@@ -580,14 +581,7 @@ export default function AdminPanel({ onBack }: Props) {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveSiteSettings}
-                  disabled={settingsSaving}
-                  className="glass-cta w-full rounded-2xl px-4 py-3 text-sm text-amber-300 transition hover:brightness-105 disabled:opacity-50"
-                >
-                  {settingsSaving ? '保存中...' : '保存站点配置'}
-                </button>
+                <SaveButton onSave={handleSaveSiteSettings} disabled={settingsSaving} label="保存站点配置" className="w-full" />
               </div>
             </div>
           )}
@@ -685,13 +679,7 @@ export default function AdminPanel({ onBack }: Props) {
                             className="w-16 border border-stone-300 rounded px-2 py-0.5 text-xs text-center"
                             min={0}
                           />
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuota(user.id)}
-                            className="text-xs text-green-600 hover:text-green-800"
-                          >
-                            ✓
-                          </button>
+                          <SaveButton onSave={() => handleUpdateQuota(user.id)} label="保存" compact secondary />
                           <button
                             type="button"
                             onClick={() => setEditingId(null)}
@@ -733,13 +721,7 @@ export default function AdminPanel({ onBack }: Props) {
                           >
                             复制
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(user.id, user.email)}
-                            className="text-xs text-red-500 hover:text-red-700"
-                          >
-                            删除
-                          </button>
+                          <DeleteButton onDelete={() => handleDeleteUser(user.id, user.email)} />
                         </>
                       )}
                     </td>
@@ -790,7 +772,7 @@ export default function AdminPanel({ onBack }: Props) {
                 {editingId === detailUser.id ? (
                   <span className="ml-2 flex items-center gap-1">
                     <input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className="glass-input w-16 rounded-xl px-2 py-1 text-xs" min={0} />
-                    <button type="button" onClick={() => handleUpdateQuota(detailUser.id)} className="text-xs text-green-600">✓</button>
+                    <SaveButton onSave={() => handleUpdateQuota(detailUser.id)} label="保存" compact secondary />
                     <button type="button" onClick={() => setEditingId(null)} className="text-xs text-stone-400">✕</button>
                   </span>
                 ) : (
@@ -843,7 +825,7 @@ export default function AdminPanel({ onBack }: Props) {
                 {passwordError && <p className="text-xs text-red-600 mb-2">{passwordError}</p>}
                 <div className="flex gap-2">
                   <button type="button" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setPasswordError(''); }} className="glass-chip rounded-full px-3 py-1.5 text-xs text-stone-600">取消</button>
-                  <button type="button" onClick={() => handleChangePassword(detailUser.id)} className="glass-cta rounded-full px-3 py-1.5 text-xs text-amber-300">确认</button>
+                  <SaveButton onSave={() => handleChangePassword(detailUser.id)} label="确认" pendingLabel="更新中" successLabel="已更新" compact />
                 </div>
               </div>
             )}
@@ -888,13 +870,7 @@ export default function AdminPanel({ onBack }: Props) {
                             <p className="text-xs text-stone-700 mt-0.5 break-words line-clamp-3">{m.content}</p>
                             <span className="text-[10px] text-stone-400">{new Date(m.createdAt).toLocaleString('zh-CN')}</span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMessage(m.id)}
-                            className="text-xs text-red-500 hover:text-red-700 flex-shrink-0"
-                          >
-                            删除
-                          </button>
+                          <DeleteButton onDelete={() => handleDeleteMessage(m.id)} />
                         </div>
                       ))}
                     </div>

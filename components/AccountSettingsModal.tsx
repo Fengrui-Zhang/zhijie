@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import DeleteButton from './interactive/DeleteButton';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
@@ -27,9 +28,11 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
       } else {
         const data = await res.json();
         setError(data.error || '注销失败');
+        return false;
       }
     } catch {
       setError('网络错误');
+      return false;
     } finally {
       setDeleting(false);
     }
@@ -84,14 +87,7 @@ export default function AccountSettingsModal({ onClose, onDeleted }: Props) {
               >
                 取消
               </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={confirmText !== '确认注销' || deleting}
-                className="glass-chip flex-1 rounded-2xl border border-red-300/70 bg-red-500/90 py-2 text-sm text-white hover:bg-red-600/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deleting ? '注销中...' : '确认注销'}
-              </button>
+              <DeleteButton label="确认注销" onDelete={handleDelete} disabled={confirmText !== '确认注销' || deleting} />
             </div>
           </div>
         )}
