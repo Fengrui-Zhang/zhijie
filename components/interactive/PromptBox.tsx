@@ -65,10 +65,16 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = 'è¾
   }, [contextOpen]);
   useEffect(() => {
     if (!contextOpen) return;
-    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node) && !ownsContextPopup(event.target)) { setFocused(false); toggle.current?.(); } };
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); toggle.current?.(); contextTrigger.current?.focus(); } };
-    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
-    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+    let dismissed = false;
+    const dismiss = () => { if (!dismissed) { dismissed = true; toggle.current?.(); } };
+    const outside = (event: PointerEvent) => {
+      if (event.target === input.current) { dismiss(); return; }
+      if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node) && !ownsContextPopup(event.target)) { setFocused(false); dismiss(); }
+    };
+    const focusInput = (event: FocusEvent) => { if (event.target === input.current) dismiss(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); contextTrigger.current?.focus(); } };
+    document.addEventListener('pointerdown', outside); document.addEventListener('focusin', focusInput); document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('focusin', focusInput); document.removeEventListener('keydown', escape); };
   }, [contextOpen]);
   const ownsContextPopup = (target: EventTarget | null) => target instanceof Element && target.closest('[data-prompt-owner]')?.getAttribute('data-prompt-owner') === contextId;
   const submit = () => { if (!disabled && !busy && (allowEmpty || value.trim())) { if (contextOpen) toggle.current?.(); onSubmit(); } };
