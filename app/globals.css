@@ -537,8 +537,8 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 
 .filter-select { display:inline-flex; min-width:0; max-width:100%; vertical-align:middle; }
 .filter-select-full { display:flex; width:100%; }
-.filter-select-trigger { position:relative; display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; max-width:100%; text-align:left; isolation:isolate; }
-.filter-select-surface { position:absolute; inset:0; border-radius:inherit; background:inherit; border:inherit; pointer-events:none; z-index:-1; }
+.filter-select-trigger { position:relative; display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; max-width:100%; text-align:left; isolation:isolate; overflow:hidden; }
+.filter-select-surface { position:absolute; inset:0; border-radius:inherit; background:inherit; border:0; pointer-events:none; z-index:-1; }
 .filter-select-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .filter-select-indicator { display:grid; place-items:center; flex-shrink:0; width:24px; height:24px; border:1px solid #e7e5e4; border-radius:50%; background:#fffefa; color:#78716c; }
 .filter-select-trigger:disabled { cursor:not-allowed; opacity:.45; }
