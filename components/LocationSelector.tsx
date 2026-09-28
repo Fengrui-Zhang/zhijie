@@ -1,3 +1,4 @@
+import FilterSelect from './interactive/FilterSelect';
 import React, { useEffect, useMemo, useState } from 'react';
 import { CHINA_REGIONS, findPlaceCoord, type RegionNode } from '../utils/locations';
 
@@ -105,7 +106,7 @@ const LocationSelector: React.FC<Props> = ({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-xs text-stone-500">省/直辖市</label>
-              <select
+              <FilterSelect
                 value={province}
                 onChange={(event) => {
                   setProvince(event.target.value);
@@ -118,11 +119,11 @@ const LocationSelector: React.FC<Props> = ({
                 {CHINA_REGIONS.map((item) => (
                   <option key={item.name} value={item.name}>{item.name}</option>
                 ))}
-              </select>
+              </FilterSelect>
             </div>
             <div>
               <label className="mb-1 block text-xs text-stone-500">市/区</label>
-              <select
+              <FilterSelect
                 value={city}
                 onChange={(event) => {
                   setCity(event.target.value);
@@ -135,11 +136,11 @@ const LocationSelector: React.FC<Props> = ({
                 {cities.map((item) => (
                   <option key={item.name} value={item.name}>{item.name}</option>
                 ))}
-              </select>
+              </FilterSelect>
             </div>
             <div>
               <label className="mb-1 block text-xs text-stone-500">区/县</label>
-              <select
+              <FilterSelect
                 value={district}
                 onChange={(event) => setDistrict?.(event.target.value)}
                 disabled={!city || districts.length === 0}
@@ -149,7 +150,7 @@ const LocationSelector: React.FC<Props> = ({
                 {districts.map((item) => (
                   <option key={item.name} value={item.name}>{item.name}</option>
                 ))}
-              </select>
+              </FilterSelect>
             </div>
           </div>
           <div className="text-xs text-stone-400">

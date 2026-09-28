@@ -1,4 +1,5 @@
 
+import FilterSelect from './interactive/FilterSelect';
 import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
 import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
@@ -211,20 +212,20 @@ export default function LifeReadingForm({
                   <div key={key}>
                     <label className="mb-1 block text-xs text-stone-500">{['年柱', '月柱', '日柱', '时柱'][index]}</label>
                     <div className="grid grid-cols-2 gap-1">
-                      <select
+                      <FilterSelect
                         value={value.charAt(0)}
                         onChange={(event) => updatePillar(key, event.target.value, value.charAt(1) || '子')}
                         className="glass-input glass-select rounded-2xl p-2.5 text-sm outline-none"
                       >
                         {STEMS.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
-                      <select
+                      </FilterSelect>
+                      <FilterSelect
                         value={value.charAt(1)}
                         onChange={(event) => updatePillar(key, value.charAt(0) || '甲', event.target.value)}
                         className="glass-input glass-select rounded-2xl p-2.5 text-sm outline-none"
                       >
                         {BRANCHES.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
+                      </FilterSelect>
                     </div>
                   </div>
                 );
@@ -236,21 +237,21 @@ export default function LifeReadingForm({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="mb-1 block text-xs text-stone-500">年</label>
-                <select value={year} onChange={(event) => setYear(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
+                <FilterSelect value={year} onChange={(event) => setYear(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {YEAR_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
+                </FilterSelect>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-stone-500">月</label>
-                <select value={month} onChange={(event) => setMonth(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
+                <FilterSelect value={month} onChange={(event) => setMonth(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {MONTH_OPTIONS.map((item) => <option key={item} value={item}>{calendarType === 'lunar' ? LUNAR_MONTH_NAMES[item] : `${item}月`}</option>)}
-                </select>
+                </FilterSelect>
               </div>
               <div>
                 <label className="mb-1 block text-xs text-stone-500">日</label>
-                <select value={Math.min(day, dayCount)} onChange={(event) => setDay(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
+                <FilterSelect value={Math.min(day, dayCount)} onChange={(event) => setDay(Number(event.target.value))} className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none">
                   {days.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
+                </FilterSelect>
               </div>
             </div>
 

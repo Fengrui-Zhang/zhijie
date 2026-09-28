@@ -1,5 +1,6 @@
 'use client';
 
+import FilterSelect from './interactive/FilterSelect';
 import React, { useMemo, useState } from 'react';
 import { BorderBeam } from 'border-beam';
 import type { GenericTaibuResponse } from '../types';
@@ -343,7 +344,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
             <p className="mt-1 text-sm text-stone-500">输入事项和日期范围后，页面会高亮推荐日期。</p>
           </div>
           {caseOptions.length > 0 && (
-            <select
+            <FilterSelect
               value={selectedCaseId}
               onChange={(event) => onCaseChange(event.target.value)}
               className="min-w-[180px] rounded-2xl border border-amber-200 bg-white px-4 py-2 text-sm font-bold text-amber-700 outline-none"
@@ -352,7 +353,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
               {caseOptions.map((item) => (
                 <option key={item.id} value={item.id}>{item.title}</option>
               ))}
-            </select>
+            </FilterSelect>
           )}
         </div>
 

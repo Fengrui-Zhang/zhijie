@@ -10,9 +10,10 @@ type Props = {
   disabled?: boolean;
   className?: string;
   countdown?: number;
+  neutral?: boolean;
 };
 
-export default function DeleteButton({ onDelete, label = '删除', disabled, className = '', countdown = 5 }: Props) {
+export default function DeleteButton({ onDelete, label = '删除', disabled, className = '', countdown = 3, neutral = false }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -57,8 +58,8 @@ export default function DeleteButton({ onDelete, label = '删除', disabled, cla
   return <span className={`inline-flex max-w-full flex-col items-start gap-1 ${className}`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
     <motion.button type="button" layout disabled={disabled || pending} aria-busy={pending}
       aria-label={cancelling ? `取消${label}，剩余${remaining}秒` : label}
-      className="delete-action" data-cancelling={cancelling}
-      animate={{ backgroundColor: cancelling ? '#FFEDF1' : '#FE322A', color: cancelling ? '#FE322A' : '#FFFFFF', filter: enabled ? ['blur(1px)', 'blur(0px)'] : 'blur(0px)' }}
+      className={`delete-action ${neutral ? 'delete-action-neutral' : ''}`} data-cancelling={cancelling}
+      animate={{ backgroundColor: cancelling ? '#FFEDF1' : neutral && !pending ? '#FFFFFF' : '#FE322A', color: cancelling ? '#FE322A' : neutral && !pending ? '#57534E' : '#FFFFFF', borderColor: cancelling || pending ? '#FE322A' : '#E7E5E4', filter: enabled ? ['blur(1px)', 'blur(0px)'] : 'blur(0px)' }}
       whileTap={enabled ? { scale: .95 } : undefined}
       transition={{ layout: layoutTransition, backgroundColor: { duration: enabled ? .4 : 0, ease: 'easeInOut' }, color: { duration: enabled ? .2 : 0 }, filter: { duration: enabled ? .1 : 0 } }}
       onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setRemaining(null); } }}

@@ -40,7 +40,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   useLayoutEffect(() => {
     const element = input.current;
     if (!element) return;
-    const measure = () => { element.style.height = 'auto'; const height = Math.min(254, Math.max(44, element.scrollHeight)); element.style.height = `${height}px`; setFieldHeight(height); };
+    const measure = () => { element.style.height = 'auto'; const height = expanded ? Math.min(254, Math.max(44, element.scrollHeight)) : 44; element.style.height = `${height}px`; setFieldHeight(height); };
     measure();
     let width = element.getBoundingClientRect().width;
     const observer = new ResizeObserver(([entry]) => { if (Math.abs(entry.contentRect.width - width) > .5) { width = entry.contentRect.width; measure(); } });
@@ -65,15 +65,16 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   }, [contextOpen]);
   useEffect(() => {
     if (!contextOpen) return;
-    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) { setFocused(false); toggle.current?.(); } };
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node) && !ownsContextPopup(event.target)) { setFocused(false); toggle.current?.(); } };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); toggle.current?.(); contextTrigger.current?.focus(); } };
     document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
   }, [contextOpen]);
+  const ownsContextPopup = (target: EventTarget | null) => target instanceof Element && target.closest('[data-prompt-owner]')?.getAttribute('data-prompt-owner') === contextId;
   const submit = () => { if (!disabled && !busy && (allowEmpty || value.trim())) { if (contextOpen) toggle.current?.(); onSubmit(); } };
   return <>
     <motion.div ref={root} initial={false} animate={{ maxWidth: expanded ? 440 : 320 }} transition={shellTransition} className="prompt-frame"
-      onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node)) setFocused(false); }}>
+      onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node) && !ownsContextPopup(event.relatedTarget)) setFocused(false); }}>
       <motion.div initial={false} animate={{ height: expanded ? fieldHeight + 60 : 52 }} transition={shellTransition} className={`prompt-box ${expanded ? 'prompt-box-expanded' : ''}`}
         onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }} onPointerLeave={() => setHovered(false)}>
         <textarea ref={input} aria-label={placeholder} rows={1} maxLength={maxLength} value={value} disabled={disabled || busy} placeholder={placeholder}
@@ -87,7 +88,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
           inert={!expanded} aria-hidden={!expanded || undefined} className="prompt-toolbar">
           {context && onToggleContext && <button ref={contextTrigger} type="button" disabled={busy} aria-expanded={contextOpen} aria-controls={contextId} aria-haspopup="dialog" onClick={onToggleContext} className="prompt-context-trigger"><ContextIcon /><span>添加上下文{contextCount ? ` · ${contextCount}` : ''}</span><motion.svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" initial={false} animate={{ rotate: contextOpen ? 180 : 0 }} transition={{ duration: enabled ? .16 : 0, ease: easeOutQuad }}><path d="m5 7 5 5 5-5" /></motion.svg></button>}
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            {onCopy && <button type="button" onClick={onCopy} disabled={busy} className="prompt-copy">{copied ? '已复制' : '复制AI提示词'}</button>}
+            {onCopy && <button type="button" onClick={onCopy} disabled={busy} className="prompt-copy" aria-label={copied ? '已复制' : '复制AI提示词'}><span className="prompt-copy-label">{copied ? '已复制' : '复制AI提示词'}</span><svg className="prompt-copy-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">{copied ? <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>}</svg></button>}
             <motion.button type="button" onClick={submit} disabled={disabled || busy || (!allowEmpty && !value.trim())} aria-busy={busy} className="prompt-send" aria-label={busy ? '正在生成' : submitLabel}
               initial={false} animate={{ opacity: expanded ? 1 : 0, scale: expanded || !enabled ? 1 : .85 }} whileTap={enabled ? { scale: .92 } : undefined} transition={{ duration: enabled ? .15 : 0, ease: easeOutQuad }}>
               <AnimatePresence initial={false} mode="wait"><motion.span key={busy ? 'busy' : 'send'} className="inline-flex items-center gap-1.5" initial={{ opacity: 0, scale: enabled ? .5 : 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: enabled ? .5 : 1 }} transition={{ duration: enabled ? .15 : 0, ease: easeOutQuad }}>
@@ -98,7 +99,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
         </motion.div>
       </motion.div>
     </motion.div>
-    {context && panelBounds && typeof document !== 'undefined' && createPortal(<div ref={panel} inert={!contextOpen} onBlurCapture={(event) => { if (contextOpen && event.relatedTarget && !panel.current?.contains(event.relatedTarget as Node) && !root.current?.contains(event.relatedTarget as Node)) { setFocused(false); toggle.current?.(); } }} className="prompt-context-anchor" style={{ ...panelBounds, pointerEvents: contextOpen ? 'auto' : 'none' }}>
+    {context && panelBounds && typeof document !== 'undefined' && createPortal(<div ref={panel} data-prompt-context={contextId} inert={!contextOpen} onBlurCapture={(event) => { if (contextOpen && event.relatedTarget && !panel.current?.contains(event.relatedTarget as Node) && !root.current?.contains(event.relatedTarget as Node) && !ownsContextPopup(event.relatedTarget)) { setFocused(false); toggle.current?.(); } }} className="prompt-context-anchor" style={{ ...panelBounds, pointerEvents: contextOpen ? 'auto' : 'none' }}>
       <AnimatePresence>{contextOpen && <motion.div id={contextId} role="dialog" aria-label="添加上下文" className="prompt-context" style={{ maxHeight: panelBounds.maxHeight, transformOrigin: panelBounds.bottom !== undefined ? 'bottom left' : 'top left' }}
         initial={{ opacity: 0, scale: enabled ? .94 : 1, y: enabled ? (panelBounds.bottom !== undefined ? 8 : -8) : 0 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: enabled ? .98 : 1, y: enabled ? (panelBounds.bottom !== undefined ? 5 : -5) : 0, transition: { duration: enabled ? .14 : 0, ease: easeOutQuad } }}

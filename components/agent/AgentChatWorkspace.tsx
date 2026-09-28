@@ -1,5 +1,6 @@
 'use client';
 
+import FilterSelect from '../interactive/FilterSelect';
 import { type FormEvent } from 'react';
 import PromptBox from '../interactive/PromptBox';
 import InlinePromptEdit from '../interactive/InlinePromptEdit';
@@ -126,17 +127,17 @@ export default function AgentChatWorkspace(props: Props) {
         <div className="grid gap-4 p-4">
           <label>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
-            <select value={props.caseSelectValue} onChange={(event) => props.onSelectCase(event.target.value)} disabled={props.loading || !props.availableCases.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
+            <FilterSelect value={props.caseSelectValue} onChange={(event) => props.onSelectCase(event.target.value)} disabled={props.loading || !props.availableCases.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
               <option value="">{props.availableCases.length ? '引用命例' : '暂无命例'}</option>
               {props.availableCases.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
-            </select>
+            </FilterSelect>
           </label>
           <label>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用历史会话</span>
-            <select value={props.sessionSelectValue} onChange={(event) => props.onSelectSession(event.target.value)} disabled={props.loading || !props.availableSessions.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
+            <FilterSelect value={props.sessionSelectValue} onChange={(event) => props.onSelectSession(event.target.value)} disabled={props.loading || !props.availableSessions.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
               <option value="">{props.availableSessions.length ? '引用会话' : '暂无会话'}</option>
               {props.availableSessions.map((item) => <option key={item.id} value={item.id}>{item.modelLabel} · {item.title}</option>)}
-            </select>
+            </FilterSelect>
           </label>
           <div>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">参考资料</span>

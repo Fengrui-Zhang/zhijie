@@ -1,6 +1,7 @@
 
 'use client';
 
+import FilterSelect from './components/interactive/FilterSelect';
 import SaveButton from './components/interactive/SaveButton';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -8258,7 +8259,7 @@ const App: React.FC<AppProps> = ({
         <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
           <label className="block">
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
-          <select
+          <FilterSelect
             value={standaloneCaseSelectValue}
             onChange={(event) => handleSelectStandaloneCaseReference(event.target.value)}
             className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45"
@@ -8270,11 +8271,11 @@ const App: React.FC<AppProps> = ({
                 {getCaseModelDisplayLabel(item.modelType)} · {getCaseDisplayName(item)}
               </option>
             ))}
-          </select>
+          </FilterSelect>
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用历史会话</span>
-          <select
+          <FilterSelect
             value={standaloneSessionSelectValue}
             onChange={(event) => handleSelectStandaloneSessionReference(event.target.value)}
             className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none transition hover:bg-white disabled:opacity-45"
@@ -8286,7 +8287,7 @@ const App: React.FC<AppProps> = ({
                 {MODEL_LABELS[item.modelType] || item.modelType} · {item.title}
               </option>
             ))}
-          </select>
+          </FilterSelect>
           </label>
           <div>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">参考资料</span>
@@ -8302,7 +8303,7 @@ const App: React.FC<AppProps> = ({
               >
                 {standaloneChatUseKnowledge ? '已启用' : '未启用'}
               </button>
-              <select
+              <FilterSelect
                 value={standaloneChatKnowledgeBoard}
                 onChange={(event) => setStandaloneChatKnowledgeBoard(event.target.value as 'bazi' | 'qimen')}
                 disabled={!standaloneChatUseKnowledge}
@@ -8310,7 +8311,7 @@ const App: React.FC<AppProps> = ({
               >
                 <option value="bazi">四柱资料</option>
                 <option value="qimen">奇门资料</option>
-              </select>
+              </FilterSelect>
             </div>
           </div>
         </div>
@@ -8558,7 +8559,7 @@ const App: React.FC<AppProps> = ({
                     {appPreferences.mobileBottomNav.map((navId, index) => (
                       <label key={`mobile-nav-${index}`} className="min-w-0">
                         <span className="mb-1 block text-[11px] font-semibold text-stone-400">第 {index + 1} 项</span>
-                        <select
+                        <FilterSelect
                           value={navId}
                           onChange={(event) => handleMobileBottomNavSlotChange(index, event.target.value as MobileBottomNavItemId)}
                           className="glass-input w-full min-w-0 rounded-2xl px-3 py-2.5 text-sm font-semibold text-stone-700 outline-none"
@@ -8572,7 +8573,7 @@ const App: React.FC<AppProps> = ({
                               {option.label}
                             </option>
                           ))}
-                        </select>
+                        </FilterSelect>
                       </label>
                     ))}
                   </div>
@@ -8677,7 +8678,7 @@ const App: React.FC<AppProps> = ({
                 </label>
                 <label className="block">
                   <span className="block text-sm font-bold text-stone-600">表达风格</span>
-                  <select
+                  <FilterSelect
                     value={personalizationDraft.expressionStyle}
                     onChange={(event) => setPersonalizationDraft((current) => ({
                       ...current,
@@ -8688,13 +8689,13 @@ const App: React.FC<AppProps> = ({
                     {EXPRESSION_STYLE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
-                  </select>
+                  </FilterSelect>
                 </label>
               </div>
 
               <label className="block">
                 <span className="block text-sm font-bold text-stone-600">默认命盘</span>
-                <select
+                <FilterSelect
                   value={appPreferences.defaultCaseId}
                   onChange={(event) => {
                     const nextCaseId = event.target.value;
@@ -8717,7 +8718,7 @@ const App: React.FC<AppProps> = ({
                         {getCaseDisplayName(item)}
                       </option>
                     ))}
-                </select>
+                </FilterSelect>
                 <div className="mt-2 text-xs leading-5 text-stone-400">
                   日运、月运和择日会优先使用这个八字命盘；没有选择或命盘不存在时自动回退到第一条八字命例。
                 </div>
@@ -8802,7 +8803,7 @@ const App: React.FC<AppProps> = ({
               <div className="grid min-w-0 gap-4 md:grid-cols-2">
                 <label className="block">
                   <span className="block text-sm font-bold text-stone-600">默认展示大运期数</span>
-                  <select
+                  <FilterSelect
                     value={personalizationDraft.dayunPeriods}
                     onChange={(event) => setPersonalizationDraft((current) => ({
                       ...current,
@@ -8813,11 +8814,11 @@ const App: React.FC<AppProps> = ({
                     {Array.from({ length: 8 }, (_, index) => index + 3).map((value) => (
                       <option key={value} value={value}>{value} 期</option>
                     ))}
-                  </select>
+                  </FilterSelect>
                 </label>
                 <label className="block">
                   <span className="block text-sm font-bold text-stone-600">图表风格</span>
-                  <select
+                  <FilterSelect
                     value={personalizationDraft.chartStyle}
                     onChange={(event) => setPersonalizationDraft((current) => ({
                       ...current,
@@ -8828,7 +8829,7 @@ const App: React.FC<AppProps> = ({
                     {CHART_STYLE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
-                  </select>
+                  </FilterSelect>
                 </label>
               </div>
 
@@ -9890,7 +9891,7 @@ const App: React.FC<AppProps> = ({
                 <div className="glass-panel-soft rounded-[28px] border border-white/60 p-4 md:p-5">
                   <label className="block text-stone-700 font-bold mb-2">选择八字命例</label>
                   {fortuneCaseOptions.length > 0 ? (
-                    <select
+                    <FilterSelect
                       value={fortuneCaseId}
                       onChange={(event) => setFortuneCaseId(event.target.value)}
                       className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
@@ -9900,7 +9901,7 @@ const App: React.FC<AppProps> = ({
                           {item.title}
                         </option>
                       ))}
-                    </select>
+                    </FilterSelect>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
                       暂无八字命例。请先进入“四柱八字”新增命例，再生成每日或每月运势。
@@ -9996,14 +9997,14 @@ const App: React.FC<AppProps> = ({
                     <div className="grid gap-4 animate-fade-in">
                       <div>
                         <label className="block text-xs text-stone-500 mb-1">起局方法</label>
-                        <select
+                        <FilterSelect
                           value={qimenJuModel}
                           onChange={(e) => setQimenJuModel(parseInt(e.target.value, 10))}
                           className="glass-input glass-select w-full rounded-2xl p-3 text-sm outline-none"
                         >
                           <option value={0}>拆补法</option>
                           <option value={2}>茅山道人法</option>
-                        </select>
+                        </FilterSelect>
                       </div>
                     </div>
                   )}

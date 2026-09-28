@@ -7,6 +7,7 @@ import { getCaseCardPreview } from '../../lib/case-card-preview';
 import { getWuxingColor } from '../../utils/wuxing';
 import { useInteractionTransition } from '../InteractionMotion';
 import DeleteButton from './DeleteButton';
+import { TactileButton } from './TactileButton';
 
 type Props = { items: CaseItem[]; onOpen: (id: string) => void; onEdit: (id: string) => void; onDelete: (id: string) => Promise<void | boolean>; };
 type Entry = { item: CaseItem; preview: ReturnType<typeof getCaseCardPreview> };
@@ -49,14 +50,13 @@ function CaseCard({ entry, expanded, onToggle, onOpen, onEdit, onDelete }: Entry
         <motion.svg className="case-library-chevron" aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"
           animate={{ rotate: expanded ? 180 : 0 }} transition={transition}><path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></motion.svg>
       </motion.button>
-      <button type="button" className="case-library-open" aria-label={`查看${preview.name}专业排盘`} onClick={() => onOpen(item.id)}>专业排盘<span aria-hidden="true">↗</span></button>
     </div>
     <AnimatePresence initial={false}>{expanded && <CaseDetails key="detail" id={`${id}-detail`} labelledBy={`${id}-trigger`} entry={entry} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} />}</AnimatePresence>
   </motion.article></div>;
 }
 
 type EntryProps = Pick<Props, 'onOpen' | 'onEdit' | 'onDelete'> & { entry: Entry };
-function CaseDetails({ id, labelledBy, entry: { item, preview }, onEdit, onDelete }: EntryProps & { id: string; labelledBy: string }) {
+function CaseDetails({ id, labelledBy, entry: { item, preview }, onOpen, onEdit, onDelete }: EntryProps & { id: string; labelledBy: string }) {
   const present = useIsPresent();
   const motionPreference = useInteractionTransition(.18);
   const transition = motionPreference.duration ? spring : { duration: 0 };
@@ -70,8 +70,11 @@ function CaseDetails({ id, labelledBy, entry: { item, preview }, onEdit, onDelet
           {preview.location && <div><dt>出生地</dt><dd>{preview.location}</dd></div>}
           <div><dt>排盘时间</dt><dd>{new Date(preview.chartTime).toLocaleString('zh-CN', { hour12: false })}</dd></div>
         </dl>
+        <TactileButton disabled={!present} className="case-library-open" size="sm" fullWidth aria-label={`查看${preview.name}专业排盘与解读`} onClick={() => onOpen(item.id)}>
+          专业排盘<span className="case-library-open-reading">与解读</span>
+        </TactileButton>
         <div className="case-library-actions">
-          <DeleteButton disabled={!present} onDelete={() => onDelete(item.id)} label="删除命例" />
+          <DeleteButton disabled={!present} onDelete={() => onDelete(item.id)} neutral countdown={3} />
           <button type="button" onClick={() => onEdit(item.id)} className="case-library-edit">编辑</button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import FilterSelect from './interactive/FilterSelect';
 import SaveButton from './interactive/SaveButton';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -374,7 +375,7 @@ const CaseSelector = ({
 }: Pick<Props, 'caseOptions' | 'selectedCaseId' | 'onCaseChange'>) => {
   if (!caseOptions?.length || !onCaseChange) return null;
   return (
-    <select
+    <FilterSelect
       value={selectedCaseId || caseOptions[0]?.id || ''}
       onChange={(event) => onCaseChange(event.target.value)}
       className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 outline-none transition hover:bg-amber-100"
@@ -383,7 +384,7 @@ const CaseSelector = ({
       {caseOptions.map((item) => (
         <option key={item.id} value={item.id}>{item.title}</option>
       ))}
-    </select>
+    </FilterSelect>
   );
 };
 
