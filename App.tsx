@@ -9516,9 +9516,9 @@ const App: React.FC<AppProps> = ({
                 aria-expanded={showUserMenu}
                 aria-controls={showUserMenu ? "account-dropdown" : undefined}
                 onClick={() => setShowUserMenu((open) => !open)}
-                className="min-h-9 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-stone-200 hover:border-white/25 hover:bg-white/10 hover:text-white"
+                className="account-trigger min-h-9 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-stone-200 hover:border-white/25 hover:bg-white/10 hover:text-white"
               >
-                {authSession?.user?.name || '用户'}{typeof userQuota === 'number' ? ` · ${userQuota}点` : ''}
+                <span className="account-trigger-label">{authSession?.user?.name || '用户'}{typeof userQuota === 'number' ? ` · ${userQuota}点` : ''}</span>
               </button>
             ) : (
               <button

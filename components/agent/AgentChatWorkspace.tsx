@@ -123,7 +123,7 @@ export default function AgentChatWorkspace(props: Props) {
           placeholder="输入问题，Agent 会自动选择所需工具..." onCopy={props.onCopyPrompt} copied={props.copied}
           maxLength={4000} contextOpen={props.contextOpen} contextCount={contextCount} onToggleContext={props.onToggleContext}
           context={
-        <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
+        <div className="grid gap-4 p-4">
           <label>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
             <select value={props.caseSelectValue} onChange={(event) => props.onSelectCase(event.target.value)} disabled={props.loading || !props.availableCases.length} className="w-full rounded-2xl border border-stone-200 bg-white/80 px-3 py-2.5 text-sm font-semibold text-stone-600 outline-none disabled:opacity-45">
