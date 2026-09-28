@@ -1,5 +1,7 @@
 'use client';
 
+import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ZiweiResponse } from '../types';
 import { ChartMasthead } from './DivinationVisualSystem';
@@ -74,23 +76,24 @@ export default function ZiweiWorkspace({
         symbol="紫"
       />
 
-      <nav className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3" aria-label="紫微斗数功能">
+      <SelectionGroup><nav className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3" aria-label="紫微斗数功能">
         {TAB_ITEMS.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => setActiveTab(item.key)}
             aria-current={activeTab === item.key ? 'page' : undefined}
-            className={`rounded-xl border px-2 py-2.5 text-center text-sm font-bold md:rounded-2xl md:px-4 md:py-3.5 md:text-base ${
+            aria-pressed={activeTab === item.key}
+            className={`interaction-choice rounded-xl border px-2 py-2.5 text-center text-sm font-bold md:rounded-2xl md:px-4 md:py-3.5 md:text-base ${
               activeTab === item.key
-                ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_14px_30px_rgba(28,25,23,0.16)]'
+                ? 'border-transparent text-amber-200'
                 : 'border-white/75 bg-white/62 text-stone-700 hover:bg-white'
             }`}
           >
-            {item.label}
+            <SelectionHighlight active={activeTab === item.key} className="glass-panel-dark border-transparent shadow-[0_14px_30px_rgba(28,25,23,0.16)]" /><span className="interaction-choice-label">{item.label}</span>
           </button>
         ))}
-      </nav>
+      </nav></SelectionGroup>
 
       <div className="mt-5">
         {activeTab === 'professional' ? <ZiweiGrid data={data} embedded /> : null}

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { AnimatePresence, motion, useIsPresent } from 'motion/react';
+import { useInteractionTransition } from './InteractionMotion';
 import { createPortal } from 'react-dom';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -17,7 +19,12 @@ type DialogPortalProps = {
   panelClassName?: string;
 };
 
-export default function DialogPortal({
+export default function DialogPortal(props: DialogPortalProps) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(<AnimatePresence>{props.open ? <DialogSurface {...props} /> : null}</AnimatePresence>, document.body);
+}
+
+function DialogSurface({
   open,
   onClose,
   children,
@@ -28,33 +35,35 @@ export default function DialogPortal({
   layerClassName = 'z-50',
   panelClassName = '',
 }: DialogPortalProps) {
-  useBodyScrollLock(open);
-  const dialogRef = useDialogFocus<HTMLDivElement>(open, onClose);
+  const present = useIsPresent();
+  const transition = useInteractionTransition(0.2);
+  useBodyScrollLock(true);
+  const dialogRef = useDialogFocus<HTMLDivElement>(present, onClose);
 
-  if (!open || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={transition}
+      inert={!present}
       data-dialog-root="true"
       className={`${layerClassName} fixed inset-0 flex overflow-hidden bg-black/35 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-sm md:items-center md:justify-center md:p-4`}
       onClick={closeOnBackdrop ? onClose : undefined}
     >
-      <div
+      <motion.div
+        initial={{ opacity: 0, y: 6, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4, scale: 0.99 }} transition={transition}
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
         aria-label={labelledBy ? undefined : ariaLabel}
         tabIndex={-1}
-        className={`materialize-in glass-panel flex min-h-0 w-full flex-col overflow-hidden rounded-[26px] border border-white/70 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:rounded-[30px] ${
+        className={`glass-panel flex min-h-0 w-full flex-col overflow-hidden rounded-[26px] border border-white/70 shadow-[0_30px_90px_rgba(0,0,0,0.24)] md:rounded-[30px] ${
           mobileFill ? 'h-full max-h-full md:h-auto md:max-h-[calc(100dvh-2rem)]' : 'max-h-full md:max-h-[calc(100dvh-2rem)]'
         } ${panelClassName}`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
-      </div>
-    </div>,
-    document.body
+      </motion.div>
+    </motion.div>
   );
 }
 

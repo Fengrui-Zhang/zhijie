@@ -1,3 +1,4 @@
+import { SmoothCollapse } from './InteractionMotion';
 import React, { useState } from 'react';
 
 type PrimaryCase = {
@@ -98,8 +99,8 @@ export default function HomeWorkspace({
           ))}
         </div>
 
-        {divinationOpen && (
-          <div className="materialize-in mt-4 rounded-[22px] border border-white/75 bg-white/58 p-4 md:p-5" style={{ '--material-origin': '50% 0%' } as React.CSSProperties}>
+        <SmoothCollapse open={divinationOpen}>
+          <div className="mt-4 rounded-[22px] border border-white/75 bg-white/58 p-4 md:p-5" style={{ '--material-origin': '50% 0%' } as React.CSSProperties}>
             <div className="mb-3">
               <div className="text-sm font-bold text-stone-800">选择占测方式</div>
               <div className="mt-1 text-xs text-stone-500">按问题的性质选择，不确定时可先用梅花易数快速判断。</div>
@@ -120,7 +121,7 @@ export default function HomeWorkspace({
               ))}
             </div>
           </div>
-        )}
+        </SmoothCollapse>
 
         {!primaryCase && (
           <div className="mt-5 flex flex-wrap gap-2">

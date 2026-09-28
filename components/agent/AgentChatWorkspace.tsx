@@ -1,6 +1,7 @@
 'use client';
 
-import type { FormEvent, KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, type FormEvent, type KeyboardEvent } from 'react';
+import { SmoothCollapse, TransitionText } from '../InteractionMotion';
 import MarkdownContent from '../MarkdownContent';
 import { ChatWorkspace } from '../WorkspacePanels';
 import { AgentToolCards } from './AgentToolCards';
@@ -54,6 +55,20 @@ const STARTER_PROMPTS = [
 ];
 
 export default function AgentChatWorkspace(props: Props) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const previousHeight = input.getBoundingClientRect().height;
+    const previousTransition = input.style.transition;
+    input.style.transition = 'none';
+    input.style.height = 'auto';
+    const height = Math.min(144, Math.max(48, input.scrollHeight));
+    input.style.height = `${previousHeight}px`;
+    void input.offsetHeight;
+    input.style.transition = previousTransition;
+    input.style.height = `${height}px`;
+  }, [props.input]);
   const contextCount = props.selectedCases.length + props.selectedSessions.length;
   const showOrb = useDelayedBusy(props.loading);
   const runningTool = props.liveTools.find((tool) => tool.status === 'running');
@@ -61,9 +76,9 @@ export default function AgentChatWorkspace(props: Props) {
     ? 'searching'
     : 'working';
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
       event.preventDefault();
-      props.onSubmit();
+      if (!props.loading && props.input.trim()) props.onSubmit();
     }
   };
   return (
@@ -81,7 +96,7 @@ export default function AgentChatWorkspace(props: Props) {
         </button>
       </div>
 
-      {props.contextOpen ? (
+      <SmoothCollapse open={props.contextOpen}>
         <div className="grid gap-4 border-b border-stone-100 bg-white/45 px-6 py-4 md:grid-cols-3 md:px-8">
           <label>
             <span className="mb-1.5 block text-xs font-bold text-stone-500">引用命例</span>
@@ -104,7 +119,7 @@ export default function AgentChatWorkspace(props: Props) {
             </button>
           </div>
         </div>
-      ) : null}
+      </SmoothCollapse>
 
       {contextCount ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-stone-100/80 bg-white/42 px-6 py-3 md:px-8">
@@ -149,11 +164,11 @@ export default function AgentChatWorkspace(props: Props) {
       </div>
 
       {props.error ? <div className="border-t border-red-100 bg-red-50/70 px-4 py-2 text-xs text-red-600">{props.error}</div> : null}
-      <form onSubmit={(event) => props.onSubmit(event)} className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-xl xl:pb-4">
-        <div className="mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
-          <textarea value={props.input} onChange={(event) => props.onInputChange(event.target.value)} onKeyDown={handleKeyDown} placeholder="输入问题，Agent 会自动选择所需工具..." rows={1} className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400" />
-          <button type="button" disabled={props.loading} onClick={props.onCopyPrompt} className="hidden shrink-0 rounded-2xl border border-stone-200 bg-white/70 px-3 py-3 text-xs font-semibold text-stone-500 transition hover:bg-white disabled:opacity-45 sm:inline-flex">{props.copied ? '已复制' : '复制AI提示词'}</button>
-          <button type="submit" disabled={!props.input.trim() || props.loading} className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50">{props.loading ? '执行中' : '发送'}</button>
+      <form onSubmit={(event) => { event.preventDefault(); if (!props.loading && props.input.trim()) props.onSubmit(event); }} className="border-t border-white/60 bg-white/60 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] backdrop-blur-xl xl:pb-4">
+        <div className="interaction-composer mx-auto flex max-w-4xl items-end gap-3 rounded-[26px] border border-white/70 bg-white/72 p-2 shadow-sm">
+          <textarea ref={inputRef} value={props.input} onChange={(event) => props.onInputChange(event.target.value)} onKeyDown={handleKeyDown} placeholder="输入问题，Agent 会自动选择所需工具..." rows={1} className="max-h-36 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3 py-3 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400" />
+          <button type="button" disabled={props.loading} onClick={props.onCopyPrompt} className="hidden shrink-0 rounded-2xl border border-stone-200 bg-white/70 px-3 py-3 text-xs font-semibold text-stone-500 transition hover:bg-white disabled:opacity-45 sm:inline-flex"><TransitionText value={String(props.copied)}>{props.copied ? '已复制' : '复制AI提示词'}</TransitionText></button>
+          <button type="submit" aria-busy={props.loading} disabled={!props.input.trim() || props.loading} className="glass-cta h-12 rounded-2xl px-5 text-sm font-semibold text-amber-300 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><TransitionText value={String(props.loading)}>{props.loading ? '执行中' : '发送'}</TransitionText></button>
         </div>
       </form>
     </ChatWorkspace>

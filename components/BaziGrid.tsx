@@ -1,5 +1,7 @@
 'use client';
 
+import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
+
 import React, { useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { Solar } from 'lunar-javascript';
@@ -832,22 +834,23 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       />
       {base_info.zhen ? <div className="-mt-2 mb-3 text-right text-[10px] text-amber-700">真太阳时：{base_info.zhen.city} {base_info.zhen.shicha}</div> : null}
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+      <SelectionGroup><div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
         {tabItems.map((item) => (
           <button
             key={item.key}
             type="button"
             onClick={() => setActiveTab(item.key)}
-            className={`rounded-xl border px-2 py-2 text-center text-sm transition md:rounded-2xl md:px-4 md:py-3 md:text-base ${
+            aria-pressed={activeTab === item.key}
+            className={`interaction-choice rounded-xl border px-2 py-2 text-center text-sm transition md:rounded-2xl md:px-4 md:py-3 md:text-base ${
               activeTab === item.key
-                ? 'glass-panel-dark border-transparent text-amber-200 shadow-sm'
+                ? 'border-transparent text-amber-200'
                 : 'border-stone-100 bg-white/65 text-stone-700 hover:bg-white'
             }`}
           >
-            <div className="font-bold">{item.label}</div>
+            <SelectionHighlight active={activeTab === item.key} className="glass-panel-dark border-transparent shadow-sm" /><span className="interaction-choice-label font-bold">{item.label}</span>
           </button>
         ))}
-      </div>
+      </div></SelectionGroup>
 
       {activeTab === 'basic' && (
         <div className="space-y-5">

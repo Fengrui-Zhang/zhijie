@@ -1,0 +1,2755 @@
+{
+  "review_date": "2026-09-28",
+  "upstream_repository": "https://github.com/iurvish/uselayouts",
+  "upstream_commit": "78bfa803aed67d424755b66bb3f30eeed42d7502",
+  "upstream_commit_time": "2026-09-25T10:48:21+05:30",
+  "license": "MIT",
+  "scope": "64 registry entries and recursively resolved static local imports; third-party package binaries and remote demo images are not included; no upstream code executed",
+  "items": [
+    {
+      "name": "3d-book",
+      "type": "registry:component",
+      "title": "3D Book",
+      "description": "An interactive 3D book component with page flip animations.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/3d-book.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "翻书装饰不适合高频表格与长报告。",
+      "demo_url": "https://uselayouts.com/docs/components/3d-book",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/3d-book.tsx",
+      "resolved_source_files": [
+        "registry/default/example/3d-book.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "accessible-action",
+      "type": "registry:component",
+      "title": "Accessible Action",
+      "description": "Interactive draggable card stack with 3D tilt, swipe-to-back gestures, click interactions, random rotation, and smooth spring animations.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/accessible-action.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "拖拽翻卡隐藏数据并增加操作成本。",
+      "demo_url": "https://uselayouts.com/docs/components/accessible-action",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/accessible-action.tsx",
+      "resolved_source_files": [
+        "registry/default/example/accessible-action.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "framer-motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "accordionos",
+      "type": "registry:component",
+      "title": "AccordionOS",
+      "description": "Interactive accordion showcase with animated content, image transitions, hover effects, keyboard navigation, autoplay, and responsive design.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/accordionos.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅借鉴工具调用详情/高级选项展开；不用图片自动播放或整套组件。",
+      "demo_url": "https://uselayouts.com/docs/components/accordionos",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/accordionos.tsx",
+      "resolved_source_files": [
+        "registry/default/example/accordionos.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@radix-ui/react-tooltip",
+        "framer-motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "@radix-ui/react-tooltip",
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "analog-stick",
+      "type": "registry:component",
+      "title": "Analog Stick",
+      "description": "A metallic stick that tilts into the press. Hover a quadrant and the cap leans, the shadow shifts, and the matching arrow goes amber.",
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/analog-stick.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "方向摇杆没有对应任务。",
+      "demo_url": "https://uselayouts.com/docs/components/analog-stick",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/analog-stick.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/analog-stick.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "animated-collection",
+      "type": "registry:component",
+      "title": "Animated Collection",
+      "description": "A collection of items with smooth layout transitions and animations.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/animated-collection.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "命例库列表/卡片切换；保留标题、历法与时间摘要，移除图片及 Pack 堆叠。",
+      "demo_url": "https://uselayouts.com/docs/components/animated-collection",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/animated-collection.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/animated-collection.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "bento-card",
+      "type": "registry:component",
+      "title": "Bento Card",
+      "description": "An interactive bento card with animated tabs and workspace preview.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/bento-card.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅借鉴首页主次分区；不用营销演示仪表盘。",
+      "demo_url": "https://uselayouts.com/docs/components/bento-card",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/bento-card.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/bento-card.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "bottom-menu",
+      "type": "registry:component",
+      "title": "Bottom Menu",
+      "description": "A floating bottom navigation menu with smooth interactions.",
+      "dependencies": [
+        "motion",
+        "react-use-measure",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/bottom-menu.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "手机底栏与更多菜单；保留现有自定义导航、文字标签与安全区。",
+      "demo_url": "https://uselayouts.com/docs/components/bottom-menu",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/bottom-menu.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/bottom-menu.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "react-use-measure",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "bucket",
+      "type": "registry:component",
+      "title": "Bucket",
+      "description": "An interactive card component that simulates a bucket where chips are tossed and replaced with smooth physics-inspired animations.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/bucket.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "hooks/use-mobile.ts",
+          "type": "registry:hook"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "物理投掷标签不利于精确筛选。",
+      "demo_url": "https://uselayouts.com/docs/components/bucket",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/bucket.tsx",
+      "resolved_source_files": [
+        "hooks/use-mobile.ts",
+        "registry/default/example/bucket.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "lucide-react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "lucide-react"
+      ]
+    },
+    {
+      "name": "card-folder",
+      "type": "registry:component",
+      "title": "Card Folder",
+      "description": "This component creates an animated folder-style card with a background image, floating 3D object, hover effects, and customizable colors and text. You can easily change the images, colors, content, and animation settings from the card props.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/card-folder.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "图片文件夹与命例信息结构不匹配。",
+      "demo_url": "https://uselayouts.com/docs/components/card-folder",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/card-folder.tsx",
+      "resolved_source_files": [
+        "registry/default/example/card-folder.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "client-card",
+      "type": "registry:component",
+      "title": "Client Card",
+      "description": "A client CRM card with payment and deadline rings, plus a morphing avatar stack.",
+      "dependencies": [
+        "motion",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/client-card.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "账单客户管理领域不匹配。",
+      "demo_url": "https://uselayouts.com/docs/components/client-card",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/client-card.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/client-card.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "lucide-react",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "confidential-folder",
+      "type": "registry:component",
+      "title": "Confidential Folder",
+      "description": "A charcoal sleeve that pulls a letter out, flips it, and lands it in front of you.",
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/confidential-folder.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "信件揭幕增加读取步骤。",
+      "demo_url": "https://uselayouts.com/docs/components/confidential-folder",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/confidential-folder.tsx",
+      "resolved_source_files": [
+        "registry/default/example/confidential-folder.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "corner-video",
+      "type": "registry:component",
+      "title": "Corner Video",
+      "description": "A compact corner video player with smooth open/close morphing, autoplay, mute, enlarge, hover controls, and video scrubbing.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/corner-video.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "当前没有对应视频工作流。",
+      "demo_url": "https://uselayouts.com/docs/components/corner-video",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/corner-video.tsx",
+      "resolved_source_files": [
+        "registry/default/example/corner-video.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "coverflow-drag",
+      "type": "registry:component",
+      "title": "Coverflow Drag",
+      "description": "A drag coverflow of portraits that scale, dim, and snap as you swipe.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/coverflow-drag.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "照片轮播不适合命例检索。",
+      "demo_url": "https://uselayouts.com/docs/components/coverflow-drag",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/coverflow-drag.tsx",
+      "resolved_source_files": [
+        "registry/default/example/coverflow-drag.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "create-menu",
+      "type": "registry:component",
+      "title": "Create Menu",
+      "description": "A Start Creating pill that springs open into a list of create actions.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/react",
+        "@hugeicons/core-free-icons"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/create-menu.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "首页和命例库的新建入口；选择八字、紫微或占卜，补齐真实动作与键盘操作。",
+      "demo_url": "https://uselayouts.com/docs/components/create-menu",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/create-menu.tsx",
+      "resolved_source_files": [
+        "registry/default/example/create-menu.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "curve-drawer",
+      "type": "registry:component",
+      "title": "Curve Drawer",
+      "description": "Side drawers whose inner edge starts as a bulge and morphs into a straight line as the panel settles.",
+      "dependencies": [
+        "motion",
+        "vaul",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/curve-drawer.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "手机宫位详情、引用资料与更多筛选；优先沿用现有 DialogPortal；弧边仅可选，800ms 缩短。",
+      "demo_url": "https://uselayouts.com/docs/components/curve-drawer",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/curve-drawer.tsx",
+      "resolved_source_files": [
+        "components/ui/button.tsx",
+        "lib/utils.ts",
+        "registry/default/example/curve-drawer-curve.tsx",
+        "registry/default/example/curve-drawer-primitives.tsx",
+        "registry/default/example/curve-drawer.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "class-variance-authority",
+        "clsx",
+        "lucide-react",
+        "motion",
+        "react",
+        "tailwind-merge",
+        "vaul"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ]
+    },
+    {
+      "name": "day-picker",
+      "type": "registry:component",
+      "title": "Day Picker",
+      "description": "A custom day picker component with smooth animations.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/day-picker.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "实际是频率/星期选择器，不能替代公农历日期组件。",
+      "demo_url": "https://uselayouts.com/docs/components/day-picker",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/day-picker.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/day-picker.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "delete-button",
+      "type": "registry:component",
+      "title": "Delete Button",
+      "description": "A confirmation button with smooth icon transitions.",
+      "dependencies": [
+        "motion",
+        "dialkit",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/delete-button.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅借鉴确认与状态反馈；现有删除确认保留，移除 DialKit 与模拟倒计时。",
+      "demo_url": "https://uselayouts.com/docs/components/delete-button",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/delete-button.tsx",
+      "resolved_source_files": [
+        "registry/default/example/delete-button.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "dialkit",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "discover-button",
+      "type": "registry:component",
+      "title": "Discover Button",
+      "description": "An interactive button with expanding discovery state.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/discover-button.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "与推荐 Create Menu 重复，避免两种新建交互。",
+      "demo_url": "https://uselayouts.com/docs/components/discover-button",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/discover-button.tsx",
+      "resolved_source_files": [
+        "registry/default/example/discover-button.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "discrete-tabs",
+      "type": "registry:component",
+      "title": "Discrete Tabs",
+      "description": "A tab component with discrete sliding animations.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/discrete-tabs.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "八字/紫微结果、风水时间层级、设置分类；所有中文标签常显，受控状态。",
+      "demo_url": "https://uselayouts.com/docs/components/discrete-tabs",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/discrete-tabs.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/discrete-tabs.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "drawer-buttons",
+      "type": "registry:component",
+      "title": "Drawer Buttons",
+      "description": "Two buttons that open side drawers with a 3D fold. Payment comes from the right, cart from the left, and the fields stagger in.",
+      "dependencies": [
+        "motion",
+        "vaul",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "field"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/drawer-buttons.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "购物车/付款抽屉没有对应任务。",
+      "demo_url": "https://uselayouts.com/docs/components/drawer-buttons",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/drawer-buttons.tsx",
+      "resolved_source_files": [
+        "components/ui/button.tsx",
+        "components/ui/field.tsx",
+        "components/ui/input.tsx",
+        "components/ui/label.tsx",
+        "components/ui/select.tsx",
+        "components/ui/separator.tsx",
+        "components/ui/textarea.tsx",
+        "lib/utils.ts",
+        "registry/default/example/drawer-buttons-drawer.tsx",
+        "registry/default/example/drawer-buttons-field.tsx",
+        "registry/default/example/drawer-buttons.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority",
+        "clsx",
+        "lucide-react",
+        "motion",
+        "react",
+        "tailwind-merge",
+        "vaul"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority"
+      ]
+    },
+    {
+      "name": "dynamic-grid-gallery",
+      "type": "registry:component",
+      "title": "Dynamic Grid Gallery",
+      "description": "A 3×2 photo grid that grows the hovered row and column so one still takes the stage.",
+      "files": [
+        {
+          "path": "registry/default/example/dynamic-grid-gallery.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "dependencies": [],
+      "decision": "本轮不采用",
+      "fit": "图片展示不适合专业命盘。",
+      "demo_url": "https://uselayouts.com/docs/components/dynamic-grid-gallery",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/dynamic-grid-gallery.tsx",
+      "resolved_source_files": [
+        "registry/default/example/dynamic-grid-gallery.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "dynamic-toolbar",
+      "type": "registry:component",
+      "title": "Dynamic Toolbar",
+      "description": "A toolbar that adapts its size and layout based on content.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/dynamic-toolbar.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "hooks/use-measure.tsx",
+          "type": "registry:hook"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "分析结果的复制、导出、版本与重新分析操作；明确区分消耗额度的动作。",
+      "demo_url": "https://uselayouts.com/docs/components/dynamic-toolbar",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/dynamic-toolbar.tsx",
+      "resolved_source_files": [
+        "hooks/use-measure.tsx",
+        "registry/default/example/dynamic-toolbar.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "editorial-deck",
+      "type": "registry:component",
+      "title": "Editorial Deck",
+      "description": "A stacked editorial story deck. Drag the front card and it springs back into the pile.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/editorial-deck.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "卡片翻阅降低报告扫描效率。",
+      "demo_url": "https://uselayouts.com/docs/components/editorial-deck",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/editorial-deck.tsx",
+      "resolved_source_files": [
+        "registry/default/example/editorial-deck.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "empty-testimonial",
+      "type": "registry:component",
+      "title": "Empty Testimonial",
+      "description": "An interactive empty state for testimonials with a playful folder animation.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/empty-testimonial.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅借鉴空态层次：解释原因与下一步；替换为项目自己的轻量空态。",
+      "demo_url": "https://uselayouts.com/docs/components/empty-testimonial",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/empty-testimonial.tsx",
+      "resolved_source_files": [
+        "registry/default/example/empty-testimonial.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "expandable-gallery",
+      "type": "registry:component",
+      "title": "Expandable Gallery",
+      "description": "A photo gallery with smooth item expansion.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "button"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/expandable-gallery.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "图片画廊没有对应任务。",
+      "demo_url": "https://uselayouts.com/docs/components/expandable-gallery",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/expandable-gallery.tsx",
+      "resolved_source_files": [
+        "hooks/use-outside-click.ts",
+        "lib/utils.ts",
+        "registry/default/example/expandable-gallery.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "feature-carousel",
+      "type": "registry:component",
+      "title": "Feature Carousel",
+      "description": "A smooth carousel for showcasing product features.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/feature-carousel.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "营销轮播无助于工具操作。",
+      "demo_url": "https://uselayouts.com/docs/components/feature-carousel",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/feature-carousel.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/feature-carousel.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "filter-interaction",
+      "type": "registry:component",
+      "title": "Filter Interaction",
+      "description": "Interactive list items with hover and focus effects.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/filter-interaction.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "分析记录与命例筛选；移动端更多筛选展开，保留已选条件摘要。",
+      "demo_url": "https://uselayouts.com/docs/components/filter-interaction",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/filter-interaction.tsx",
+      "resolved_source_files": [
+        "registry/default/example/filter-interaction.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "fluid-expanding-grid",
+      "type": "registry:component",
+      "title": "Fluid Expanding Grid",
+      "description": "A responsive gallery grid that fluidly shifts and expands items using motion layout.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/fluid-expanding-grid.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "图片网格会扰乱专业宫位布局。",
+      "demo_url": "https://uselayouts.com/docs/components/fluid-expanding-grid",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/fluid-expanding-grid.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/fluid-expanding-grid.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "framer-motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "focus-testimonials",
+      "type": "registry:component",
+      "title": "Focus Testimonials",
+      "description": "Interactive testimonial section with hover-based focus effects, animated author tooltips, and expandable testimonials.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/focus-testimonials.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "客户评价组件没有对应任务。",
+      "demo_url": "https://uselayouts.com/docs/components/focus-testimonials",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/focus-testimonials.tsx",
+      "resolved_source_files": [
+        "registry/default/example/focus-testimonials.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "framer-motion",
+        "lucide-react",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion",
+        "lucide-react"
+      ]
+    },
+    {
+      "name": "folder-interaction",
+      "type": "registry:component",
+      "title": "Folder Interaction",
+      "description": "A folder management system with drag-and-drop-like feel.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/folder-interaction.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "装饰性文件夹需要额外点击，暂无分类任务。",
+      "demo_url": "https://uselayouts.com/docs/components/folder-interaction",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/folder-interaction.tsx",
+      "resolved_source_files": [
+        "registry/default/example/folder-interaction.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "get-in-touch",
+      "type": "registry:component",
+      "title": "Get In Touch",
+      "description": "A glossy contact pill. Hover and the label lifts away so a portrait and YOU merge, then Let’s Talk! writes in.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/get-in-touch.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "联系入口与当前产品任务无关。",
+      "demo_url": "https://uselayouts.com/docs/components/get-in-touch",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/get-in-touch.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/get-in-touch-button.tsx",
+        "registry/default/example/get-in-touch.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "next",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "holographic-referral-card",
+      "type": "registry:component",
+      "title": "Holographic Referral Card",
+      "description": "A dark invite card that tilts in 3D with the pointer. A holographic glow follows. Touch stays still. Tab for a quiet glow.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/holographic-referral-card.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "推荐邀请与光效无当前需求。",
+      "demo_url": "https://uselayouts.com/docs/components/holographic-referral-card",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/holographic-referral-card.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/holographic-referral-card.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "gooey-navbar",
+      "type": "registry:component",
+      "title": "Gooey Navbar",
+      "description": "A pill nav that melts into its neighbor when you hover — liquid bridges, active dot.",
+      "dependencies": [],
+      "files": [
+        {
+          "path": "registry/default/example/gooey-navbar.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "融化效果干扰高频导航识别。",
+      "demo_url": "https://uselayouts.com/docs/components/gooey-navbar",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/gooey-navbar.tsx",
+      "resolved_source_files": [
+        "registry/default/example/gooey-navbar.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "infinite-grid",
+      "type": "registry:component",
+      "title": "Infinite Canvas",
+      "description": "A free-panning product canvas that tiles forever — drag, scroll, and skim an endless grid of images and captions.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/infinite-grid.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "无限图片画布不适合有语义顺序的数据。",
+      "demo_url": "https://uselayouts.com/docs/components/infinite-grid",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/infinite-grid.tsx",
+      "resolved_source_files": [
+        "registry/default/example/infinite-grid.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "inline-edit",
+      "type": "registry:component",
+      "title": "Inline Edit",
+      "description": "An input that switches between read and edit modes.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "input"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/inline-edit.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "命例或会话名称、笔记标题；对接真实保存、撤销、失败及中文输入法。",
+      "demo_url": "https://uselayouts.com/docs/components/inline-edit",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/inline-edit.tsx",
+      "resolved_source_files": [
+        "components/ui/input.tsx",
+        "lib/cn.ts",
+        "lib/utils.ts",
+        "registry/default/example/inline-edit.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react"
+      ]
+    },
+    {
+      "name": "liquid-index",
+      "type": "registry:component",
+      "title": "Liquid Index",
+      "description": "A feature list whose hover badge is a WebGL liquid gradient that tracks the row.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/liquid-index.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/default/example/liquid-index-canvas.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "WebGL徽章成本与价值不匹配。",
+      "demo_url": "https://uselayouts.com/docs/components/liquid-index",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/liquid-index.tsx",
+      "resolved_source_files": [
+        "registry/default/example/liquid-index-canvas.tsx",
+        "registry/default/example/liquid-index.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "lucide-react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "lucide-react"
+      ]
+    },
+    {
+      "name": "magnified-bento",
+      "type": "registry:component",
+      "title": "Magnified Bento",
+      "description": "A bento card component with a draggable magnifying lens effect over scrolling chips.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/magnified-bento.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "放大镜交互不适合正文和命盘阅读。",
+      "demo_url": "https://uselayouts.com/docs/components/magnified-bento",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/magnified-bento.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/magnified-bento.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "morphing-input",
+      "type": "registry:component",
+      "title": "Morphing Input",
+      "description": "An input field that morphs between different states.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "input"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/morphing-input.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "与 Prompt Box 功能重复。",
+      "demo_url": "https://uselayouts.com/docs/components/morphing-input",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/morphing-input.tsx",
+      "resolved_source_files": [
+        "components/ui/input.tsx",
+        "lib/utils.ts",
+        "registry/default/example/morphing-input.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react"
+      ]
+    },
+    {
+      "name": "multi-step-form",
+      "type": "registry:component",
+      "title": "Multi Step Form",
+      "description": "A dynamic, animated multi-step form with validation.",
+      "dependencies": [
+        "motion",
+        "date-fns",
+        "react-hook-form",
+        "@hookform/resolvers",
+        "zod",
+        "sonner",
+        "lucide-react",
+        "react-use-measure",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "card",
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "badge",
+        "calendar",
+        "popover"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/multi-step-form.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅复杂手机出生表单/合盘引导；桌面保留快速填写，原历法规则不动。",
+      "demo_url": "https://uselayouts.com/docs/components/multi-step-form",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/multi-step-form.tsx",
+      "resolved_source_files": [
+        "components/ui/badge.tsx",
+        "components/ui/button.tsx",
+        "components/ui/calendar.tsx",
+        "components/ui/card.tsx",
+        "components/ui/field.tsx",
+        "components/ui/input.tsx",
+        "components/ui/label.tsx",
+        "components/ui/popover.tsx",
+        "components/ui/select.tsx",
+        "components/ui/separator.tsx",
+        "components/ui/textarea.tsx",
+        "lib/utils.ts",
+        "registry/default/example/multi-step-form.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hookform/resolvers",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority",
+        "clsx",
+        "date-fns",
+        "lucide-react",
+        "motion",
+        "react",
+        "react-day-picker",
+        "react-hook-form",
+        "react-use-measure",
+        "sonner",
+        "tailwind-merge",
+        "zod"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority",
+        "react-day-picker"
+      ]
+    },
+    {
+      "name": "overlapping-slider",
+      "type": "registry:component",
+      "title": "Overlapping Slider",
+      "description": "A full-width landing row of portrait cards. They sit flat until you move — then the card on the left scales back.",
+      "dependencies": [
+        "lucide-react"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/overlapping-slider.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "叠图轮播掩盖正文。",
+      "demo_url": "https://uselayouts.com/docs/components/overlapping-slider",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/overlapping-slider.tsx",
+      "resolved_source_files": [
+        "registry/default/example/overlapping-slider.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "lucide-react",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "perspective-text-scroll",
+      "type": "registry:component",
+      "title": "Perspective Text Scroll",
+      "description": "A polished example interaction built with React and Motion.",
+      "dependencies": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/perspective-text-scroll.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "大幅透视滚动不适合报告。",
+      "demo_url": "https://uselayouts.com/docs/components/perspective-text-scroll",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/perspective-text-scroll.tsx",
+      "resolved_source_files": [
+        "registry/default/example/perspective-text-scroll.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "photo-albums",
+      "type": "registry:component",
+      "title": "Photo Albums",
+      "description": "Tilted album stacks that expand into a shared-element photo grid.",
+      "dependencies": [
+        "motion",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/photo-albums.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "相册业务不存在。",
+      "demo_url": "https://uselayouts.com/docs/components/photo-albums",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/photo-albums.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/photo-albums.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "lucide-react",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "paper-shred-button",
+      "type": "registry:component",
+      "title": "Paper Shred Button",
+      "description": "Hover Delete and a page appears above it. Click and the page clips away while paper strips draw in below. After a few seconds it resets so you can shred again.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/paper-shred-button.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "碎纸动画会混淆真实删除与撤销状态。",
+      "demo_url": "https://uselayouts.com/docs/components/paper-shred-button",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/paper-shred-button.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/paper-shred-button.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "polaroid-drag",
+      "type": "registry:component",
+      "title": "Polaroid Drag",
+      "description": "Draggable Polaroid photo gallery with realistic tilt, stacking, smooth animations, and customizable captions, sizes, and decorations.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/polaroid-drag.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "照片拖拽业务不存在。",
+      "demo_url": "https://uselayouts.com/docs/components/polaroid-drag",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/polaroid-drag.tsx",
+      "resolved_source_files": [
+        "registry/default/example/polaroid-drag.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "framer-motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "polaroid-stack",
+      "type": "registry:component",
+      "title": "Polaroid Stack",
+      "description": "Seven Polaroids sit in a pile. Hover and they fan into an arc from one corner.",
+      "dependencies": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/polaroid-stack.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "照片堆叠业务不存在。",
+      "demo_url": "https://uselayouts.com/docs/components/polaroid-stack",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/polaroid-stack.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/polaroid-stack.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "pop-tilt-cards",
+      "type": "registry:component",
+      "title": "Pop Tilt Cards",
+      "description": "Interactive tilt card deck with smooth hover animations, 3D popping effects, images, links, and customizable card styling.",
+      "dependencies": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/pop-tilt-cards.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "倾斜图片降低文字稳定性。",
+      "demo_url": "https://uselayouts.com/docs/components/pop-tilt-cards",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/pop-tilt-cards.tsx",
+      "resolved_source_files": [
+        "registry/default/example/pop-tilt-cards.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "pricing-card",
+      "type": "registry:component",
+      "title": "Pricing Card",
+      "description": "A focused pricing card layout with clear hierarchy.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "lucide-react",
+        "@number-flow/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/pricing-card.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "当前无对应订阅套餐页面。",
+      "demo_url": "https://uselayouts.com/docs/components/pricing-card",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/pricing-card.tsx",
+      "resolved_source_files": [
+        "registry/default/example/pricing-card.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "@number-flow/react",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "prompt-box",
+      "type": "registry:component",
+      "title": "Prompt Box",
+      "description": "A collapsed chat composer that expands into a textarea with a model menu and send control.",
+      "dependencies": [
+        "motion",
+        "@base-ui/react",
+        "lucide-react"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/prompt-box.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/default/example/prompt-box-icons.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "问智解输入与上下文入口；裁剪为真实支持的命例/会话/知识库功能。",
+      "demo_url": "https://uselayouts.com/docs/components/prompt-box",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/prompt-box.tsx",
+      "resolved_source_files": [
+        "registry/default/example/prompt-box-icons.tsx",
+        "registry/default/example/prompt-box.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "lucide-react",
+        "motion",
+        "react",
+        "react-dom"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "rolling-card-stack",
+      "type": "registry:component",
+      "title": "Rolling Card Stack",
+      "description": "It’s a responsive, animated rolling card stack component built with React, TypeScript, Tailwind CSS, and Framer Motion. It supports desktop/mobile layouts, swipe and keyboard navigation, autoplay, pagination, and customizable card content",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/rolling-card-stack.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "自动轮播不适合案例选择。",
+      "demo_url": "https://uselayouts.com/docs/components/rolling-card-stack",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/rolling-card-stack.tsx",
+      "resolved_source_files": [
+        "registry/default/example/rolling-card-stack.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "framer-motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "save-button",
+      "type": "registry:component",
+      "title": "Save Button",
+      "description": "A button with animated states for idle, loading, and success.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/save-button.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "保存/复制/生成按钮的状态转换；移除模拟计时，以真实异步结果驱动。",
+      "demo_url": "https://uselayouts.com/docs/components/save-button",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/save-button.tsx",
+      "resolved_source_files": [
+        "components/ui/button.tsx",
+        "lib/utils.ts",
+        "registry/default/example/save-button.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ]
+    },
+    {
+      "name": "scan-document",
+      "type": "registry:component",
+      "title": "Scan Document",
+      "description": "Click Scan and a page unfolds, flips, and a glowing bar reads it. Done holds, then it resets.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/scan-document.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "扫描计时为演示，不能代表分析进度。",
+      "demo_url": "https://uselayouts.com/docs/components/scan-document",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/scan-document.tsx",
+      "resolved_source_files": [
+        "registry/default/example/scan-document.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "scroll-split-cards",
+      "type": "registry:component",
+      "title": "Scroll Split Cards",
+      "description": "One photograph that splits into three panels as you scroll, then flips to copy.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/scroll-split-cards.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "图片分裂滚动不适合分析阅读。",
+      "demo_url": "https://uselayouts.com/docs/components/scroll-split-cards",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/scroll-split-cards.tsx",
+      "resolved_source_files": [
+        "registry/default/example/scroll-split-cards.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "framer-motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "scroll-stack-deck",
+      "type": "registry:component",
+      "title": "Scroll Stack Deck",
+      "description": "Scroll-linked project cards that pin in the viewport and stack, scale, and settle as you move down the page.",
+      "dependencies": [
+        "lenis",
+        "motion",
+        "react"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/scroll-stack-deck.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "滚动劫持与长报告阅读冲突。",
+      "demo_url": "https://uselayouts.com/docs/components/scroll-stack-deck",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/scroll-stack-deck.tsx",
+      "resolved_source_files": [
+        "registry/default/example/scroll-stack-deck.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "lenis",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "set-timer",
+      "type": "registry:component",
+      "title": "Set Timer",
+      "description": "A dark timer pill that morphs into a minute wheel picker, then into a running timer with pause, cancel, and a rounded-rectangle progress border.",
+      "dependencies": [
+        "motion",
+        "@ncdai/react-wheel-picker",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/set-timer.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "没有定时任务；不能用作AI耗时承诺。",
+      "demo_url": "https://uselayouts.com/docs/components/set-timer",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/set-timer.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/set-timer.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@ncdai/react-wheel-picker",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "shake-testimonial-card",
+      "type": "registry:component",
+      "title": "Shake Testimonial Card",
+      "description": "An eye-catching testimonial card with playful animations.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/shake-testimonial-card.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "评价摇晃无对应业务。",
+      "demo_url": "https://uselayouts.com/docs/components/shake-testimonial-card",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/shake-testimonial-card.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/shake-testimonial-card.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "slide-subscribe",
+      "type": "registry:component",
+      "title": "Slide Subscribe",
+      "description": "Pick a billing period, then slide to start a trial.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/react",
+        "@hugeicons/core-free-icons",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/slide-subscribe.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/default/example/slide-subscribe-unlock.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/default/example/slide-subscribe-shimmer.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "当前无对应订阅滑块业务。",
+      "demo_url": "https://uselayouts.com/docs/components/slide-subscribe",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/slide-subscribe.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/slide-subscribe-shimmer.tsx",
+        "registry/default/example/slide-subscribe-unlock.tsx",
+        "registry/default/example/slide-subscribe.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "smooth-dropdown",
+      "type": "registry:component",
+      "title": "Smooth Dropdown",
+      "description": "A dropdown menu with premium layout transitions.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/smooth-dropdown.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "核心采用并适配",
+      "fit": "账户与记录行更多菜单；桌面锚定，手机改底部弹层，补齐菜单语义。",
+      "demo_url": "https://uselayouts.com/docs/components/smooth-dropdown",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/smooth-dropdown.tsx",
+      "resolved_source_files": [
+        "registry/default/example/smooth-dropdown.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "motion",
+        "react",
+        "react-use-measure"
+      ],
+      "undeclared_direct_packages": [
+        "react-use-measure"
+      ]
+    },
+    {
+      "name": "stack-scroll-reveal",
+      "type": "registry:component",
+      "title": "Stack Scroll Reveal",
+      "description": "Scroll-linked case-study cards that pin in the viewport and peel, scale, and fade as you move down the page.",
+      "dependencies": [
+        "clsx",
+        "lenis",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/stack-scroll-reveal.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "作品集滚动展示不适合工具界面。",
+      "demo_url": "https://uselayouts.com/docs/components/stack-scroll-reveal",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/stack-scroll-reveal.tsx",
+      "resolved_source_files": [
+        "registry/default/example/stack-scroll-reveal.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "lenis",
+        "motion",
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "stacked-list",
+      "type": "registry:component",
+      "title": "Stacked List",
+      "description": "An expandable list widget with a stacked layout and smooth morphing transitions.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "registryDependencies": [
+        "input",
+        "button"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/stacked-list.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "已引用资料和最近记录的收起摘要；完整命例列表不可藏进堆叠。",
+      "demo_url": "https://uselayouts.com/docs/components/stacked-list",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/stacked-list.tsx",
+      "resolved_source_files": [
+        "components/ui/button.tsx",
+        "components/ui/input.tsx",
+        "lib/utils.ts",
+        "registry/default/example/stacked-list.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@base-ui/react",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "class-variance-authority",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "@base-ui/react",
+        "class-variance-authority"
+      ]
+    },
+    {
+      "name": "stacked-outline-text",
+      "type": "registry:component",
+      "title": "Stacked Outline Text",
+      "description": "Heavy outlined type you can drag. Speed leaves a stacked white-on-black trail that springs back when you stop.",
+      "dependencies": [
+        "motion",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/stacked-outline-text.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "拖拽立体字无业务价值。",
+      "demo_url": "https://uselayouts.com/docs/components/stacked-outline-text",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/stacked-outline-text.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/stacked-outline-text.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "theme-toggle",
+      "type": "registry:component",
+      "title": "Theme Toggle",
+      "description": "A physical switch with a dotted grip. Click and the knob slides across a recessed track.",
+      "files": [
+        {
+          "path": "registry/default/example/theme-toggle.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "dependencies": [],
+      "decision": "核心采用并适配",
+      "fit": "借鉴开关反馈，用于真太阳时、参考资料等已有设置；不引入全站深色主题。",
+      "demo_url": "https://uselayouts.com/docs/components/theme-toggle",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/theme-toggle.tsx",
+      "resolved_source_files": [
+        "registry/default/example/theme-toggle.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "react"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "tactile-button",
+      "type": "registry:component",
+      "title": "Tactile Button",
+      "description": "A liquid-glass rocker that tilts into its well when you press it.",
+      "dependencies": [
+        "motion"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/tactile-button.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "低幅度按压用于主要按钮；去除重玻璃和3D翻转，避免叠加全局 active 缩放。",
+      "demo_url": "https://uselayouts.com/docs/components/tactile-button",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/tactile-button.tsx",
+      "resolved_source_files": [
+        "registry/default/example/tactile-button.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "framer-motion",
+        "react"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    },
+    {
+      "name": "vertical-tabs",
+      "type": "registry:component",
+      "title": "Vertical Tabs",
+      "description": "A vertical tab interaction with smooth content switching.",
+      "dependencies": [
+        "motion",
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/vertical-tabs.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "条件采用或仅借鉴模式",
+      "fit": "仅借鉴桌面设置分栏；禁用原示例自动切换、图片轮播。",
+      "demo_url": "https://uselayouts.com/docs/components/vertical-tabs",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/vertical-tabs.tsx",
+      "resolved_source_files": [
+        "lib/utils.ts",
+        "registry/default/example/vertical-tabs.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "@hugeicons/core-free-icons",
+        "@hugeicons/react",
+        "clsx",
+        "motion",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": []
+    },
+    {
+      "name": "wheel-carousel",
+      "type": "registry:component",
+      "title": "Wheel Carousel",
+      "description": "This component creates a smooth wheel-style carousel with photos and selectable items. It supports drag, scroll, keyboard controls, snapping, momentum, themes, image crossfades, and customizable layout and colors.",
+      "dependencies": [
+        "motion",
+        "lucide-react",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "files": [
+        {
+          "path": "registry/default/example/wheel-carousel.tsx",
+          "type": "registry:component"
+        }
+      ],
+      "decision": "本轮不采用",
+      "fit": "照片滚轮不能直接代替日期选择。",
+      "demo_url": "https://uselayouts.com/docs/components/wheel-carousel",
+      "source_url": "https://github.com/iurvish/uselayouts/blob/78bfa803aed67d424755b66bb3f30eeed42d7502/registry/default/example/wheel-carousel.tsx",
+      "resolved_source_files": [
+        "registry/default/example/wheel-carousel.tsx"
+      ],
+      "unresolved_local_imports": [],
+      "observed_package_imports": [
+        "clsx",
+        "framer-motion",
+        "lucide-react",
+        "react",
+        "tailwind-merge"
+      ],
+      "undeclared_direct_packages": [
+        "framer-motion"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "sha256": "159928ad2fabd3c9b2042f2b36d70ba2d6cd200e5b582a7c8a89ab1ad5eaa6e2",
+      "bytes": 1068
+    },
+    {
+      "path": "README.md",
+      "sha256": "04b7b63df6e40229f1f9eaef7d9f38bde2740ddbd09be30210b3e7a2ebc58c85",
+      "bytes": 2062
+    },
+    {
+      "path": "components/ui/badge.tsx",
+      "sha256": "c45c77ad3dce29aa569f1e21fd33cb2baaee74eac30c5d799606483490274212",
+      "bytes": 1903
+    },
+    {
+      "path": "components/ui/button.tsx",
+      "sha256": "69755ed1748863f1abcc93594285028b089f9db5d7123a1902bf6e40525d996b",
+      "bytes": 3349
+    },
+    {
+      "path": "components/ui/calendar.tsx",
+      "sha256": "ee4cf6f6c58e19d985c10ed6b6cc21a0f5e3e5ea4763ce2dda5e4f0ef321a06d",
+      "bytes": 8273
+    },
+    {
+      "path": "components/ui/card.tsx",
+      "sha256": "b9f01ab05d59caa598520458e03e64d18b744a0b63f58847400283e7dfc921ac",
+      "bytes": 2556
+    },
+    {
+      "path": "components/ui/field.tsx",
+      "sha256": "4afa63497bd887e9b2f329345a1c8823f9d119f6697800ba10e6c6bfe73c3c33",
+      "bytes": 5929
+    },
+    {
+      "path": "components/ui/input.tsx",
+      "sha256": "73712bb9c87d27527dea7ddcef0ea4fb11210cfbea215eae337eff720b8304b0",
+      "bytes": 1048
+    },
+    {
+      "path": "components/ui/label.tsx",
+      "sha256": "a5d0a6851e53b2c4b95862c21ffffb1562f4aea283ba7324bece353a86bce233",
+      "bytes": 518
+    },
+    {
+      "path": "components/ui/popover.tsx",
+      "sha256": "102766e4c30f65063e4242483717e212e36dbb7789586832773f354a863495e5",
+      "bytes": 2483
+    },
+    {
+      "path": "components/ui/select.tsx",
+      "sha256": "f4047915e2079bceb535e1d0220c6ea2cbb96fcea43785e06f0db4bc63eeec40",
+      "bytes": 6677
+    },
+    {
+      "path": "components/ui/separator.tsx",
+      "sha256": "68fe2eb705a1a196efa9f9bdee9f1b7402f6666bc57ee3c18256bbbba9db0e2a",
+      "bytes": 601
+    },
+    {
+      "path": "components/ui/textarea.tsx",
+      "sha256": "a8adae06e51d650b9dd48456112468737542cef0962e91903eb795557ec112dd",
+      "bytes": 850
+    },
+    {
+      "path": "hooks/use-measure.tsx",
+      "sha256": "276118d30f80801dbef1b51f9cb2f9f0dab38b8744ccd9ecd6082d5cf4108673",
+      "bytes": 651
+    },
+    {
+      "path": "hooks/use-mobile.ts",
+      "sha256": "464e778a9da49481e3c6dac4f92ff589e01349b33063a74c45435cfeed81e1c0",
+      "bytes": 584
+    },
+    {
+      "path": "hooks/use-outside-click.ts",
+      "sha256": "aeafac53d7029d3eca2b3fc6e4be670596a83dc9519c67cd72a304fce1c0c5d6",
+      "bytes": 666
+    },
+    {
+      "path": "lib/cn.ts",
+      "sha256": "d75a12510303cc09ddbbbf0a2694e95eb2fda8acb9f377f703b4981ffdd5b475",
+      "bytes": 48
+    },
+    {
+      "path": "lib/utils.ts",
+      "sha256": "7c8c3dfc0cdd370d44932828eb067ef771c8fe7996693221d5d4b90af6d54f2d",
+      "bytes": 166
+    },
+    {
+      "path": "package.json",
+      "sha256": "969111c05f052910ae19d5ef50649fe5a62b994c73fe306937ce9c3b4daab9ac",
+      "bytes": 3195
+    },
+    {
+      "path": "registry.json",
+      "sha256": "98a0e30d5bd7575854cd80863946ea6f3423b830c61edfeaaf53b32877157754",
+      "bytes": 33252
+    },
+    {
+      "path": "registry/default/example/3d-book.tsx",
+      "sha256": "61d8c26e35db8619711fa3659ee33680b6ad73aaafc7070a4ff7523c442c1979",
+      "bytes": 5680
+    },
+    {
+      "path": "registry/default/example/accessible-action.tsx",
+      "sha256": "95ede3945e8bb9361672cbf23e1d14c4b48c3ae7d2bb53cb0a8908e40818c10a",
+      "bytes": 7111
+    },
+    {
+      "path": "registry/default/example/accordionos.tsx",
+      "sha256": "a4c8b8aacbb1ac207065de708bb3191a9f1dc11c195893dc4a8de4878f633fc6",
+      "bytes": 25425
+    },
+    {
+      "path": "registry/default/example/analog-stick.tsx",
+      "sha256": "ee8d40649d50600ff6332b29303c68262d4df44be089f2c631ab150af031904d",
+      "bytes": 8376
+    },
+    {
+      "path": "registry/default/example/animated-collection.tsx",
+      "sha256": "7bff46bcb0a9c50379c9e2cc38a11706d06636a96140d58323d89a633983c062",
+      "bytes": 9329
+    },
+    {
+      "path": "registry/default/example/bento-card.tsx",
+      "sha256": "f54ac0ad544e35c3a5b2d1efd53ad0f60e5ef4b433e173a179d73532699ae459",
+      "bytes": 17552
+    },
+    {
+      "path": "registry/default/example/bottom-menu.tsx",
+      "sha256": "fa5f7834d0d12fa00bfda819fc64d5ce1bcaca5215e83ac3ce8622599711e1c1",
+      "bytes": 10083
+    },
+    {
+      "path": "registry/default/example/bucket.tsx",
+      "sha256": "303eb7a2606355de5e291f1cc2ef5f2cb0094e58049e0e00d8d13b266dbd53d5",
+      "bytes": 34616
+    },
+    {
+      "path": "registry/default/example/card-folder.tsx",
+      "sha256": "28ffce1c02be3b2d2c20f44a634a3329ace2775c6f7a25610f0e0a003435d90e",
+      "bytes": 7128
+    },
+    {
+      "path": "registry/default/example/client-card.tsx",
+      "sha256": "0638cf8d66b1338600b9cc4f896a9752615f6ac062924f05d8a76c8b1913cf17",
+      "bytes": 11348
+    },
+    {
+      "path": "registry/default/example/confidential-folder.tsx",
+      "sha256": "c408ef6129ad8298d299deb5523ee25287ad2a93831dd1a0c8035ed9b5b717c2",
+      "bytes": 17931
+    },
+    {
+      "path": "registry/default/example/corner-video.tsx",
+      "sha256": "68bece5f989e4b56667fb5f7a539bcf22f1524e0f6de22800b10321cd88f9100",
+      "bytes": 11421
+    },
+    {
+      "path": "registry/default/example/coverflow-drag.tsx",
+      "sha256": "dc9edbb29d8ef47be21e3e6f81294a8c3a8ce6d889bc773c396e964868e7ce9f",
+      "bytes": 4281
+    },
+    {
+      "path": "registry/default/example/create-menu.tsx",
+      "sha256": "3a2a50138d1be161a3945116d1d0aaf2e9b0ca3d3ef8b9eb1b25d8b7453a708d",
+      "bytes": 3341
+    },
+    {
+      "path": "registry/default/example/curve-drawer-curve.tsx",
+      "sha256": "cbf7f43197312345cf59857ae9e796b9d1e15622dc79854c06a824b97bf7b665",
+      "bytes": 2769
+    },
+    {
+      "path": "registry/default/example/curve-drawer-primitives.tsx",
+      "sha256": "f15b84778a8d12afa5544f4987caf6812668d493a91e2dcdbe4b63bf0c2bcfc6",
+      "bytes": 8164
+    },
+    {
+      "path": "registry/default/example/curve-drawer.tsx",
+      "sha256": "91527d8d5992e82bb0d115111f043eeabd26a08ee26c63d95d02912419ac8535",
+      "bytes": 4148
+    },
+    {
+      "path": "registry/default/example/day-picker.tsx",
+      "sha256": "0bc97d4eb639f0ff9cba249b517d88066b5424bf3cd867ced18bacd781d4849b",
+      "bytes": 8170
+    },
+    {
+      "path": "registry/default/example/delete-button.tsx",
+      "sha256": "693ce3f55f442f5f9827c224d5fbbd63ab639863cf566428f2d1d479a45029c9",
+      "bytes": 7684
+    },
+    {
+      "path": "registry/default/example/discover-button.tsx",
+      "sha256": "11466645d3b760693007f70fd0908ffe304ad500f7370f9b4b948c92d77aefe9",
+      "bytes": 5969
+    },
+    {
+      "path": "registry/default/example/discrete-tabs.tsx",
+      "sha256": "96d70de00715864cd5b8aeb0838baa4fb78a563db01eaf2a773807c54d609499",
+      "bytes": 6772
+    },
+    {
+      "path": "registry/default/example/drawer-buttons-drawer.tsx",
+      "sha256": "e44b51f963bf909ac469be8b5e043718bb26affc4d33dabdc13dd00cb3ae0f73",
+      "bytes": 3573
+    },
+    {
+      "path": "registry/default/example/drawer-buttons-field.tsx",
+      "sha256": "29dbcd485577624b5f43af23a3c20f8681c2c017a0712e5fc0ed7d919c77e5c0",
+      "bytes": 18698
+    },
+    {
+      "path": "registry/default/example/drawer-buttons.tsx",
+      "sha256": "57ce6f7d5d622ac13ddd1f6cb1cc65e5c59cf248d6e80bd6f2d7e61918d7554c",
+      "bytes": 8197
+    },
+    {
+      "path": "registry/default/example/dynamic-grid-gallery.tsx",
+      "sha256": "2ae56ff2a4a03ab03e4ddf51becb1e30ec4c2585642d59320545c1b53d82b277",
+      "bytes": 5051
+    },
+    {
+      "path": "registry/default/example/dynamic-toolbar.tsx",
+      "sha256": "6ea77344eed6ae2e5a35f1387b984b764da5e6a97274756277cf3e3533b3e449",
+      "bytes": 5267
+    },
+    {
+      "path": "registry/default/example/editorial-deck.tsx",
+      "sha256": "53a890b146a69eb8a01053b9fab0b5d6f62042817d8f9b264a87615876c16e40",
+      "bytes": 9421
+    },
+    {
+      "path": "registry/default/example/empty-testimonial.tsx",
+      "sha256": "cd1c2521294054b177c635d60d22566f93fafa6b4d50c4aadf6e1ef0583cb229",
+      "bytes": 7974
+    },
+    {
+      "path": "registry/default/example/expandable-gallery.tsx",
+      "sha256": "ebfc4bfa254d8941f0e4287c6620aa3e81c2f363875da61812b3ef4072812df8",
+      "bytes": 7953
+    },
+    {
+      "path": "registry/default/example/feature-carousel.tsx",
+      "sha256": "413132265b58186da1e7aad33d916679321bbfcbf17823573de0cbf87d1dd693",
+      "bytes": 11646
+    },
+    {
+      "path": "registry/default/example/filter-interaction.tsx",
+      "sha256": "b9d88e48c6b41b094a8dfc86018195b98d9e706bb204c68d2001eb1a08f9309c",
+      "bytes": 5281
+    },
+    {
+      "path": "registry/default/example/fluid-expanding-grid.tsx",
+      "sha256": "d99f5e553c3570dd0ec2f9c31982ddad1da830c820800979d5c01ec58a9f939a",
+      "bytes": 6826
+    },
+    {
+      "path": "registry/default/example/focus-testimonials.tsx",
+      "sha256": "66c6f872a7649b88724d6f2a34967df7a3f829539df1c9a6888d2db38c628b10",
+      "bytes": 12429
+    },
+    {
+      "path": "registry/default/example/folder-interaction.tsx",
+      "sha256": "8dafcc1773212bc3d35053eb81f39db042d0b491bd37848919d39577414784f1",
+      "bytes": 8057
+    },
+    {
+      "path": "registry/default/example/get-in-touch-button.tsx",
+      "sha256": "709dd4f91c2e808aafdb90babec9a470f53455d27a2c56c1f1cecae02eafb3de",
+      "bytes": 2061
+    },
+    {
+      "path": "registry/default/example/get-in-touch.tsx",
+      "sha256": "b97e0dcc1fc3b6c2596f02980ed262f4cfc5b78bf30405cd5e9b757aea144496",
+      "bytes": 7942
+    },
+    {
+      "path": "registry/default/example/gooey-navbar.tsx",
+      "sha256": "e2f8ecdccf1bae817dd488c949861db5fddb78d4768e52202a421708871a1f2d",
+      "bytes": 13396
+    },
+    {
+      "path": "registry/default/example/holographic-referral-card.tsx",
+      "sha256": "6cbb1ac2be4bff38c7bc2f17f4d43826e1fcbd68a20afe30e72fb5123cc8261a",
+      "bytes": 8447
+    },
+    {
+      "path": "registry/default/example/infinite-grid.tsx",
+      "sha256": "0133709519b4e8fd313a59d1c1f62a825b25391d4e934e98fefa261e9c4ca1ea",
+      "bytes": 15842
+    },
+    {
+      "path": "registry/default/example/inline-edit.tsx",
+      "sha256": "86f419edd38e714f316656e8a5139b2bb261d00534bad1e8aff3bd6d1f22150f",
+      "bytes": 2990
+    },
+    {
+      "path": "registry/default/example/liquid-index-canvas.tsx",
+      "sha256": "3484366bb14cca76904b549305f8119a83dcce1abe21053d14376b821ede2fd5",
+      "bytes": 13125
+    },
+    {
+      "path": "registry/default/example/liquid-index.tsx",
+      "sha256": "5fe699e88ac2fafda36254cde97da9d9e2d71bbba5d2895b665870d7abc7cc34",
+      "bytes": 9701
+    },
+    {
+      "path": "registry/default/example/magnified-bento.tsx",
+      "sha256": "bc53ea6f9cb4d7728beace61f2462eefb9dd5e0febd01846028c2b89b6ab64f1",
+      "bytes": 9236
+    },
+    {
+      "path": "registry/default/example/morphing-input.tsx",
+      "sha256": "07b3d8d0151323905a0ff61eed096af3d411690fd904eb3d336d52ae75a13547",
+      "bytes": 4408
+    },
+    {
+      "path": "registry/default/example/multi-step-form.tsx",
+      "sha256": "989df0cee0c94dd3b82754cd11179f64ebda75d6288582f73a6fea45be18e9da",
+      "bytes": 15371
+    },
+    {
+      "path": "registry/default/example/overlapping-slider.tsx",
+      "sha256": "b5e17c87d36a3293e595d99b800f0ea8e3a6a62adceb4f999f23d14af87ec7ae",
+      "bytes": 13531
+    },
+    {
+      "path": "registry/default/example/paper-shred-button.tsx",
+      "sha256": "017d9c6b54c94d3ca412af5cdf456e53dcc20c61f76a543174f324fea36ef359",
+      "bytes": 10503
+    },
+    {
+      "path": "registry/default/example/perspective-text-scroll.tsx",
+      "sha256": "d1028a3f5cd12db1a12e87c31fb2dab0c502f4330e7d7ec9f1df5054cf78750a",
+      "bytes": 5599
+    },
+    {
+      "path": "registry/default/example/photo-albums.tsx",
+      "sha256": "fc775c34905e1278b40104189fa76c14c416eeb3a555c75682bf98e9f66805a5",
+      "bytes": 8685
+    },
+    {
+      "path": "registry/default/example/polaroid-drag.tsx",
+      "sha256": "ebcb55fd8155b5e1349420dac87036b9ab7244d0d3e0b5a65290314630ae40b2",
+      "bytes": 9150
+    },
+    {
+      "path": "registry/default/example/polaroid-stack.tsx",
+      "sha256": "80a9670d63f2692fd5ea5b24b0eabe2d2a85cd0732b6509ba1b69f5ed9284bef",
+      "bytes": 3276
+    },
+    {
+      "path": "registry/default/example/pop-tilt-cards.tsx",
+      "sha256": "c0d79c5564386f9e1ed5c3da2d1e71e411a42c7569b717a9ac3ddaf154659ca7",
+      "bytes": 6327
+    },
+    {
+      "path": "registry/default/example/pricing-card.tsx",
+      "sha256": "53d10981410fe997337ba619510f63536f5932cf0c8ec7ee76e0014f466fa8bb",
+      "bytes": 11258
+    },
+    {
+      "path": "registry/default/example/prompt-box-icons.tsx",
+      "sha256": "d938790185aaf73cf1e184c9a4d60852e3c797127f3b406fa11e3294b6514680",
+      "bytes": 5082
+    },
+    {
+      "path": "registry/default/example/prompt-box.tsx",
+      "sha256": "f6dc206553fd478973d17f179e37c45ab9e89874f6d5781f0b0c5c097bafdb04",
+      "bytes": 65340
+    },
+    {
+      "path": "registry/default/example/rolling-card-stack.tsx",
+      "sha256": "049a66e60ca4444e08d1c844fbf4fc4428f1bd2db2d49443a27fb2b347cef2b5",
+      "bytes": 20363
+    },
+    {
+      "path": "registry/default/example/save-button.tsx",
+      "sha256": "fed584ed572e8f91b31b353f53a32d0a156665f85237d53788e549d8d4829f34",
+      "bytes": 5337
+    },
+    {
+      "path": "registry/default/example/scan-document.tsx",
+      "sha256": "72032ebc0faa555da5b5c73aabde7569e2d7aa290363170593a9f9b11f433226",
+      "bytes": 9817
+    },
+    {
+      "path": "registry/default/example/scroll-split-cards.tsx",
+      "sha256": "703f9aa34a21b5d92bf3dd84bf3ceac6bbaf517a195b8e9641b39749b92fabca",
+      "bytes": 6013
+    },
+    {
+      "path": "registry/default/example/scroll-stack-deck.tsx",
+      "sha256": "3fcddae847e6eeb4b11bde9a1ee08c1e1f6f6e70fbc7110846d675d7ec6baab2",
+      "bytes": 11536
+    },
+    {
+      "path": "registry/default/example/set-timer.tsx",
+      "sha256": "a031fc3b7ef5428b1e75a160aa23077306fc5d5310927a59541c3bb414edf266",
+      "bytes": 16742
+    },
+    {
+      "path": "registry/default/example/shake-testimonial-card.tsx",
+      "sha256": "1eefe5617860cd50cb98ccf0fa1f101fd27b4429653d6773cf73b971f920c84e",
+      "bytes": 6513
+    },
+    {
+      "path": "registry/default/example/slide-subscribe-shimmer.tsx",
+      "sha256": "34994b36bfd2ad4455ecd5972f393fac734ce458cb6db50a79b9a25cc6551d3f",
+      "bytes": 1315
+    },
+    {
+      "path": "registry/default/example/slide-subscribe-unlock.tsx",
+      "sha256": "112077141f6aa56cf162582057ee627ec21975d0eabf36d27adb9cbce7541352",
+      "bytes": 5066
+    },
+    {
+      "path": "registry/default/example/slide-subscribe.tsx",
+      "sha256": "c93d39a336cba6708b9e6ed53d2c44595e69227509b1660969ebc5b6f7de7c78",
+      "bytes": 10640
+    },
+    {
+      "path": "registry/default/example/smooth-dropdown.tsx",
+      "sha256": "c8fe6e1afd8a90808bb7940e59fbcaad1631e5cb1ab56fa8723d34110b89d932",
+      "bytes": 7520
+    },
+    {
+      "path": "registry/default/example/stack-scroll-reveal.tsx",
+      "sha256": "07e950263522ea6f70240ec1d276341e5222d27c8c678ccf0f5aac76c614198e",
+      "bytes": 6848
+    },
+    {
+      "path": "registry/default/example/stacked-list.tsx",
+      "sha256": "bc8bcbed7513420074504aaa488d84f283b5709eb68488e5dc870af09bbf92e9",
+      "bytes": 13195
+    },
+    {
+      "path": "registry/default/example/stacked-outline-text.tsx",
+      "sha256": "0dd89df6b111464355254bd7e7910613d22d8ff724a47141e3d0bc39e2c6cd1e",
+      "bytes": 9065
+    },
+    {
+      "path": "registry/default/example/tactile-button.tsx",
+      "sha256": "e3e117c1507f7cef6072e878f6d2186827a651a321e036080cddae6353d205d3",
+      "bytes": 8713
+    },
+    {
+      "path": "registry/default/example/theme-toggle.tsx",
+      "sha256": "1e39d75b00a29da25189e0cb67cfc7eebd0c4c19d1694a625a9ef80f5a96744a",
+      "bytes": 3323
+    },
+    {
+      "path": "registry/default/example/vertical-tabs.tsx",
+      "sha256": "a101520f1ee0651be4669334caf3236d85ba1a68870dec99ccfe86625bf8c344",
+      "bytes": 8741
+    },
+    {
+      "path": "registry/default/example/wheel-carousel.tsx",
+      "sha256": "8e3828c375fce001915b153fdec95996db881f5063c07deb9018926dc96e6ca6",
+      "bytes": 25724
+    }
+  ]
+}

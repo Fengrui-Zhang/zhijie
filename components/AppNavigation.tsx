@@ -1,3 +1,5 @@
+
+import { SmoothCollapse, SelectionGroup, SelectionHighlight } from './InteractionMotion';
 import React from 'react';
 import { ModelType } from '../types';
 import {
@@ -135,14 +137,14 @@ export function AppNavigation({
           <button type="button" onClick={onToggleProfessional} aria-expanded={professionalOpen} className="flex min-h-8 w-full items-center justify-between rounded-lg px-2 text-[11px] font-bold tracking-[0.16em] text-stone-400 hover:bg-white/40 hover:text-stone-600">
             <span>预测占卜</span><span className={`text-base font-normal transition-transform ${professionalOpen ? 'rotate-45' : ''}`}>+</span>
           </button>
-          {professionalOpen && (
-            <div className="materialize-in space-y-1">
+          <SmoothCollapse open={professionalOpen}>
+            <div className="space-y-1">
               {PROFESSIONAL_TOOLS.map(([type, label]) => {
                 const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
                 return <NavButton key={type} icon={NAV_ICONS[type]} label={label} selected={selected} onClick={() => selectModel(type)} />;
               })}
             </div>
-          )}
+          </SmoothCollapse>
         </div>
 
         <NavGroup label="择日工具">
@@ -213,19 +215,19 @@ export function MobileBottomNavigation({ items, moreActive, onMore }: MobileBott
   const allItems = [...items, { id: 'more-bottom', label: '更多', active: moreActive, onClick: onMore }];
   return (
     <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-[22px] border border-white/80 bg-white/88 p-1.5 shadow-[0_18px_50px_rgba(28,25,23,0.16)] backdrop-blur-2xl xl:hidden" aria-label="移动端主导航">
-      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${allItems.length}, minmax(0, 1fr))` }}>
+      <SelectionGroup><div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${allItems.length}, minmax(0, 1fr))` }}>
         {allItems.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={item.onClick}
             aria-current={item.active ? 'page' : undefined}
-            className={`rounded-[16px] px-1.5 py-2 text-[11px] font-bold ${item.active ? 'bg-stone-900 text-amber-100 shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'}`}
+            className={`interaction-choice rounded-[16px] px-1.5 py-2 text-[11px] font-bold ${item.active ? 'text-amber-100' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'}`}
           >
-            <span className="block">{item.label}</span>
+            <SelectionHighlight active={item.active} className="bg-stone-900 shadow-sm" /><span className="interaction-choice-label block">{item.label}</span>
           </button>
         ))}
-      </div>
+      </div></SelectionGroup>
     </nav>
   );
 }

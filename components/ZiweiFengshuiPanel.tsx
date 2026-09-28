@@ -1,5 +1,7 @@
 'use client';
 
+import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import type { ZiweiResponse } from '../types';
@@ -406,19 +408,19 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
         </div>
 
         <div className="mt-4 space-y-2.5">
-          <div className="flex w-fit items-center rounded-2xl border border-white/75 bg-white/62 p-1 shadow-sm" aria-label="紫微风水时间层">
+          <SelectionGroup><div className="flex w-fit items-center rounded-2xl border border-white/75 bg-white/62 p-1 shadow-sm" aria-label="紫微风水时间层">
             {ZIWEI_FENGSHUI_LAYER_OPTIONS.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 onClick={() => setLayer(option.key)}
                 aria-pressed={layer === option.key}
-                className={`min-w-[68px] rounded-xl px-3 py-2 text-xs font-bold transition-colors ${layer === option.key ? 'bg-stone-900 text-amber-200 shadow-sm' : 'text-stone-500 hover:bg-white hover:text-stone-800'}`}
+                className={`interaction-choice min-w-[68px] rounded-xl px-3 py-2 text-xs font-bold transition-colors ${layer === option.key ? 'text-amber-200' : 'text-stone-500 hover:bg-white hover:text-stone-800'}`}
               >
-                {option.label}
+                <SelectionHighlight active={layer === option.key} className="bg-stone-900 shadow-sm" /><span className="interaction-choice-label">{option.label}</span>
               </button>
             ))}
-          </div>
+          </div></SelectionGroup>
 
           {layer === 'decadal' ? (
             <div className="glass-scrollbar flex max-w-full gap-2 overflow-x-auto pb-1">

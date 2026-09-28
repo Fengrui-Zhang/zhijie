@@ -119,17 +119,21 @@ body::after {
 
 .app-shell button:not(:disabled),
 .app-shell [role="button"],
-.app-shell a {
+.app-shell a,
+[data-dialog-root] button:not(:disabled),
+.account-dropdown button {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform, filter;
   transition-duration: 180ms;
-  transition-timing-function: var(--spring-ease);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .app-shell button:not(:disabled):active,
 .app-shell [role="button"]:active,
-.app-shell a:active {
-  transform: scale(0.975);
-  transition-duration: 90ms;
+.app-shell a:active,
+[data-dialog-root] button:not(:disabled):active,
+.account-dropdown button:active {
+  transform: scale(0.98);
+  transition-duration: 110ms;
 }
 
 .app-shell :focus-visible {
@@ -144,6 +148,23 @@ body::after {
   cursor: not-allowed;
   opacity: 0.55;
 }
+
+.app-shell button[aria-busy="true"],
+[data-dialog-root] button[aria-busy="true"] {
+  opacity: 0.95;
+  cursor: wait;
+}
+
+.interaction-choice { position: relative; }
+.interaction-selection { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.interaction-choice-label { position: relative; z-index: 1; }
+.interaction-collapse { overflow: hidden; flex-shrink: 0; }
+.interaction-composer { transition: border-color 180ms ease, box-shadow 180ms ease; }
+.interaction-composer:focus-within { border-color: rgba(154, 102, 30, 0.3); box-shadow: 0 0 0 3px rgba(154, 102, 30, 0.06); }
+.interaction-composer textarea { transition: height 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+html[data-input-mode="keyboard"] .app-shell button:active,
+html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: none; }
 
 .glass-panel {
   background: var(--glass-bg);
@@ -271,12 +292,12 @@ body::after {
 }
 
 .materialize-in {
-  animation: materialize-in 320ms var(--spring-ease) both;
+  animation: materialize-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: var(--material-origin, 50% 0%);
 }
 
 .mobile-sheet-in {
-  animation: mobile-sheet-in 360ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: mobile-sheet-in 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .mobile-scrim-in {
@@ -287,7 +308,6 @@ body::after {
   from {
     opacity: 0;
     transform: translateY(-6px) scale(0.985);
-    filter: blur(5px);
   }
   to {
     opacity: 1;
@@ -300,7 +320,6 @@ body::after {
   from {
     opacity: 0;
     transform: translateY(28px) scale(0.985);
-    filter: blur(4px);
   }
   to {
     opacity: 1;

@@ -118,6 +118,7 @@ import AdminPanel from '@/components/AdminPanel';
 import AccountSettingsModal from '@/components/AccountSettingsModal';
 import BaziLayoutSettings from '@/components/BaziLayoutSettings';
 import UserMenuPopup from './components/UserMenuPopup';
+import { SelectionGroup, SelectionHighlight } from './components/InteractionMotion';
 import ChangePasswordModal from './components/ChangePasswordModal';
 
 // Types
@@ -1801,6 +1802,7 @@ const App: React.FC<AppProps> = ({
   const caseDetailRef = useRef<HTMLDivElement>(null);
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const supportsKnowledge =
     modelType === ModelType.QIMEN ||
@@ -8586,7 +8588,7 @@ const App: React.FC<AppProps> = ({
 
       <div className="grid min-h-[520px] min-w-0 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="min-w-0 border-b border-stone-100 bg-white/35 p-2 md:p-3 lg:border-b-0 lg:border-r">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:block lg:space-y-1">
+          <SelectionGroup><div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:block lg:space-y-1">
             {SETTINGS_WORKSPACE_TABS.map((tab) => {
               const selected = settingsWorkspaceTab === tab.id;
               return (
@@ -8594,18 +8596,20 @@ const App: React.FC<AppProps> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => handleSettingsWorkspaceTabChange(tab.id)}
-                  className={`flex min-w-0 items-center gap-2 rounded-2xl px-2.5 py-2.5 text-left transition md:gap-3 md:px-3 md:py-3 lg:w-full ${
+                  aria-pressed={selected}
+                  className={`interaction-choice flex min-w-0 items-center gap-2 rounded-2xl px-2.5 py-2.5 text-left transition md:gap-3 md:px-3 md:py-3 lg:w-full ${
                     selected
-                      ? 'bg-stone-200/70 text-stone-900 shadow-sm'
+                      ? 'text-stone-900'
                       : 'text-stone-500 hover:bg-white/70 hover:text-stone-800'
                   }`}
                 >
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
+                  <SelectionHighlight active={selected} className="bg-stone-200/70 shadow-sm" />
+                  <span className={`interaction-choice-label flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
                     selected ? 'bg-white/75 text-stone-800' : 'bg-white/45 text-stone-400'
                   }`}>
                     {tab.icon}
                   </span>
-                  <span className="min-w-0">
+                  <span className="interaction-choice-label min-w-0">
                     <span className="block text-sm font-bold">{tab.label}</span>
                     <span className={`block truncate text-[11px] ${selected ? 'text-stone-500' : 'text-stone-400'}`}>
                       {tab.description}
@@ -8614,7 +8618,7 @@ const App: React.FC<AppProps> = ({
                 </button>
               );
             })}
-          </div>
+          </div></SelectionGroup>
         </aside>
 
         <section className="min-w-0 overflow-x-hidden p-3 md:p-7">
@@ -9346,7 +9350,7 @@ const App: React.FC<AppProps> = ({
                   professionalBusy ? 'opacity-90 cursor-wait' : !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                 }`}
               >
-                {professionalBusy ? <AiBusyText active state="working">联合分析启动中…</AiBusyText> : '开始联合分析'}
+                <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '联合分析启动中…' : '开始联合分析'}</AiBusyText>
               </button>
             </div>
           )}
@@ -9411,7 +9415,7 @@ const App: React.FC<AppProps> = ({
                   professionalBusy ? 'opacity-90 cursor-wait' : !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                 }`}
               >
-                {professionalBusy ? <AiBusyText active state="working">双盘排盘中…</AiBusyText> : '排盘并开始联合分析'}
+                <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '双盘排盘中…' : '排盘并开始联合分析'}</AiBusyText>
               </button>
             </div>
           )}
@@ -9573,7 +9577,7 @@ const App: React.FC<AppProps> = ({
               professionalBusy ? 'opacity-90 cursor-wait' : 'hover:brightness-105'
             }`}
           >
-            {professionalBusy ? <AiBusyText active state="working">合盘准备中…</AiBusyText> : '开始八字合盘分析'}
+            <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '合盘准备中…' : '开始八字合盘分析'}</AiBusyText>
           </button>
         </div>
       )}
@@ -9613,7 +9617,11 @@ const App: React.FC<AppProps> = ({
             {isLoggedIn ? (
               <button
                 type="button"
-                onClick={() => setShowUserMenu(true)}
+                ref={userMenuAnchorRef}
+                aria-haspopup="dialog"
+                aria-expanded={showUserMenu}
+                aria-controls={showUserMenu ? "account-dropdown" : undefined}
+                onClick={() => setShowUserMenu((open) => !open)}
                 className="min-h-9 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-stone-200 hover:border-white/25 hover:bg-white/10 hover:text-white"
               >
                 {authSession?.user?.name || '用户'}{typeof userQuota === 'number' ? ` · ${userQuota}点` : ''}
@@ -9631,8 +9639,10 @@ const App: React.FC<AppProps> = ({
         </div>
       </header>
 
-      {showUserMenu && isLoggedIn && (
+      {isLoggedIn && (
         <UserMenuPopup
+          open={showUserMenu}
+          anchorRef={userMenuAnchorRef}
           email={authSession?.user?.email}
           name={authSession?.user?.name}
           quota={userQuota}
@@ -11021,7 +11031,7 @@ const App: React.FC<AppProps> = ({
                <div className="glass-panel-soft p-4 border-t border-white/50 flex flex-wrap gap-2">
                  <input
                    type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)}
-                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!isTyping && !isKlineRunning) handleSendMessage(); } }}
                    placeholder={isKlineRunning ? "K线运行中，暂不可发送" : (isLoggedIn && userQuota !== null && userQuota <= 0) ? "额度已用完" : (!isLoggedIn && !guestModeEnabled) ? "需要登录后才能使用" : (!isLoggedIn && guestFollowUpCount >= 1) ? "访客追问次数已用完，请登录" : "追问..."} disabled={isTyping || isKlineRunning || (isLoggedIn && userQuota !== null && userQuota <= 0)}
                    className="glass-input flex-1 rounded-2xl px-4 py-2"
                  />
@@ -11428,7 +11438,7 @@ const App: React.FC<AppProps> = ({
                             professionalBusy ? 'opacity-90 cursor-wait' : !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                           }`}
                         >
-                          {professionalBusy ? <AiBusyText active state="working">联合分析启动中…</AiBusyText> : '开始联合分析'}
+                          <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '联合分析启动中…' : '开始联合分析'}</AiBusyText>
                         </button>
                       </div>
                     </div>
@@ -11494,7 +11504,7 @@ const App: React.FC<AppProps> = ({
                           professionalBusy ? 'opacity-90 cursor-wait' : !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                         }`}
                       >
-                        {professionalBusy ? <AiBusyText active state="working">双盘排盘中…</AiBusyText> : '排盘并开始联合分析'}
+                        <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '双盘排盘中…' : '排盘并开始联合分析'}</AiBusyText>
                       </button>
                     </div>
                   )}
@@ -11657,7 +11667,7 @@ const App: React.FC<AppProps> = ({
                         professionalBusy ? 'opacity-90 cursor-wait' : 'hover:brightness-105'
                       }`}
                     >
-                      {professionalBusy ? <AiBusyText active state="working">合盘准备中…</AiBusyText> : '开始八字合盘分析'}
+                      <AiBusyText active={professionalBusy} state="working">{professionalBusy ? '合盘准备中…' : '开始八字合盘分析'}</AiBusyText>
                     </button>
                   </div>
                 </div>

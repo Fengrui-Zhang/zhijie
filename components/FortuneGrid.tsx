@@ -14,6 +14,7 @@ import {
 import type { GenericTaibuResponse } from '../types';
 import DialogPortal, { DialogBody } from './DialogPortal';
 import AiBusyText from './AiBusyText';
+import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
 
 type Props = {
   data: GenericTaibuResponse;
@@ -805,7 +806,7 @@ const InterpretationModeControl = ({
   onModeChange: (mode: InterpretationMode) => void;
   activeClass?: string;
 }) => (
-  <div className="flex flex-wrap gap-1 rounded-2xl bg-stone-100 p-1">
+  <SelectionGroup><div className="flex flex-wrap gap-1 rounded-2xl bg-stone-100 p-1">
     {(Object.keys(MODE_LABELS) as InterpretationMode[]).map((item) => {
       const active = mode === item;
       return (
@@ -814,15 +815,16 @@ const InterpretationModeControl = ({
           type="button"
           onClick={() => onModeChange(item)}
           title={MODE_CONFIG[item].description}
-          className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition md:px-3 ${
-            active ? activeClass : 'text-stone-500 hover:bg-white hover:text-stone-800'
+          aria-pressed={active}
+          className={`interaction-choice flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition md:px-3 ${
+            active ? 'text-white' : 'text-stone-500 hover:bg-white hover:text-stone-800'
           }`}
         >
-          <span>{MODE_LABELS[item]}</span>
+          <SelectionHighlight active={active} className={activeClass} /><span className="interaction-choice-label">{MODE_LABELS[item]}</span>
         </button>
       );
     })}
-  </div>
+  </div></SelectionGroup>
 );
 
 const TrendTooltip = ({ active, payload, label }: any) => {

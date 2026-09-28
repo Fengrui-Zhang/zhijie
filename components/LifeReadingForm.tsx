@@ -1,3 +1,5 @@
+
+import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
 import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
 import { buildBirthPlaceText, findPlaceCoord } from '../utils/locations';
@@ -98,13 +100,14 @@ const ToggleButton = ({
   <button
     type="button"
     onClick={onClick}
-    className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+    aria-pressed={active}
+    className={`interaction-choice rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
       active
-        ? 'glass-panel-dark border-transparent text-amber-200 shadow-[0_16px_34px_rgba(28,25,23,0.18)]'
+        ? 'border-transparent text-amber-200'
         : 'glass-chip border-white/60 text-stone-700 hover:bg-white/75 hover:text-stone-900'
     }`}
   >
-    {children}
+    <SelectionHighlight active={active} className="glass-panel-dark border-transparent shadow-[0_16px_34px_rgba(28,25,23,0.18)]" /><span className="interaction-choice-label">{children}</span>
   </button>
 );
 
@@ -183,18 +186,18 @@ export default function LifeReadingForm({
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-semibold text-stone-600">性别</label>
-            <div className="grid grid-cols-2 gap-2">
+            <SelectionGroup><div className="grid grid-cols-2 gap-2">
               <ToggleButton active={gender === 0} onClick={() => setGender(0)}>男</ToggleButton>
               <ToggleButton active={gender === 1} onClick={() => setGender(1)}>女</ToggleButton>
-            </div>
+            </div></SelectionGroup>
           </div>
           <div>
             <label className="mb-2 block text-sm font-semibold text-stone-600">历法</label>
-            <div className="grid grid-cols-3 gap-2">
+            <SelectionGroup><div className="grid grid-cols-3 gap-2">
               <ToggleButton active={calendarType === 'solar'} onClick={() => setCalendarType('solar')}>公历</ToggleButton>
               <ToggleButton active={calendarType === 'lunar'} onClick={() => setCalendarType('lunar')}>农历</ToggleButton>
               <ToggleButton active={calendarType === 'pillars'} onClick={() => setCalendarType('pillars')}>四柱</ToggleButton>
-            </div>
+            </div></SelectionGroup>
           </div>
         </div>
 
