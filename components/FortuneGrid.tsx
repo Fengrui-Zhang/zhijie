@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import type { GenericTaibuResponse } from '../types';
 import DialogPortal, { DialogBody } from './DialogPortal';
+import AiBusyText from './AiBusyText';
 
 type Props = {
   data: GenericTaibuResponse;
@@ -403,9 +404,10 @@ const AiCalibrationButton = ({ aiCalibration }: Pick<Props, 'aiCalibration'>) =>
         aiCalibration.enabled
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
           : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
-      } disabled:cursor-not-allowed disabled:opacity-50`}
+      } disabled:cursor-not-allowed ${aiCalibration.loading ? 'disabled:opacity-90' : 'disabled:opacity-50'}`}
+      aria-busy={Boolean(aiCalibration.loading)}
     >
-      {label}
+      <AiBusyText active={Boolean(aiCalibration.loading)} state="solving" theme="light">{label}</AiBusyText>
     </button>
   );
 };

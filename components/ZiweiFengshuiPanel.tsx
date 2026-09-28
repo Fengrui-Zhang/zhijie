@@ -393,9 +393,15 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
             type="button"
             onClick={() => void generate(Boolean(result))}
             disabled={!caseId || state === 'loading'}
-            className="glass-panel-dark rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-200 disabled:opacity-45"
+            aria-busy={state === 'loading'}
+            className={`glass-panel-dark inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold text-amber-200 ${state === 'loading' ? 'cursor-wait opacity-95' : 'disabled:opacity-45'}`}
           >
-            {state === 'loading' ? '分析中…' : result ? '重新生成 · 1点' : `生成${layer === 'natal' ? '本命' : layer === 'decadal' ? '此大运' : '此流年'} · 1点`}
+            {state === 'loading' ? (
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center" aria-hidden="true">
+                {showOrb ? <ThinkingOrb state="solving" size={20} theme="dark" /> : null}
+              </span>
+            ) : null}
+            <span>{state === 'loading' ? '分析中…' : result ? '重新生成 · 1点' : `生成${layer === 'natal' ? '本命' : layer === 'decadal' ? '此大运' : '此流年'} · 1点`}</span>
           </button>
         </div>
 
@@ -542,10 +548,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
               <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成“{periodLabel}”的物象预测与催旺方案。一次调用将返回完整十二宫，消耗 1 点。</div>
             ) : null}
             {state === 'loading' ? (
-              <div role="status" className="flex items-center justify-center gap-2 border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">
-                {showOrb ? <ThinkingOrb state="solving" size={20} theme="light" aria-hidden="true" /> : null}
-                <span>正在推演“{periodLabel}”的十二方位物象…</span>
-              </div>
+              <div role="status" className="border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">正在推演“{periodLabel}”的十二方位物象…</div>
             ) : null}
           </div>
 

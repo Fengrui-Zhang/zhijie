@@ -153,6 +153,7 @@ import { useDialogFocus } from './hooks/useDialogFocus';
 import { assertCompleteKlineResult, KLINE_REQUEST_OPTIONS } from './lib/kline-request';
 import HomeWorkspace from './components/HomeWorkspace';
 import AgentChatWorkspace from './components/agent/AgentChatWorkspace';
+import AiBusyText from './components/AiBusyText';
 import { useAgentChat, type AgentToolCard, type AgentTurnUsage } from './components/agent/useAgentChat';
 
 const FortuneGrid = dynamic(() => import('./components/FortuneGrid'), {
@@ -7849,13 +7850,18 @@ const App: React.FC<AppProps> = ({
                   type="button"
                   onClick={() => void handleRegenerateCaseInitialAnalysis()}
                   disabled={initialAnalysisBusy || loading || isTyping}
+                  aria-busy={initialAnalysisBusy}
                   className={`rounded-full px-3 py-1.5 text-xs transition ${
-                    initialAnalysisBusy || loading || isTyping
+                    initialAnalysisBusy
+                      ? 'glass-panel-dark text-amber-200 cursor-wait opacity-95'
+                      : loading || isTyping
                       ? 'glass-chip text-stone-300 cursor-not-allowed'
                       : 'glass-panel-dark text-amber-200 hover:brightness-105'
                   }`}
                 >
-                  生成初始化分析 · 1点
+                  <AiBusyText active={initialAnalysisBusy} state="composing">
+                    {initialAnalysisBusy ? '生成中…' : '生成初始化分析 · 1点'}
+                  </AiBusyText>
                 </button>
               )}
             </div>
@@ -7894,9 +7900,12 @@ const App: React.FC<AppProps> = ({
               type="button"
               onClick={handleStartCaseAnalysis}
               disabled={loading || isTyping}
+              aria-busy={loading || isTyping}
               className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
             >
-              {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
+              {loading || isTyping ? (
+                <AiBusyText active state="solving">分析中…</AiBusyText>
+              ) : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
             </button>
           </div>
         </div>
@@ -9332,11 +9341,12 @@ const App: React.FC<AppProps> = ({
                 type="button"
                 onClick={() => void handleRunJointProfessionalFromExisting()}
                 disabled={professionalBusy || !professionalSelectedCaseId}
+                aria-busy={professionalBusy}
                 className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                  professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                  professionalBusy ? 'opacity-90 cursor-wait' : !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                 }`}
               >
-                {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
+                {professionalBusy ? <AiBusyText active state="working">联合分析启动中…</AiBusyText> : '开始联合分析'}
               </button>
             </div>
           )}
@@ -9396,11 +9406,12 @@ const App: React.FC<AppProps> = ({
                 type="button"
                 onClick={() => void handleRunJointProfessionalFromNew()}
                 disabled={professionalBusy || !professionalCustomDate}
+                aria-busy={professionalBusy}
                 className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                  professionalBusy || !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                  professionalBusy ? 'opacity-90 cursor-wait' : !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                 }`}
               >
-                {professionalBusy ? '双盘排盘中...' : '排盘并开始联合分析'}
+                {professionalBusy ? <AiBusyText active state="working">双盘排盘中…</AiBusyText> : '排盘并开始联合分析'}
               </button>
             </div>
           )}
@@ -9557,11 +9568,12 @@ const App: React.FC<AppProps> = ({
             type="button"
             onClick={() => void handleRunBaziCompatibilityProfessional()}
             disabled={professionalBusy}
+            aria-busy={professionalBusy}
             className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-              professionalBusy ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+              professionalBusy ? 'opacity-90 cursor-wait' : 'hover:brightness-105'
             }`}
           >
-            {professionalBusy ? '合盘准备中...' : '开始八字合盘分析'}
+            {professionalBusy ? <AiBusyText active state="working">合盘准备中…</AiBusyText> : '开始八字合盘分析'}
           </button>
         </div>
       )}
@@ -10617,13 +10629,18 @@ const App: React.FC<AppProps> = ({
                           type="button"
                           onClick={() => void handleRegenerateCaseInitialAnalysis()}
                           disabled={initialAnalysisBusy || loading || isTyping}
+                          aria-busy={initialAnalysisBusy}
                           className={`rounded-full px-3 py-1.5 text-xs transition ${
-                            initialAnalysisBusy || loading || isTyping
+                            initialAnalysisBusy
+                              ? 'glass-panel-dark text-amber-200 cursor-wait opacity-95'
+                              : loading || isTyping
                               ? 'glass-chip text-stone-300 cursor-not-allowed'
                               : 'glass-panel-dark text-amber-200 hover:brightness-105'
                           }`}
                         >
-                          生成初始化分析 · 1点
+                          <AiBusyText active={initialAnalysisBusy} state="composing">
+                            {initialAnalysisBusy ? '生成中…' : '生成初始化分析 · 1点'}
+                          </AiBusyText>
                         </button>
                       )}
                     </div>
@@ -10662,9 +10679,12 @@ const App: React.FC<AppProps> = ({
                       type="button"
                       onClick={handleStartCaseAnalysis}
                       disabled={loading || isTyping}
+                      aria-busy={loading || isTyping}
                       className="glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 hover:brightness-105 transition flex items-center justify-center gap-2"
                     >
-                      {loading || isTyping ? <Spinner /> : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
+                      {loading || isTyping ? (
+                        <AiBusyText active state="solving">分析中…</AiBusyText>
+                      ) : (!isLoggedIn && activeCase.sessions.length > 0 ? '继续分析 · 1点' : '开始分析 · 1点')}
                     </button>
                   </div>
                 </div>
@@ -10991,7 +11011,11 @@ const App: React.FC<AppProps> = ({
                      </div>
                    </div>
                  )})}
-                 {isTyping && <div className="text-stone-400 text-sm p-4 animate-pulse">正在分析...</div>}
+                 {isTyping && (
+                   <div className="p-4 text-sm text-stone-500" role="status" aria-live="polite">
+                     <AiBusyText active state="composing" theme="light">正在分析…</AiBusyText>
+                   </div>
+                 )}
                  <div ref={chatEndRef} />
                </div>
                <div className="glass-panel-soft p-4 border-t border-white/50 flex flex-wrap gap-2">
@@ -11130,13 +11154,16 @@ const App: React.FC<AppProps> = ({
                     type="button"
                     onClick={() => setShowInitialAnalysisRegenerateConfirm(true)}
                     disabled={initialAnalysisBusy || loading || isTyping}
+                    aria-busy={initialAnalysisBusy}
                     className={`rounded-full px-3 py-1.5 text-xs transition ${
                       initialAnalysisBusy || loading || isTyping
-                        ? 'glass-chip text-stone-300 cursor-not-allowed'
+                        ? 'glass-chip text-stone-500 cursor-not-allowed'
                         : 'glass-chip text-stone-500 hover:text-stone-700'
                     }`}
                   >
-                    {initialAnalysisBusy ? '生成中...' : '重新生成'}
+                    <AiBusyText active={initialAnalysisBusy} state="composing" theme="light">
+                      {initialAnalysisBusy ? '生成中…' : '重新生成'}
+                    </AiBusyText>
                   </button>
                   <button
                     type="button"
@@ -11396,11 +11423,12 @@ const App: React.FC<AppProps> = ({
                           type="button"
                           onClick={() => void handleRunJointProfessionalFromExisting()}
                           disabled={professionalBusy || !professionalSelectedCaseId}
+                          aria-busy={professionalBusy}
                           className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                            professionalBusy || !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                            professionalBusy ? 'opacity-90 cursor-wait' : !professionalSelectedCaseId ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                           }`}
                         >
-                          {professionalBusy ? '联合分析启动中...' : '开始联合分析'}
+                          {professionalBusy ? <AiBusyText active state="working">联合分析启动中…</AiBusyText> : '开始联合分析'}
                         </button>
                       </div>
                     </div>
@@ -11461,11 +11489,12 @@ const App: React.FC<AppProps> = ({
                         type="button"
                         onClick={() => void handleRunJointProfessionalFromNew()}
                         disabled={professionalBusy || !professionalCustomDate}
+                        aria-busy={professionalBusy}
                         className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                          professionalBusy || !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                          professionalBusy ? 'opacity-90 cursor-wait' : !professionalCustomDate ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
                         }`}
                       >
-                        {professionalBusy ? '双盘排盘中...' : '排盘并开始联合分析'}
+                        {professionalBusy ? <AiBusyText active state="working">双盘排盘中…</AiBusyText> : '排盘并开始联合分析'}
                       </button>
                     </div>
                   )}
@@ -11623,11 +11652,12 @@ const App: React.FC<AppProps> = ({
                       type="button"
                       onClick={() => void handleRunBaziCompatibilityProfessional()}
                       disabled={professionalBusy}
+                      aria-busy={professionalBusy}
                       className={`glass-cta w-full rounded-2xl py-3.5 font-bold text-amber-300 transition ${
-                        professionalBusy ? 'opacity-60 cursor-not-allowed' : 'hover:brightness-105'
+                        professionalBusy ? 'opacity-90 cursor-wait' : 'hover:brightness-105'
                       }`}
                     >
-                      {professionalBusy ? '合盘准备中...' : '开始八字合盘分析'}
+                      {professionalBusy ? <AiBusyText active state="working">合盘准备中…</AiBusyText> : '开始八字合盘分析'}
                     </button>
                   </div>
                 </div>
