@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { BorderBeam } from 'border-beam';
 import type { GenericTaibuResponse } from '../types';
 import DialogPortal, { DialogBody } from './DialogPortal';
+import { useDelayedBusy } from './useDelayedBusy';
 
 export type AlmanacCaseOption = {
   id: string;
@@ -216,6 +218,7 @@ const AlmanacWorkspace: React.FC<Props> = ({
   const [startDate, setStartDate] = useState(selectedDate);
   const [endDate, setEndDate] = useState(addDays(selectedDate, 14));
   const [activeRecommendation, setActiveRecommendation] = useState<AlmanacSelectionResult['selected'][number] | null>(null);
+  const showSelectionBeam = useDelayedBusy(Boolean(selectionLoading), 3_000);
 
   const selectedDates = useMemo(
     () => new Set((selectionResult?.selected || []).map((item) => item.date)),
@@ -385,14 +388,25 @@ const AlmanacWorkspace: React.FC<Props> = ({
               未来{days}天
             </button>
           ))}
-          <button
-            type="button"
-            disabled={selectionLoading || !matter.trim()}
-            onClick={() => onRunSelection({ matter, startDate, endDate, caseId: selectedCaseId })}
-            className="ml-auto rounded-full bg-stone-900 px-5 py-2 text-sm font-bold text-amber-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-45"
+          <BorderBeam
+            size="pulse-inner"
+            colorVariant="sunset"
+            theme="dark"
+            strength={0.65}
+            active={showSelectionBeam}
+            className="ml-auto"
+            style={{ display: 'inline-block' }}
           >
-            {selectionLoading ? '筛选中...' : '智能择吉 · 1点'}
-          </button>
+            <button
+              type="button"
+              disabled={selectionLoading || !matter.trim()}
+              aria-busy={selectionLoading}
+              onClick={() => onRunSelection({ matter, startDate, endDate, caseId: selectedCaseId })}
+              className="rounded-full bg-stone-900 px-5 py-2 text-sm font-bold text-amber-200 transition hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {selectionLoading ? '筛选中...' : '智能择吉 · 1点'}
+            </button>
+          </BorderBeam>
         </div>
 
         <div className="mt-5 rounded-2xl border border-stone-100 bg-stone-50/60 p-3">

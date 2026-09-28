@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useMemo, useState } from 'react';
+import { ThinkingOrb } from 'thinking-orbs';
 import { Solar } from 'lunar-javascript';
 import { calculateBaziLiuRiData, calculateBaziLiuYueData } from 'taibu-core/bazi';
 import { BaziResponse } from '../types';
@@ -16,6 +19,7 @@ import { BaziCharacterInspector } from './BaziCharacterInspector';
 import BaziLayoutSettings from './BaziLayoutSettings';
 import { orderBaziColumns, useBaziLayout } from '../hooks/useBaziLayout';
 import { analyzeBaziCharacter, characterTenGod, HIDDEN_STEMS, type CharacterSelection } from '../lib/bazi-character-analysis';
+import { useDelayedBusy } from './useDelayedBusy';
 
 interface Props {
   data: BaziResponse;
@@ -340,6 +344,7 @@ const AnalysisCard = ({
 }) => {
   const [content, setContent] = useState(savedContent || '');
   const [loading, setLoading] = useState(false);
+  const showOrb = useDelayedBusy(loading);
   const [error, setError] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
@@ -416,9 +421,11 @@ const AnalysisCard = ({
             type="button"
             onClick={() => run(Boolean(content))}
             disabled={loading}
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
+            aria-busy={loading}
+            className="inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-60"
           >
-            {loading ? '分析中...' : content ? '重新分析 · 1点' : '开始分析 · 1点'}
+            {showOrb ? <ThinkingOrb state="working" size={20} theme="light" aria-hidden="true" /> : null}
+            <span>{loading ? '分析中...' : content ? '重新分析 · 1点' : '开始分析 · 1点'}</span>
           </button>
         </div>
       </div>

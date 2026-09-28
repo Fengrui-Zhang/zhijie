@@ -5,6 +5,8 @@ import MarkdownContent from '../MarkdownContent';
 import { ChatWorkspace } from '../WorkspacePanels';
 import { AgentToolCards } from './AgentToolCards';
 import type { AgentToolCard, AgentTurnUsage } from './useAgentChat';
+import { ThinkingOrb } from 'thinking-orbs';
+import { useDelayedBusy } from '../useDelayedBusy';
 
 export type AgentChatCaseOption = { id: string; title: string; modelLabel: string };
 export type AgentChatSessionOption = { id: string; title: string; modelLabel: string };
@@ -53,6 +55,11 @@ const STARTER_PROMPTS = [
 
 export default function AgentChatWorkspace(props: Props) {
   const contextCount = props.selectedCases.length + props.selectedSessions.length;
+  const showOrb = useDelayedBusy(props.loading);
+  const runningTool = props.liveTools.find((tool) => tool.status === 'running');
+  const orbState = runningTool && /search|retriev|knowledge|检索|搜索/i.test(`${runningTool.toolName} ${runningTool.label}`)
+    ? 'searching'
+    : 'working';
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -130,7 +137,10 @@ export default function AgentChatWorkspace(props: Props) {
             ))}
             {props.loading ? (
               <div className="rounded-[22px] border border-white/65 bg-white/72 px-4 py-3">
-                <div className="text-xs font-semibold text-stone-500">{props.statusText || 'Agent 正在工作...'}</div>
+                <div role="status" className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  {showOrb ? <ThinkingOrb state={orbState} size={20} theme="light" aria-hidden="true" /> : null}
+                  <span>{props.statusText || 'Agent 正在工作...'}</span>
+                </div>
                 <AgentToolCards tools={props.liveTools} usage={props.liveUsage} />
               </div>
             ) : null}

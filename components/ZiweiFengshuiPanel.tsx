@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { ThinkingOrb } from 'thinking-orbs';
 import type { ZiweiResponse } from '../types';
 import {
   ZIWEI_DIRECTIONS,
@@ -15,6 +16,7 @@ import {
   type ZiweiFengshuiTendency,
 } from '../lib/ziwei-fengshui';
 import DialogPortal, { DialogBody } from './DialogPortal';
+import { useDelayedBusy } from './useDelayedBusy';
 
 type Props = {
   data: ZiweiResponse;
@@ -236,6 +238,7 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
   const [draftYear, setDraftYear] = useState(String(currentYear));
   const [focus, setFocus] = useState<ZiweiFengshuiFocus>('overall');
   const [state, setState] = useState<LoadState>('loading');
+  const showOrb = useDelayedBusy(state === 'loading');
   const [result, setResult] = useState<ZiweiFengshuiResult | null>(null);
   const [error, setError] = useState('');
   const [selectedPalaceName, setSelectedPalaceName] = useState<string | null>(null);
@@ -539,7 +542,10 @@ export default function ZiweiFengshuiPanel({ data, caseId, onQuotaChange }: Prop
               <div className="border-t border-white/60 bg-white/68 px-4 py-4 text-center text-sm text-stone-500">尚未生成“{periodLabel}”的物象预测与催旺方案。一次调用将返回完整十二宫，消耗 1 点。</div>
             ) : null}
             {state === 'loading' ? (
-              <div className="border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">正在推演“{periodLabel}”的十二方位物象…</div>
+              <div role="status" className="flex items-center justify-center gap-2 border-t border-white/60 bg-white/72 px-4 py-4 text-center text-sm font-medium text-stone-600">
+                {showOrb ? <ThinkingOrb state="solving" size={20} theme="light" aria-hidden="true" /> : null}
+                <span>正在推演“{periodLabel}”的十二方位物象…</span>
+              </div>
             ) : null}
           </div>
 
