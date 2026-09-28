@@ -52,16 +52,24 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
     const position = () => {
       const rect = root.current?.getBoundingClientRect();
       if (!rect) return;
-      const above = rect.top - 16, below = window.innerHeight - rect.bottom - 16;
-      const width = Math.min(440, window.innerWidth - 24);
+      const viewport = window.visualViewport;
+      const viewportTop = viewport?.offsetTop ?? 0, viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+      const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
+      const anchorTop = Math.max(viewportTop + 16, Math.min(rect.top, viewportBottom - 16));
+      const anchorBottom = Math.max(viewportTop + 16, Math.min(rect.bottom, viewportBottom - 16));
+      const above = anchorTop - viewportTop - 16, below = viewportBottom - anchorBottom - 16;
+      const width = Math.min(440, viewportRight - viewportLeft - 24);
       const opensAbove = above >= Math.min(320, below);
-      setPanelBounds({ left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)), width,
-        ...(opensAbove ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }), maxHeight: Math.max(80, Math.min(420, opensAbove ? above : below)) });
+      setPanelBounds({ left: Math.max(viewportLeft + 12, Math.min(rect.left, viewportRight - width - 12)), width,
+        ...(opensAbove ? { bottom: window.innerHeight - anchorTop + 8 } : { top: anchorBottom + 8 }), maxHeight: Math.max(80, Math.min(420, opensAbove ? above : below)) });
     };
     position();
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', position); viewport?.addEventListener('scroll', position);
     window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
     const observer = new ResizeObserver(position); if (root.current) observer.observe(root.current);
-    return () => { observer.disconnect(); window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+    return () => { observer.disconnect(); viewport?.removeEventListener('resize', position); viewport?.removeEventListener('scroll', position); window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
   }, [contextOpen]);
   useEffect(() => {
     if (!contextOpen) return;
@@ -92,7 +100,9 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
           initial={enabled ? { opacity: 0, x: 28, rotate: -360 } : { opacity: 0 }} animate={{ opacity: 1, x: 0, rotate: 0 }} exit={enabled ? { opacity: 0, x: 22, rotate: 120 } : { opacity: 0 }} transition={{ duration: enabled ? .38 : 0, ease: easeOut }}><ContextIcon /></motion.span>}</AnimatePresence>
         <motion.div initial={false} animate={{ opacity: expanded ? 1 : 0 }} transition={{ duration: enabled ? .2 : 0, delay: enabled && expanded ? .08 : 0, ease: easeOutQuad }}
           inert={!expanded} aria-hidden={!expanded || undefined} className="prompt-toolbar">
-          {context && onToggleContext && <button ref={contextTrigger} type="button" disabled={busy} aria-expanded={contextOpen} aria-controls={contextId} aria-haspopup="dialog" onClick={onToggleContext} className="prompt-context-trigger"><ContextIcon /><span>添加上下文{contextCount ? ` · ${contextCount}` : ''}</span><motion.svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" initial={false} animate={{ rotate: contextOpen ? 180 : 0 }} transition={{ duration: enabled ? .16 : 0, ease: easeOutQuad }}><path d="m5 7 5 5 5-5" /></motion.svg></button>}
+          {context && onToggleContext && <button ref={contextTrigger} type="button" disabled={busy} aria-expanded={contextOpen} aria-controls={contextId} aria-haspopup="dialog"
+            onPointerDown={(event) => { if (event.button === 0) { event.preventDefault(); event.currentTarget.focus({ preventScroll: true }); } }}
+            onClick={onToggleContext} className="prompt-context-trigger"><ContextIcon /><span>添加上下文{contextCount ? ` · ${contextCount}` : ''}</span><motion.svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" initial={false} animate={{ rotate: contextOpen ? 180 : 0 }} transition={{ duration: enabled ? .16 : 0, ease: easeOutQuad }}><path d="m5 7 5 5 5-5" /></motion.svg></button>}
           <div className="ml-auto flex min-w-0 items-center gap-2">
             {onCopy && <button type="button" onClick={onCopy} disabled={busy} className="prompt-copy" aria-label={copied ? '已复制' : '复制AI提示词'}><span className="prompt-copy-label">{copied ? '已复制' : '复制AI提示词'}</span><svg className="prompt-copy-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">{copied ? <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>}</svg></button>}
             <motion.button type="button" onClick={submit} disabled={disabled || busy || (!allowEmpty && !value.trim())} aria-busy={busy} className="prompt-send" aria-label={busy ? '正在生成' : submitLabel}
