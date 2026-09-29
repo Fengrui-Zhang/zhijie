@@ -1,3 +1,4 @@
+import { caseBirthKey } from './case-archives';
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import {
@@ -100,6 +101,7 @@ export async function backfillDivinationCases(userId: string) {
     select: {
       id: true,
       initialAnalysisData: true,
+      chartParams: true,
     },
   });
   const calibrationUpdates = allCases.flatMap((item) => {
@@ -153,6 +155,8 @@ export async function backfillDivinationCases(userId: string) {
   const seenCaseIds = new Set<string>();
   const updates = sessionsWithMessages.flatMap((session) => {
     if (!session.caseId || seenCaseIds.has(session.caseId)) return [];
+    const currentCase = casesNeedingInitialAnalysis.find(item => item.id === session.caseId);
+    if (!currentCase || caseBirthKey(currentCase.chartParams) !== caseBirthKey(session.chartParams)) return [];
     const initialAnalysis = deriveInitialAnalysisFromSession(
       session.chartParams,
       session.messages,

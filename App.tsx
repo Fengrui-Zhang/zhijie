@@ -1,9 +1,10 @@
-
 'use client';
+
+import { archiveRepresentatives, findCaseArchive, assertArchiveCanSwitch, caseBirthKey, sharedArchiveParams, chartWithArchiveName } from './lib/case-archives';
 
 import FilterSelect from './components/interactive/FilterSelect';
 import SaveButton from './components/interactive/SaveButton';
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSession, signOut } from 'next-auth/react';
 import {
@@ -456,20 +457,7 @@ const getCasePillarsPreview = (modelType: CaseModelType, chartData: unknown) => 
   return formatSizhuInfo(sizhu);
 };
 
-const isSameCaseChartIdentity = (left: unknown, right: unknown) => {
-  const a = normalizeCaseChartParams(left);
-  const b = normalizeCaseChartParams(right);
-  return (
-    a.sex === b.sex &&
-    a.year === b.year &&
-    a.month === b.month &&
-    a.day === b.day &&
-    a.hours === b.hours &&
-    a.minute === b.minute &&
-    (a.province || '') === (b.province || '') &&
-    (a.city || '') === (b.city || '')
-  );
-};
+const isSameCaseChartIdentity = (left: unknown, right: unknown) => caseBirthKey(left) === caseBirthKey(right);
 
 const getCaseDisplayName = (item: Pick<CaseItem, 'title' | 'chartParams'> | Pick<CaseDetail, 'title' | 'chartParams'>) => {
   const params = normalizeCaseChartParams(item.chartParams);
@@ -881,8 +869,7 @@ const PERSONALIZATION_STORAGE_KEY = 'zhijie:personalization-settings:v1';
 const APP_PREFERENCES_STORAGE_KEY = 'zhijie:app-preferences:v1';
 
 const MOBILE_BOTTOM_NAV_OPTIONS: Array<{ id: MobileBottomNavItemId; label: string }> = [
-  { id: ModelType.BAZI, label: '八字' },
-  { id: ModelType.ZIWEI, label: '紫微' },
+  { id: ModelType.BAZI, label: '命例档案' },
   { id: ModelType.DAILY_FORTUNE, label: '日运' },
   { id: ModelType.MONTHLY_FORTUNE, label: '月运' },
   { id: ModelType.QIMEN, label: '奇门' },
@@ -904,7 +891,7 @@ const isMobileBottomNavItemId = (value: unknown): value is MobileBottomNavItemId
 );
 
 const normalizeMobileBottomNav = (value: unknown): MobileBottomNavItemId[] => {
-  const rawItems = Array.isArray(value) ? value.filter(isMobileBottomNavItemId) : [];
+  const rawItems = Array.isArray(value) ? value.map(item => item === ModelType.ZIWEI ? ModelType.BAZI : item).filter(isMobileBottomNavItemId) : [];
   const uniqueItems = rawItems.filter((item, index) => rawItems.indexOf(item) === index);
   const next = [...uniqueItems];
   for (const fallback of DEFAULT_APP_PREFERENCES.mobileBottomNav) {
@@ -1667,6 +1654,9 @@ const App: React.FC<AppProps> = ({
   const [savedSessions, setSavedSessions] = useState<SessionItem[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [caseItems, setCaseItems] = useState<CaseItem[]>([]);
+  const archiveItems = useMemo(() => archiveRepresentatives(caseItems), [caseItems]);
+  const [archiveSwitchBusy, setArchiveSwitchBusy] = useState(false);
+  const archiveSwitchRef = useRef(false);
   const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
   const [caseRouteStatus, setCaseRouteStatus] = useState<'idle' | 'loading' | 'not-found'>(initialCaseId ? 'loading' : 'idle');
   const [caseFormOpen, setCaseFormOpen] = useState(false);
@@ -2176,6 +2166,7 @@ const App: React.FC<AppProps> = ({
 
     if (!currentInitialAnalysis) {
       for (const session of rawSessions) {
+        if (caseBirthKey(session.chartParams) !== caseBirthKey(matchedCase.chartParams)) continue;
         const derived = deriveInitialAnalysisFromSession(
           session.chartParams,
           session.messages,
@@ -2189,7 +2180,7 @@ const App: React.FC<AppProps> = ({
         };
         const nextCases = allCases.map((item) => (item.id === caseId ? effectiveCase : item));
         writeGuestCases(nextCases);
-        setCaseItems(nextCases.filter((item) => item.modelType === modelType));
+        setCaseItems(nextCases);
         break;
       }
     }
@@ -2218,14 +2209,13 @@ const App: React.FC<AppProps> = ({
 
     if (!isLoggedIn) {
       const items = readGuestCases()
-        .filter((item) => item.modelType === type)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
       setCaseItems(items);
       return;
     }
 
     try {
-      const res = await fetch(`/api/cases?modelType=${type}`);
+      const res = await fetch('/api/cases?scope=archives');
       if (!res.ok) return;
       const data = await res.json();
       setCaseItems(Array.isArray(data) ? data : []);
@@ -2362,6 +2352,54 @@ const App: React.FC<AppProps> = ({
       return false;
     }
   }, [getGuestCaseDetail, isLoggedIn, modelType, readGuestCaseSessions]);
+
+  const switchArchiveChart = async (targetType: CaseModelType) => {
+    if (!activeCase || targetType === modelType || archiveSwitchRef.current) return;
+    archiveSwitchRef.current = true;
+    setArchiveSwitchBusy(true);
+    const startingPath = window.location.pathname;
+    setError('');
+    try {
+      let targetId: string;
+      if (isLoggedIn) {
+        const res = await fetch(`/api/case-archives/${activeCase.id}/chart`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelType: targetType }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '切换排盘失败，请稍后重试');
+        targetId = data.id;
+      } else {
+        const allCases = readGuestCases();
+        const members = findCaseArchive(allCases, activeCase.id);
+        const params = normalizeCaseChartParams(activeCase.chartParams);
+        const archiveId = params.archiveId || activeCase.id;
+        const existing = members.find(item => item.modelType === targetType);
+        const linked = allCases.map(item => members.some(member => member.id === item.id)
+          ? { ...item, chartParams: { ...item.chartParams, archiveId } } : item);
+        if (existing) targetId = existing.id;
+        else {
+          assertArchiveCanSwitch(params);
+          const data = targetType === ModelType.BAZI ? await fetchBazi(params as BaseParams) : await fetchZiwei(params as BaseParams);
+          targetId = `guest-case-${crypto.randomUUID()}`;
+          const now = new Date().toISOString();
+          linked.push({ id: targetId, modelType: targetType, title: buildCaseTitle(targetType, params),
+            chartParams: { ...params, archiveId, rechartAt: now }, chartData: data, createdAt: now, updatedAt: now });
+        }
+        writeGuestCases(linked);
+        setCaseItems(linked);
+      }
+      if (window.location.pathname !== startingPath) return;
+      if (!await loadCaseDetail(targetId, { expectedModelType: targetType })) throw new Error('排盘读取失败，请重试');
+      await hydrateCasesForModel(targetType);
+    } catch (error) {
+      setCaseRouteStatus('idle');
+      setError(error instanceof Error ? error.message : '切换排盘失败，请稍后重试');
+    } finally {
+      archiveSwitchRef.current = false;
+      setArchiveSwitchBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!initialCaseId || authStatus === 'loading' || !isCaseModelType(initialModelType)) return;
@@ -2633,10 +2671,11 @@ const App: React.FC<AppProps> = ({
     chartParams: Record<string, unknown>,
     cData: unknown,
     klineData?: unknown,
-    initialAnalysisData?: unknown
+    initialAnalysisData?: unknown,
+    archive = false
   ): Promise<CaseDetail | null> => {
     try {
-      const res = await fetch(`/api/cases/${caseId}`, {
+      const res = await fetch(`/api/cases/${caseId}${archive ? '?scope=archive' : ''}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2658,8 +2697,8 @@ const App: React.FC<AppProps> = ({
 
   const deleteCaseInDb = async (caseId: string) => {
     try {
-      const res = await fetch(`/api/cases/${caseId}`, { method: 'DELETE' });
-      return res.ok;
+      const res = await fetch(`/api/cases/${caseId}?scope=archive`, { method: 'DELETE' });
+      return res.ok || res.status === 404;
     } catch {
       return false;
     }
@@ -2768,7 +2807,7 @@ const App: React.FC<AppProps> = ({
     const current = readGuestCases().filter((item) => item.id !== nextCase.id);
     const next = [nextCase, ...current].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     writeGuestCases(next);
-    setCaseItems(next.filter((item) => item.modelType === modelType));
+    setCaseItems(next);
   }, [modelType, readGuestCases, writeGuestCases]);
 
   const saveGuestCaseSession = useCallback((session: GuestStoredSession) => {
@@ -2806,13 +2845,15 @@ const App: React.FC<AppProps> = ({
   }, [updateGuestCaseSession]);
 
   const deleteGuestCase = useCallback((caseId: string) => {
-    const nextCases = readGuestCases().filter((item) => item.id !== caseId);
-    const nextSessions = readGuestCaseSessions().filter((item) => item.caseId !== caseId);
-    const nextRelations = readGuestCaseRelations().filter((item) => item.caseAId !== caseId && item.caseBId !== caseId);
+    const allCases = readGuestCases();
+    const ids = new Set(findCaseArchive(allCases, caseId).map(item => item.id));
+    const nextCases = allCases.filter(item => !ids.has(item.id));
+    const nextSessions = readGuestCaseSessions().filter(item => !ids.has(item.caseId || ''));
+    const nextRelations = readGuestCaseRelations().filter(item => !ids.has(item.caseAId) && !ids.has(item.caseBId));
     writeGuestCases(nextCases);
     writeGuestCaseSessions(nextSessions);
     writeGuestCaseRelations(nextRelations);
-    setCaseItems(nextCases.filter((item) => item.modelType === modelType));
+    setCaseItems(nextCases);
   }, [modelType, readGuestCaseRelations, readGuestCaseSessions, readGuestCases, writeGuestCases, writeGuestCaseRelations, writeGuestCaseSessions]);
 
   const upsertGuestCaseRelations = useCallback((
@@ -4314,6 +4355,8 @@ const App: React.FC<AppProps> = ({
   }, [supportsKnowledge, modelType]);
 
   const beginCaseCreate = () => {
+    setModelType(ModelType.BAZI);
+    setActiveCase(null);
     setEditingCaseId(null);
     setCaseFormOpen(true);
     resetCaseFormInputs();
@@ -5305,7 +5348,7 @@ const App: React.FC<AppProps> = ({
       setError('');
 
       const chartResponse = shouldReuseExistingChart
-        ? activeCase!.chartData
+        ? chartWithArchiveName(activeCase!.chartData, chartParams.name)
         : modelType === ModelType.BAZI
           ? await fetchBazi(chartParams)
           : await fetchZiwei(chartParams);
@@ -5322,7 +5365,8 @@ const App: React.FC<AppProps> = ({
               chartParams,
               chartResponse,
               shouldReuseExistingChart ? activeCase?.klineData : null,
-              shouldReuseExistingChart ? activeCase?.initialAnalysisData : null
+              shouldReuseExistingChart ? activeCase?.initialAnalysisData : null,
+              true
             )
           : await createCaseInDb(modelType, chartParams, chartResponse);
         if (!detail) {
@@ -5335,21 +5379,33 @@ const App: React.FC<AppProps> = ({
       } else {
         const caseId = editingCaseId || `guest-case-${Date.now()}`;
         savedCaseId = caseId;
-        if (editingCaseId && !shouldReuseExistingChart) {
-          clearGuestCaseSessions(caseId);
-        }
+        const allCases = readGuestCases();
+        const members = editingCaseId ? findCaseArchive(allCases, caseId) : [];
+        const archiveId = activeCase?.chartParams?.archiveId || caseId;
         const nextCase: CaseItem = {
           id: caseId,
           modelType,
           title: buildCaseTitle(modelType, chartParams),
-          chartParams,
+          chartParams: sharedArchiveParams(activeCase?.chartParams, chartParams, archiveId),
           chartData: chartResponse,
           klineData: shouldReuseExistingChart ? activeCase?.klineData : null,
           initialAnalysisData: shouldReuseExistingChart ? activeCase?.initialAnalysisData : null,
           createdAt: editingCaseId && activeCase ? activeCase.createdAt : nowIso,
           updatedAt: nowIso,
         };
-        saveGuestCase(nextCase);
+        const siblings = await Promise.all(members.filter(item => item.id !== caseId).map(async item => {
+          if (!shouldReuseExistingChart) assertArchiveCanSwitch(chartParams);
+          const data = shouldReuseExistingChart ? chartWithArchiveName(item.chartData, chartParams.name) : item.modelType === ModelType.BAZI
+            ? await fetchBazi(chartParams) : await fetchZiwei(chartParams);
+          return { ...item, title: buildCaseTitle(item.modelType, chartParams), chartParams: sharedArchiveParams(item.chartParams, chartParams, archiveId),
+            chartData: data, updatedAt: nowIso,
+            klineData: shouldReuseExistingChart ? item.klineData : null,
+            initialAnalysisData: shouldReuseExistingChart ? item.initialAnalysisData : null };
+        }));
+        const updates = [nextCase, ...siblings];
+        const next = [...updates, ...allCases.filter(item => !updates.some(update => update.id === item.id))];
+        writeGuestCases(next);
+        setCaseItems(next);
         refreshGuestActiveCase(caseId);
         if (shouldReuseExistingChart) {
           const currentGuestSession = readGuestCaseSessions().find((item) => item.caseId === caseId);
@@ -5459,6 +5515,7 @@ const App: React.FC<AppProps> = ({
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
     for (const session of guestSessions) {
+      if (caseBirthKey(session.chartParams) !== caseBirthKey(targetCase.chartParams)) continue;
       const derived = deriveInitialAnalysisFromSession(
         session.chartParams,
         session.messages,
@@ -5991,7 +6048,7 @@ const App: React.FC<AppProps> = ({
       return;
     }
     if (isFortuneReading && !fortuneCaseId) {
-      setError("请先选择一个八字命例。没有命例时，请先在四柱八字中新增命例。");
+      setError("请先选择一个八字命例。没有命例时，请先在命例档案中新增档案。");
       return;
     }
     if ((modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) && lifeCalendarType === 'pillars') {
@@ -7673,7 +7730,7 @@ const App: React.FC<AppProps> = ({
       id,
       label: option?.label || '入口',
       onClick: () => (isWorkspace ? navigateWorkspace(id) : handleModelChange(id as ModelType)),
-      active: isWorkspace ? workspaceView === id : modelType === id && workspaceView === 'divination',
+      active: isWorkspace ? workspaceView === id : (id === ModelType.BAZI ? isCaseModelType(modelType) : modelType === id) && workspaceView === 'divination',
     };
   });
   const openHomeCaseCreate = (type: ModelType.BAZI | ModelType.ZIWEI) => {
@@ -7696,8 +7753,7 @@ const App: React.FC<AppProps> = ({
   const currentModuleLabel =
     professionalSelectedProject === PROFESSIONAL_FEATURE_JOINT ? '八字+紫微联合分析' :
     professionalSelectedProject === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '八字合盘' :
-    modelType === ModelType.BAZI ? '四柱八字' :
-    modelType === ModelType.ZIWEI ? '紫微斗数' :
+    isCaseModelType(modelType) ? '命例档案' :
     modelType === ModelType.DAILY_FORTUNE ? '每日运势' :
     modelType === ModelType.MONTHLY_FORTUNE ? '每月运势' :
     modelType === ModelType.QIMEN ? '奇门遁甲' :
@@ -8219,7 +8275,9 @@ const App: React.FC<AppProps> = ({
   const standaloneSelectedCases = standaloneSelectedCaseIds
     .map((id) => standaloneCaseOptions.find((item) => item.id === id))
     .filter((item): item is CaseItem => Boolean(item));
-  const standaloneAvailableCaseOptions = standaloneCaseOptions.filter((item) => !standaloneSelectedCaseIds.includes(item.id));
+  const standaloneAvailableCaseOptions = archiveRepresentatives(standaloneCaseOptions).filter(item =>
+    !findCaseArchive(standaloneCaseOptions, item.id).some(member => standaloneSelectedCaseIds.includes(member.id))
+  );
   const standaloneSelectedSessions = standaloneSelectedSessionIds
     .map((id) => savedSessions.find((item) => item.id === id))
     .filter((item): item is SessionItem => Boolean(item));
@@ -8706,7 +8764,7 @@ const App: React.FC<AppProps> = ({
                   }}
                   className="glass-input mt-2 w-full min-w-0 rounded-2xl px-4 py-3 text-sm font-semibold text-stone-700 outline-none"
                 >
-                  <option value="">不指定，按命例库顺序选择</option>
+                  <option value="">不指定，按命例档案顺序选择</option>
                   {standaloneCaseOptions
                     .filter((item) => item.modelType === ModelType.BAZI)
                     .map((item) => (
@@ -9716,7 +9774,7 @@ const App: React.FC<AppProps> = ({
             primaryCase={homePrimaryCase ? {
               id: homePrimaryCase.id,
               title: homePrimaryCase.title,
-              summary: homePrimaryCase.modelType === ModelType.BAZI ? '四柱八字' : '紫微斗数',
+              summary: '命例档案',
               detail: homePrimaryPillars ? `四柱：${homePrimaryPillars}` : '命盘已保存',
             } : undefined}
             hasBaziCase={Boolean(homeBaziCase)}
@@ -9768,7 +9826,7 @@ const App: React.FC<AppProps> = ({
               <div className="space-y-5 animate-fade-in">
                 {fortuneCaseOptions.length === 0 && (
                   <div className="rounded-2xl border border-dashed border-stone-200 bg-white/60 px-4 py-5 text-sm leading-6 text-stone-500">
-                    暂无八字命例。请先进入“四柱八字”新增命例，再查看每日或每月运势。
+                    暂无八字命例。请先进入“命例档案”新增档案，再查看每日或每月运势。
                   </div>
                 )}
 
@@ -9819,25 +9877,25 @@ const App: React.FC<AppProps> = ({
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-lg font-bold text-stone-700">命例库</div>
+                    <div className="text-sm text-stone-500">共 {archiveItems.length} 份档案</div>
                   </div>
                   <button
                     type="button"
                     onClick={beginCaseCreate}
                     className="glass-cta rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-300 hover:brightness-105 transition"
                   >
-                    新增命例
+                    新增档案
                   </button>
                 </div>
 
-                {caseItems.length === 0 && !caseFormOpen && (
+                {archiveItems.length === 0 && !caseFormOpen && (
                   <div className="glass-panel-soft rounded-[28px] border border-white/60 px-5 py-10 text-center text-sm text-stone-500">
-                    暂无已保存命例，点击右上角“新增命例”开始排盘并保存。
+                    暂无已保存命例，点击右上角“新增档案”开始排盘并保存。
                   </div>
                 )}
 
-                {caseItems.length > 0 && <CaseCardStack items={caseItems}
-                  onOpen={(id) => void loadCaseDetail(id)}
+                {archiveItems.length > 0 && <CaseCardStack items={archiveItems}
+                  onOpen={(id) => void loadCaseDetail(id, { expectedModelType: archiveItems.find(item => item.id === id)?.modelType })}
                   onEdit={(id) => void beginCaseEditFromLibrary(id)}
                   onDelete={handleDeleteCaseFromLibrary} />}
 
@@ -9900,7 +9958,7 @@ const App: React.FC<AppProps> = ({
                     </FilterSelect>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-stone-200 bg-white/50 px-4 py-5 text-sm leading-6 text-stone-500">
-                      暂无八字命例。请先进入“四柱八字”新增命例，再生成每日或每月运势。
+                      暂无八字命例。请先进入“命例档案”新增档案，再生成每日或每月运势。
                     </div>
                   )}
                 </div>
@@ -10203,10 +10261,25 @@ const App: React.FC<AppProps> = ({
           <div className="animate-fade-in space-y-6">
             <div ref={reportChartRef} className="space-y-4">
               <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
-                 <span className="font-bold text-stone-700">
+                 {isCaseModel && activeCase && !isJointChartData(chartData) && !isBaziCompatibilityChartData(chartData) ? (
+                   <div aria-label="档案排盘方式" role="group" aria-busy={archiveSwitchBusy} className="min-w-0">
+                     <SelectionGroup><div className="flex gap-1 rounded-full bg-stone-100/80 p-1">
+                       {([ModelType.BAZI, ModelType.ZIWEI] as const).map(type => (
+                         <button key={type} type="button" aria-pressed={modelType === type}
+                           disabled={archiveSwitchBusy || loading || isTyping || initialAnalysisBusy || klineStatus === 'analyzing'}
+                           onClick={() => void switchArchiveChart(type)}
+                           className={`interaction-choice rounded-full px-3 py-2 text-sm font-semibold sm:px-5 ${modelType === type ? 'text-amber-100' : 'text-stone-500 hover:text-stone-800'} disabled:cursor-wait`}>
+                           <SelectionHighlight active={modelType === type} className="bg-stone-900" />
+                           <span className="interaction-choice-label">{MODEL_LABELS[type]}</span>
+                         </button>
+                       ))}
+                     </div></SelectionGroup>
+                     {archiveSwitchBusy && <span role="status" className="sr-only">正在切换排盘</span>}
+                   </div>
+                 ) : <span className="font-bold text-stone-700">
                   {isFortuneReading ? '运势面板' : (MODEL_LABELS[modelType] || '排盘结果')}
-                 </span>
-                 <button data-report-ignore="true" onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
+                 </span>}
+                 <button data-report-ignore="true" disabled={archiveSwitchBusy} onClick={handleReset} className="text-sm text-stone-500 hover:text-stone-800 underline">返回</button>
               </div>
 
               {/* Visualization Components */}
@@ -10733,7 +10806,7 @@ const App: React.FC<AppProps> = ({
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">出生信息</div>
             <div id="case-form-dialog-title" className="mt-1 text-xl font-bold text-stone-800 md:text-2xl">
-              {editingCaseId ? '编辑' : '新增'}{modelType === ModelType.BAZI ? '八字' : '紫微'}命例
+              {editingCaseId ? '编辑' : '新增'}命例档案
             </div>
             <div className="mt-1 text-xs leading-5 text-stone-500">
               支持公历、农历与四柱输入；精确时间可按出生地校准。

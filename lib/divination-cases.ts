@@ -7,6 +7,7 @@ export const CASE_MODEL_TYPES = [ModelType.BAZI, ModelType.ZIWEI] as const;
 export type CaseModelType = (typeof CASE_MODEL_TYPES)[number];
 
 export type CaseChartParams = {
+  archiveId?: string;
   name?: string;
   sex?: number;
   year?: number;
@@ -148,6 +149,7 @@ export const normalizeCaseChartParams = (value: unknown): CaseChartParams => {
     ? input.specialTags.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : undefined;
   const result: CaseChartParams = {
+    archiveId: toText(input.archiveId),
     name: toText(input.name),
     sex: toNumber(input.sex),
     year: toNumber(input.year),

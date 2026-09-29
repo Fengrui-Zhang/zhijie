@@ -47,7 +47,7 @@ export default function HomeWorkspace({
 }: Props) {
   const [divinationOpen, setDivinationOpen] = useState(false);
   const tasks = [
-    { key: 'chart', title: '建立命盘', description: '输入出生信息，生成八字或紫微命盘', action: onCreateBazi },
+    { key: 'chart', title: '建立命例档案', description: '输入出生信息，生成八字或紫微命盘', action: onCreateBazi },
     { key: 'sun', title: '看看今天', description: hasBaziCase ? '查看今天的运势与重要提示' : '建立八字命盘后查看个性化日运', action: onOpenDaily },
     { key: 'divination', title: '我要占测', description: '选择合适的方法，针对具体事情起盘判断', action: () => setDivinationOpen((current) => !current) },
     { key: 'calendar', title: '挑选吉日', description: '选择良辰吉日，查看适合事项与时辰', action: onOpenAlmanac },
@@ -125,8 +125,7 @@ export default function HomeWorkspace({
 
         {!primaryCase && (
           <div className="mt-5 flex flex-wrap gap-2">
-            <button type="button" onClick={onCreateBazi} className="glass-panel-dark rounded-[14px] px-5 py-2.5 text-sm font-bold text-amber-100">建立八字命盘</button>
-            <button type="button" onClick={onCreateZiwei} className="rounded-[14px] border border-stone-200/80 bg-white/64 px-5 py-2.5 text-sm font-bold text-stone-700 hover:bg-white">建立紫微命盘</button>
+            <button type="button" onClick={onCreateBazi} className="glass-panel-dark rounded-[14px] px-5 py-2.5 text-sm font-bold text-amber-100">建立命例档案</button>
           </div>
         )}
       </section>

@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const modelType = searchParams.get('modelType');
 
-  if (!isCaseModelType(modelType)) {
+  const archives = searchParams.get('scope') === 'archives';
+  if (!archives && !isCaseModelType(modelType)) {
     return NextResponse.json({ error: '无效的命例类型' }, { status: 400 });
   }
 
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
   const cases = await prisma.divinationCase.findMany({
     where: {
       userId: session.user.id,
-      modelType,
+      modelType: archives ? { in: ['bazi', 'ziwei'] } : modelType!,
     },
     orderBy: { updatedAt: 'desc' },
     select: {

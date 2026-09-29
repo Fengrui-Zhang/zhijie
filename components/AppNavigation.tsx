@@ -22,8 +22,7 @@ type AppNavigationProps = {
 };
 
 const COMMON_TASKS: Array<[ModelType, string]> = [
-  [ModelType.BAZI, '四柱八字'],
-  [ModelType.ZIWEI, '紫微斗数'],
+  [ModelType.BAZI, '命例档案'],
   [ModelType.DAILY_FORTUNE, '每日运势'],
   [ModelType.MONTHLY_FORTUNE, '每月运势'],
 ];
@@ -128,7 +127,7 @@ export function AppNavigation({
       <div className={mobile ? 'grid gap-4 md:grid-cols-3' : 'glass-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'}>
         <NavGroup label="命理运势">
           {COMMON_TASKS.map(([type, label]) => {
-            const selected = workspaceView === 'divination' && modelType === type && !professionalSelectedProject;
+            const selected = workspaceView === 'divination' && (type === ModelType.BAZI ? (modelType === ModelType.BAZI || modelType === ModelType.ZIWEI) : modelType === type) && !professionalSelectedProject;
             return <NavButton key={type} icon={NAV_ICONS[type]} label={label} selected={selected} onClick={() => selectModel(type)} />;
           })}
         </NavGroup>

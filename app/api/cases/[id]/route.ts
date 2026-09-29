@@ -1,3 +1,4 @@
+import { ArchiveError, updateCaseArchive, deleteCaseArchive } from '../../../../lib/case-archive-store';
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { auth } from '../../../../lib/auth';
@@ -155,9 +156,13 @@ export async function PUT(
   }
 
   const body = await request.json();
+  if (new URL(request.url).searchParams.get('scope') === 'archive' && body.chartParams !== undefined) {
+    try { return NextResponse.json(await updateCaseArchive(session.user.id, id, body)); }
+    catch (error) { return NextResponse.json({ error: error instanceof ArchiveError || (error instanceof Error && /这份档案/.test(error.message)) ? error.message : '保存档案失败，请稍后重试' }, { status: error instanceof ArchiveError ? error.status : 400 }); }
+  }
   const hasChartParams = body.chartParams !== undefined;
   const chartParams = hasChartParams
-    ? normalizeCaseChartParams(body.chartParams)
+    ? { ...normalizeCaseChartParams(body.chartParams), ...((normalizeCaseChartParams(existing.chartParams).archiveId) ? { archiveId: normalizeCaseChartParams(existing.chartParams).archiveId } : {}) }
     : existing.chartParams;
   const hasChartData = body.chartData !== undefined;
   const chartData = hasChartData ? body.chartData : existing.chartData;
@@ -212,6 +217,10 @@ export async function DELETE(
     return NextResponse.json({ error: '命例不存在' }, { status: 404 });
   }
 
+  if (new URL(_request.url).searchParams.get('scope') === 'archive') {
+    try { return NextResponse.json(await deleteCaseArchive(session.user.id, id)); }
+    catch (error) { return NextResponse.json({ error: '删除档案失败' }, { status: error instanceof ArchiveError ? error.status : 500 }); }
+  }
   await prisma.divinationCase.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
