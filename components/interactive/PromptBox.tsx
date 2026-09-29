@@ -163,7 +163,6 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
         <AnimatePresence initial={false}>{busy && <motion.div key="generating" role="status" aria-live="polite" aria-atomic="true" className="prompt-busy-overlay"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, pointerEvents: 'none' }} transition={{ duration: enabled ? .16 : 0 }}>
           <div className="prompt-busy-title"><AiBusyText active theme="light" state="composing">正在生成…</AiBusyText></div>
-          <span className="prompt-busy-hint">生成期间暂不可输入</span>
         </motion.div>}</AnimatePresence>
       </motion.div>
     </motion.div>
