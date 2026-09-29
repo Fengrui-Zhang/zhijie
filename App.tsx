@@ -2911,19 +2911,15 @@ const App: React.FC<AppProps> = ({
   const handleDeleteSession = async (id: string) => {
     try {
       const response = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('删除记录失败，请重试');
+      if (!response.ok && response.status !== 404) throw new Error('删除记录失败，请重试');
       setSavedSessions(prev => prev.filter(s => s.id !== id));
-      if (activeCase && isLoggedIn) {
-        const detailRes = await fetch(`/api/cases/${activeCase.id}`);
-        if (detailRes.ok) {
-          const detail = await detailRes.json();
-          setActiveCase(detail);
-        }
-      }
+      setActiveCase(prev => prev ? { ...prev, sessions: prev.sessions.filter(session => session.id !== id) } : prev);
+      setStandaloneSelectedSessionIds(prev => prev.filter(sessionId => sessionId !== id));
       if (activeSessionId === id) {
         setActiveSessionId(null);
         handleReset();
       }
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '删除记录失败，请重试');
       return false;
@@ -4304,12 +4300,12 @@ const App: React.FC<AppProps> = ({
     }
   }, [activeSessionId, clearViewState, readGuestCaseSessions, writeGuestCaseSessions]);
 
-  const handleDeleteCaseSessionEntry = useCallback((id: string) => {
+  const handleDeleteCaseSessionEntry = (id: string) => {
     if (isLoggedIn) {
       return handleDeleteSession(id);
     }
     handleDeleteGuestSession(id);
-  }, [handleDeleteGuestSession, isLoggedIn]);
+  };
 
   useEffect(() => {
     if (supportsKnowledge) {
