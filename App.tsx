@@ -7931,7 +7931,7 @@ const App: React.FC<AppProps> = ({
         <div>
           <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
           <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleStartCaseAnalysis()}
-            allowEmpty busy={loading || isTyping} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
+            allowEmpty busy={loading || isTyping || initialAnalysisBusy} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
             onCopy={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
             copied={copiedPromptKey === 'case-analysis'} />
         </div>
@@ -10529,7 +10529,7 @@ const App: React.FC<AppProps> = ({
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">想咨询的问题 (可选)</label>
                   <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleStartCaseAnalysis()}
-            allowEmpty busy={loading || isTyping} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
+            allowEmpty busy={loading || isTyping || initialAnalysisBusy} placeholder="例如：事业发展方向如何？" submitLabel="开始分析 · 1点"
             onCopy={() => handleCopyPromptText(buildActiveCasePromptCopyText(), 'case-analysis')}
             copied={copiedPromptKey === 'case-analysis'} />
                 </div>

@@ -433,6 +433,12 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 .prompt-box-expanded { border-color:#c9b995; box-shadow:0 4px 20px #2925240a; }
 .prompt-field { display:block; width:100%; min-height:44px; max-height:254px; padding:11px 20px; resize:none; outline:none; background:transparent; font-size:16px; line-height:22px; color:#292524; overscroll-behavior:contain; }
 .prompt-field:disabled { opacity:.65; }
+.prompt-box-busy { cursor:wait; }
+.prompt-box-busy .prompt-field,.prompt-box-busy .prompt-toolbar { visibility:hidden; }
+.prompt-busy-overlay { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; padding:16px; border-radius:inherit; background:#f7f6f3; color:#57534e; cursor:wait; }
+.prompt-busy-title { display:flex; max-width:100%; align-items:center; justify-content:center; font-size:15px; font-weight:600; line-height:24px; }
+.prompt-busy-hint { font-size:12px; line-height:18px; color:#8a8175; text-align:center; }
+
 .prompt-box:not(.prompt-box-expanded) .prompt-field { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:36px; }
 .prompt-toolbar { position:absolute; inset-inline:3px; bottom:3px; display:flex; align-items:center; gap:6px; min-height:52px; padding:6px 8px 6px 10px; }
 .prompt-context-trigger { display:flex; align-items:center; gap:6px; border-radius:999px; padding:8px 6px; font-size:12px; white-space:nowrap; color:#57534e; }
