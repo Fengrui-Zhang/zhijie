@@ -10193,7 +10193,7 @@ const App: React.FC<AppProps> = ({
                   <label className="block text-stone-700 font-bold mb-2">所求何事</label>
                   <PromptBox value={question} onChange={setQuestion} onSubmit={() => void handleCalculate()}
                     placeholder={modelType === ModelType.QIMEN ? '例如：这次面试能过吗？' : '例如：近期财运如何？'}
-                    submitLabel="开始排盘" allowEmpty busy={loading} />
+                    layout="horizontal" allowEmpty busy={loading} />
                 </div>
               )}
 

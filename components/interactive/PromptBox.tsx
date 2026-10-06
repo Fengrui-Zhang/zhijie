@@ -11,12 +11,15 @@ type Props = {
   placeholder?: string; disabled?: boolean; busy?: boolean; submitLabel?: string;
   allowEmpty?: boolean; maxLength?: number; onCopy?: () => void; copied?: boolean;
   context?: React.ReactNode; contextOpen?: boolean; contextCount?: number; onToggleContext?: () => void;
+  layout?: 'composer' | 'horizontal';
 };
 const easeOut = [.215, .61, .355, 1] as const;
 const easeOutQuad = [.25, .46, .45, .94] as const;
 function ContextIcon() { return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 
-export default function PromptBox({ value, onChange, onSubmit, placeholder = '输入你的问题…', disabled, busy, submitLabel = '发送', allowEmpty = false, maxLength, onCopy, copied, context, contextOpen, contextCount = 0, onToggleContext }: Props) {
+export default function PromptBox({ value, onChange, onSubmit, placeholder = '输入你的问题…', disabled, busy, submitLabel = '发送', allowEmpty = false, maxLength, onCopy, copied, context, contextOpen, contextCount = 0, onToggleContext, layout = 'composer' }: Props) {
+  const horizontal = layout === 'horizontal';
+  const [availableWidth, setAvailableWidth] = useState(440);
   const [focused, setFocused] = useState(false);
   const [contextPressed, setContextPressed] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -39,7 +42,16 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   const contextId = useId();
   const enabled = useInteractionTransition().duration > 0;
   const shellTransition = enabled ? { type: 'spring' as const, stiffness: 400, damping: 25, mass: 1.5 } : { duration: 0 };
-  const expanded = focused || contextPressed || Boolean(value) || Boolean(busy) || Boolean(contextOpen) || allowEmpty;
+  const expanded = focused || contextPressed || Boolean(value) || Boolean(busy) || Boolean(contextOpen) || (!horizontal && allowEmpty);
+  useLayoutEffect(() => {
+    const parent = root.current?.parentElement;
+    if (!horizontal || !parent) return;
+    const styles = getComputedStyle(parent);
+    setAvailableWidth(parent.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight));
+    const observer = new ResizeObserver(([entry]) => setAvailableWidth(entry.contentRect.width));
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [horizontal]);
   useEffect(() => {
     setHoverReady(false); setHovered(false);
     if (expanded) return;
@@ -49,13 +61,13 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   useLayoutEffect(() => {
     const element = input.current;
     if (!element) return;
-    const measure = () => { element.style.height = 'auto'; const height = expanded ? Math.min(254, Math.max(44, element.scrollHeight)) : 44; element.style.height = `${height}px`; setFieldHeight(height); };
+    const measure = () => { element.style.height = 'auto'; const height = expanded && !horizontal ? Math.min(254, Math.max(44, element.scrollHeight)) : 44; element.style.height = `${height}px`; setFieldHeight(height); };
     measure();
     let width = element.getBoundingClientRect().width;
     const observer = new ResizeObserver(([entry]) => { if (Math.abs(entry.contentRect.width - width) > .5) { width = entry.contentRect.width; measure(); } });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [value, expanded]);
+  }, [value, expanded, horizontal]);
   useLayoutEffect(() => {
     if (!contextOpen) return;
     const position = () => {
@@ -111,12 +123,13 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   };
   const submit = () => { if (!disabled && !busy && (allowEmpty || value.trim())) { setContextVisible(false); onSubmit(); } };
   return <>
-    <motion.div ref={root} initial={false} animate={{ maxWidth: expanded ? 440 : 320 }} transition={shellTransition} className="prompt-frame"
+    <motion.div ref={root} initial={false} animate={{ maxWidth: expanded ? 440 : horizontal ? Math.min(320, Math.max(0, availableWidth - 40)) : 320 }} transition={shellTransition} className={`prompt-frame${horizontal ? ' prompt-frame-horizontal' : ''}`}
       onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node) && !ownsContextPopup(event.relatedTarget)) setFocused(false); }}>
-      <motion.div initial={false} animate={{ height: expanded ? fieldHeight + 60 : 52 }} transition={shellTransition} className={`prompt-box ${expanded ? 'prompt-box-expanded' : ''} ${busy ? 'prompt-box-busy' : ''}`} data-busy={Boolean(busy)}
+      <motion.div initial={false} animate={{ height: expanded && !horizontal ? fieldHeight + 60 : 52 }} transition={shellTransition} className={`prompt-box ${expanded ? 'prompt-box-expanded' : ''} ${busy ? 'prompt-box-busy' : ''}`} data-busy={Boolean(busy)}
         onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }} onPointerLeave={() => setHovered(false)}>
-        <textarea ref={input} aria-label={placeholder} rows={1} maxLength={maxLength} value={value} disabled={disabled || busy} aria-busy={Boolean(busy)} aria-hidden={busy || undefined} placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => {
+        <motion.textarea ref={input} initial={false} animate={horizontal ? { paddingLeft: expanded ? 52 : 20 } : undefined} transition={shellTransition}
+          aria-label={placeholder} rows={1} wrap={horizontal ? 'off' : undefined} maxLength={maxLength} value={value} disabled={disabled || busy} aria-busy={Boolean(busy)} aria-hidden={busy || undefined} placeholder={placeholder}
+          onChange={(event) => onChange(horizontal ? event.target.value.replace(/[\r\n]+/g, ' ') : event.target.value)} onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); submit(); }
             if (event.key === 'Escape' && !contextOpen && !value) { event.preventDefault(); input.current?.blur(); setFocused(false); }
           }} className="prompt-field" />
@@ -154,7 +167,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
             <motion.button type="button" onClick={submit} disabled={disabled || busy || (!allowEmpty && !value.trim())} aria-busy={busy} className="prompt-send" aria-label={submitLabel}
               initial={false} animate={{ opacity: expanded ? 1 : 0, scale: expanded || !enabled ? 1 : .85 }} whileTap={enabled ? { scale: .92 } : undefined} transition={{ duration: enabled ? .15 : 0, ease: easeOutQuad }}>
               <span className="inline-flex items-center gap-1.5">
-                {submitLabel !== '发送' && <span className="text-xs">{submitLabel}</span>}
+                {!horizontal && submitLabel !== '发送' && <span className="text-xs">{submitLabel}</span>}
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"><path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </span>
             </motion.button>
