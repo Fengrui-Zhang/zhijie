@@ -450,7 +450,7 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 .prompt-frame-horizontal { margin-left:0; margin-right:auto; }
 .prompt-frame-horizontal .prompt-field { white-space:nowrap; overflow-x:auto; overflow-y:hidden; padding-right:16px; scrollbar-width:none; }
 .prompt-frame-horizontal .prompt-field::-webkit-scrollbar { display:none; }
-.prompt-frame-horizontal .prompt-toolbar { inset:3px auto 3px 8px; min-height:44px; width:36px; padding:4px 0; }
+.prompt-frame-horizontal .prompt-toolbar { inset:3px 8px 3px auto; min-height:44px; width:36px; padding:4px 0; }
 .prompt-frame-horizontal .prompt-send { width:36px; height:36px; min-height:36px; padding:0; }
 .prompt-collapsed-icon { position:absolute; top:17px; right:18px; color:#78716c; pointer-events:none; }
 .prompt-context-anchor { position:fixed; z-index:60; }

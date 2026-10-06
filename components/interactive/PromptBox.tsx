@@ -127,7 +127,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = 'è¾
       onFocusCapture={() => setFocused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node) && !ownsContextPopup(event.relatedTarget)) setFocused(false); }}>
       <motion.div initial={false} animate={{ height: expanded && !horizontal ? fieldHeight + 60 : 52 }} transition={shellTransition} className={`prompt-box ${expanded ? 'prompt-box-expanded' : ''} ${busy ? 'prompt-box-busy' : ''}`} data-busy={Boolean(busy)}
         onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }} onPointerLeave={() => setHovered(false)}>
-        <motion.textarea ref={input} initial={false} animate={horizontal ? { paddingLeft: expanded ? 52 : 20 } : undefined} transition={shellTransition}
+        <motion.textarea ref={input} initial={false} animate={horizontal ? { paddingRight: expanded ? 52 : 20 } : undefined} transition={shellTransition}
           aria-label={placeholder} rows={1} wrap={horizontal ? 'off' : undefined} maxLength={maxLength} value={value} disabled={disabled || busy} aria-busy={Boolean(busy)} aria-hidden={busy || undefined} placeholder={placeholder}
           onChange={(event) => onChange(horizontal ? event.target.value.replace(/[\r\n]+/g, ' ') : event.target.value)} onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); submit(); }
