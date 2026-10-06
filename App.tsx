@@ -125,7 +125,7 @@ import BaziLayoutSettings from '@/components/BaziLayoutSettings';
 import UserMenuPopup from './components/UserMenuPopup';
 import { SelectionGroup, SelectionHighlight } from './components/InteractionMotion';
 import DeleteButton from './components/interactive/DeleteButton';
-import SessionRetentionButton from './components/interactive/SessionRetentionButton';
+import SessionActionsMenu from './components/interactive/SessionActionsMenu';
 import PromptBox from './components/interactive/PromptBox';
 import InlinePromptEdit from './components/interactive/InlinePromptEdit';
 import CaseCardStack from './components/interactive/CaseCardStack';
@@ -7983,16 +7983,15 @@ const App: React.FC<AppProps> = ({
                     : 'glass-panel border-white/60 bg-white/70 text-stone-700 hover:bg-white/85'
                 }`}
               >
-                <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold">{session.title}</div>
                   <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
                     {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {isLoggedIn && <SessionRetentionButton enabled={Boolean(session.isPermanent)} onChange={(enabled) => handleSetSessionPermanent(session.id, enabled)} />}
-                  <DeleteButton onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
-                </div>
+                <SessionActionsMenu retained={Boolean(session.isPermanent)}
+                  onRetain={isLoggedIn ? (enabled) => handleSetSessionPermanent(session.id, enabled) : undefined}
+                  onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
               </div>
             ))}
           </div>
@@ -8257,7 +8256,7 @@ const App: React.FC<AppProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenRecordWorkspaceSession(item.id)}
-                            className="min-w-0 flex-1 basis-full text-left sm:basis-0"
+                            className="min-w-0 flex-1 text-left"
                           >
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="truncate text-base font-bold">{item.title}</span>
@@ -8276,10 +8275,9 @@ const App: React.FC<AppProps> = ({
                               更新：{formatRecordAge(item)} · {messageCount} 条消息
                             </div>
                           </button>
-                          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
-                            <SessionRetentionButton enabled={Boolean(item.isPermanent)} onChange={(enabled) => handleSetSessionPermanent(item.id, enabled)} />
-                            <DeleteButton onDelete={() => handleDeleteSession(item.id)} />
-                          </div>
+                          <SessionActionsMenu retained={Boolean(item.isPermanent)}
+                            onRetain={(enabled) => handleSetSessionPermanent(item.id, enabled)}
+                            onDelete={() => handleDeleteSession(item.id)} />
                         </div>
                       </div>
                     );
@@ -10556,16 +10554,15 @@ const App: React.FC<AppProps> = ({
                             : 'glass-panel border-white/60 bg-white/70 text-stone-700 hover:bg-white/85'
                         }`}
                       >
-                        <div className="min-w-0 flex-1 basis-full sm:basis-0">
+                        <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold">{session.title}</div>
                           <div className={`mt-1 text-xs ${activeSessionId === session.id ? 'text-amber-100/75' : 'text-stone-500'}`}>
                             {new Date(session.updatedAt).toLocaleString('zh-CN', { hour12: false })}
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                  {isLoggedIn && <SessionRetentionButton enabled={Boolean(session.isPermanent)} onChange={(enabled) => handleSetSessionPermanent(session.id, enabled)} />}
-                  <DeleteButton onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
-                </div>
+                        <SessionActionsMenu retained={Boolean(session.isPermanent)}
+                          onRetain={isLoggedIn ? (enabled) => handleSetSessionPermanent(session.id, enabled) : undefined}
+                          onDelete={() => handleDeleteCaseSessionEntry(session.id)} />
                       </div>
                     ))}
                   </div>

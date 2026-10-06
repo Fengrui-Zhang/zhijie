@@ -11,9 +11,10 @@ type Props = {
   className?: string;
   countdown?: number;
   neutral?: boolean;
+  variant?: 'button' | 'menu';
 };
 
-export default function DeleteButton({ onDelete, label = '删除', disabled, className = '', countdown = 3, neutral = false }: Props) {
+export default function DeleteButton({ onDelete, label = '删除', disabled, className = '', countdown = 3, neutral = false, variant = 'button' }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -56,14 +57,15 @@ export default function DeleteButton({ onDelete, label = '删除', disabled, cla
     return () => window.clearTimeout(timer);
   }, [remaining, disabled]);
   return <span className={`inline-flex max-w-full flex-col items-start gap-1 ${className}`} onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
-    <motion.button type="button" layout disabled={disabled || pending} aria-busy={pending}
+    <motion.button type="button" role={variant === 'menu' ? 'menuitem' : undefined} layout disabled={disabled || pending} aria-busy={pending}
       aria-label={cancelling ? `取消${label}，剩余${remaining}秒` : label}
-      className={`delete-action ${neutral ? 'delete-action-neutral' : ''}`} data-cancelling={cancelling}
-      animate={{ backgroundColor: cancelling ? '#FFEDF1' : neutral && !pending ? '#FFFFFF' : '#FE322A', color: cancelling ? '#FE322A' : neutral && !pending ? '#57534E' : '#FFFFFF', borderColor: cancelling || pending ? '#FE322A' : '#E7E5E4', filter: enabled ? ['blur(1px)', 'blur(0px)'] : 'blur(0px)' }}
+      className={`delete-action ${neutral ? 'delete-action-neutral' : ''} ${variant === 'menu' ? 'delete-action-menu' : ''}`} data-cancelling={cancelling}
+      animate={{ backgroundColor: cancelling ? '#FFEDF1' : neutral && !pending ? variant === 'menu' ? 'rgba(255,255,255,0)' : '#FFFFFF' : '#FE322A', color: cancelling ? '#FE322A' : neutral && !pending ? '#57534E' : '#FFFFFF', borderColor: cancelling || pending ? '#FE322A' : '#E7E5E4', filter: enabled ? ['blur(1px)', 'blur(0px)'] : 'blur(0px)' }}
       whileTap={enabled ? { scale: .95 } : undefined}
       transition={{ layout: layoutTransition, backgroundColor: { duration: enabled ? .4 : 0, ease: 'easeInOut' }, color: { duration: enabled ? .2 : 0 }, filter: { duration: enabled ? .1 : 0 } }}
-      onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setRemaining(null); } }}
+      onKeyDown={(event) => { if (event.key === 'Escape' && (cancelling || variant !== 'menu')) { event.stopPropagation(); setRemaining(null); } }}
       onClick={() => { setError(''); setRemaining((value) => value === null ? countdown : null); }}>
+      {variant === 'menu' && !cancelling && <svg aria-hidden="true" className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" /></svg>}
       <AnimatePresence initial={false} mode="popLayout">{cancelling && <motion.span key="undo" aria-hidden="true" className="delete-undo"
         initial={{ opacity: 0, scale: enabled ? .5 : 1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: enabled ? .5 : 1 }}
         transition={{ duration: enabled ? .2 : 0, delay: enabled ? .05 : 0 }}>

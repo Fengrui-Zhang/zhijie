@@ -78,7 +78,7 @@ export async function PUT(
     return NextResponse.json({ error: '请求格式无效' }, { status: 400 });
   }
   if ('isPermanent' in body && typeof body.isPermanent !== 'boolean') {
-    return NextResponse.json({ error: '永久保存设置无效' }, { status: 400 });
+    return NextResponse.json({ error: '留存设置无效' }, { status: 400 });
   }
   const title = typeof body.title === 'string' ? body.title.trim() : undefined;
   const chartParams =

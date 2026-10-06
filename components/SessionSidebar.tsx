@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import DeleteButton from './interactive/DeleteButton';
-import SessionRetentionButton from './interactive/SessionRetentionButton';
+import SessionActionsMenu from './interactive/SessionActionsMenu';
 
 const MODEL_LABELS: Record<string, string> = {
   chat: '聊天',
@@ -191,7 +190,7 @@ export default function SessionSidebar({
                       onSelect(item.id);
                     }
                   }}
-                  className={`group flex w-full flex-wrap items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all text-left text-sm border ${
+                  className={`group flex w-full items-center gap-3 px-3 py-3 rounded-2xl cursor-pointer transition-all text-left text-sm border ${
                     activeSessionId === item.id
                       ? 'bg-amber-50/95 text-amber-900 border-amber-200/80 shadow-[0_10px_30px_rgba(245,158,11,0.12)]'
                       : 'bg-white/50 text-stone-700 border-white/60 hover:bg-white/85 hover:border-stone-200/80'
@@ -206,10 +205,8 @@ export default function SessionSidebar({
                       <span>{MODEL_LABELS[item.modelType] || item.modelType}</span>
                     </div>
                   </div>
-                  <div className="flex w-full flex-wrap items-center justify-end gap-2">
-                    <SessionRetentionButton enabled={Boolean(item.isPermanent)} onChange={(enabled) => onSetPermanent(item.id, enabled)} />
-                    <DeleteButton onDelete={() => onDelete(item.id)} />
-                  </div>
+                  <SessionActionsMenu retained={Boolean(item.isPermanent)}
+                    onRetain={(enabled) => onSetPermanent(item.id, enabled)} onDelete={() => onDelete(item.id)} />
                 </div>
               ))}
             </div>

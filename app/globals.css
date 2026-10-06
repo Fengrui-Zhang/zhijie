@@ -569,3 +569,8 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 
 .app-shell button.gender-switch-option:not(:disabled), [data-dialog-root] button.gender-switch-option:not(:disabled) { transition-property:color,background-color,border-color; }
 .app-shell button.gender-switch-option[data-motion="off"]:active, [data-dialog-root] button.gender-switch-option[data-motion="off"]:active { transform:none; }
+
+.session-actions-menu .delete-action-menu { width:100%; min-height:44px; padding:8px 12px; justify-content:flex-start; gap:12px; border-radius:8px; font-size:14px; font-weight:500; }
+.session-actions-menu .delete-action-menu[data-cancelling="true"] { padding:8px 12px; }
+.session-actions-menu button { touch-action:manipulation; }
+.session-actions-menu button:focus-visible, .session-actions-trigger:focus-visible { outline:2px solid var(--focus-ring); outline-offset:-2px; }
