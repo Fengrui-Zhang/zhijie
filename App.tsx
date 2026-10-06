@@ -4,6 +4,7 @@ import { archiveRepresentatives, findCaseArchive, assertArchiveCanSwitch, caseBi
 
 import { useTransitionElementRef } from './components/interactive/BentoSwitch';
 import FilterSelect from './components/interactive/FilterSelect';
+import GenderSwitch from './components/interactive/GenderSwitch';
 import SaveButton from './components/interactive/SaveButton';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
@@ -9320,22 +9321,7 @@ const App: React.FC<AppProps> = ({
                 </label>
                 <div>
                   <span className="block text-sm font-semibold text-stone-700">性别</span>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setProfessionalGender(0)}
-                      className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                    >
-                      男
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProfessionalGender(1)}
-                      className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                    >
-                      女
-                    </button>
-                  </div>
+                  <GenderSwitch value={professionalGender} onChange={setProfessionalGender} className="mt-2 gap-2" />
                 </div>
               </div>
 
@@ -9478,22 +9464,7 @@ const App: React.FC<AppProps> = ({
 
                     <div>
                       <span className="block text-sm font-semibold text-stone-700">性别</span>
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => person.setState((current) => ({ ...current, gender: 0 }))}
-                          className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                        >
-                          男
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => person.setState((current) => ({ ...current, gender: 1 }))}
-                          className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                        >
-                          女
-                        </button>
-                      </div>
+                      <GenderSwitch value={person.state.gender} onChange={(gender) => person.setState((current) => ({ ...current, gender }))} className="mt-2 gap-2" />
                     </div>
 
                     <label className="block">
@@ -9985,10 +9956,7 @@ const App: React.FC<AppProps> = ({
                 {!isFortuneReading && (
                 <div>
                   <label className="block text-stone-700 font-bold mb-2">性别</label>
-                  <div className="flex gap-4">
-                    <button onClick={() => setGender(0)} className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 0 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}>男 (乾)</button>
-                    <button onClick={() => setGender(1)} className={`flex-1 py-2.5 rounded-2xl border transition ${gender === 1 ? 'glass-panel-dark text-amber-200 border-transparent' : 'glass-chip text-stone-600'}`}>女 (坤)</button>
-                  </div>
+                  <GenderSwitch value={gender} onChange={setGender} labels={['男 (乾)', '女 (坤)']} className="gap-4" />
                 </div>
                 )}
 
@@ -11194,22 +11162,7 @@ const App: React.FC<AppProps> = ({
                         </label>
                         <div>
                           <span className="block text-sm font-semibold text-stone-700">性别</span>
-                          <div className="mt-2 flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setProfessionalGender(0)}
-                              className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                            >
-                              男
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setProfessionalGender(1)}
-                              className={`flex-1 rounded-2xl border py-2.5 transition ${professionalGender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                            >
-                              女
-                            </button>
-                          </div>
+                          <GenderSwitch value={professionalGender} onChange={setProfessionalGender} className="mt-2 gap-2" />
                         </div>
                       </div>
 
@@ -11352,22 +11305,7 @@ const App: React.FC<AppProps> = ({
 
                             <div>
                               <span className="block text-sm font-semibold text-stone-700">性别</span>
-                              <div className="mt-2 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => person.setState((current) => ({ ...current, gender: 0 }))}
-                                  className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 0 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                                >
-                                  男
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => person.setState((current) => ({ ...current, gender: 1 }))}
-                                  className={`flex-1 rounded-2xl border py-2.5 transition ${person.state.gender === 1 ? 'glass-panel-dark border-transparent text-amber-200' : 'glass-chip text-stone-600'}`}
-                                >
-                                  女
-                                </button>
-                              </div>
+                              <GenderSwitch value={person.state.gender} onChange={(gender) => person.setState((current) => ({ ...current, gender }))} className="mt-2 gap-2" />
                             </div>
 
                             <label className="block">

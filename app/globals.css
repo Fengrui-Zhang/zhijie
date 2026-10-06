@@ -566,3 +566,6 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 .bento-switch-stage { position:relative; min-width:0; }
 .bento-switch-pane { min-width:0; }
 .bento-switch-pane[inert] { pointer-events:none; }
+
+.app-shell button.gender-switch-option:not(:disabled), [data-dialog-root] button.gender-switch-option:not(:disabled) { transition-property:color,background-color,border-color; }
+.app-shell button.gender-switch-option[data-motion="off"]:active, [data-dialog-root] button.gender-switch-option[data-motion="off"]:active { transform:none; }

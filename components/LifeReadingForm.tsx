@@ -1,5 +1,6 @@
 
 import FilterSelect from './interactive/FilterSelect';
+import GenderSwitch from './interactive/GenderSwitch';
 import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
 import React, { useMemo, useState } from 'react';
 import LocationSelector from './LocationSelector';
@@ -187,10 +188,7 @@ export default function LifeReadingForm({
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="mb-2 block text-sm font-semibold text-stone-600">性别</label>
-            <SelectionGroup><div className="grid grid-cols-2 gap-2">
-              <ToggleButton active={gender === 0} onClick={() => setGender(0)}>男</ToggleButton>
-              <ToggleButton active={gender === 1} onClick={() => setGender(1)}>女</ToggleButton>
-            </div></SelectionGroup>
+            <GenderSwitch value={gender} onChange={setGender} compact />
           </div>
           <div>
             <label className="mb-2 block text-sm font-semibold text-stone-600">历法</label>
