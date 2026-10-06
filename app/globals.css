@@ -447,7 +447,6 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 @media(max-width:380px) { .prompt-copy-label { display:none; } .prompt-copy-icon { display:block; } }
 .prompt-send { display:flex; align-items:center; justify-content:center; min-height:34px; padding:8px 10px; border-radius:999px; background:#292524; color:#fde68a; white-space:nowrap; }
 .prompt-send:disabled { opacity:.5; }
-.prompt-frame-horizontal { margin-left:0; margin-right:auto; }
 .prompt-frame-horizontal .prompt-field { white-space:nowrap; overflow-x:auto; overflow-y:hidden; padding-right:16px; scrollbar-width:none; }
 .prompt-frame-horizontal .prompt-field::-webkit-scrollbar { display:none; }
 .prompt-frame-horizontal .prompt-toolbar { inset:3px 8px 3px auto; min-height:44px; width:36px; padding:4px 0; }
