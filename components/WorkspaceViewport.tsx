@@ -1,3 +1,4 @@
+import { BentoContentSwitch } from './interactive/BentoSwitch';
 import React from 'react';
 import type { WorkspaceView } from '../lib/app-routes';
 
@@ -5,6 +6,7 @@ type WorkspaceViewportProps = {
   isLoggedIn: boolean;
   workspaceView: WorkspaceView;
   historyCollapsed: boolean;
+  transitionKey: string;
   children: React.ReactNode;
 };
 
@@ -12,6 +14,7 @@ export default function WorkspaceViewport({
   isLoggedIn,
   workspaceView,
   historyCollapsed,
+  transitionKey,
   children,
 }: WorkspaceViewportProps) {
   return (
@@ -23,7 +26,7 @@ export default function WorkspaceViewport({
       }`}
     >
       <div className="mx-auto mt-5 w-full max-w-[1180px] px-3 pb-28 md:px-5 xl:mt-6 xl:pb-8">
-        {children}
+        <BentoContentSwitch activeKey={transitionKey}>{children}</BentoContentSwitch>
       </div>
     </main>
   );

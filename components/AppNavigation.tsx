@@ -1,5 +1,6 @@
+import { BentoSelection } from './interactive/BentoSwitch';
 
-import { SmoothCollapse, SelectionGroup, SelectionHighlight } from './InteractionMotion';
+import { SmoothCollapse, SelectionGroup } from './InteractionMotion';
 import React from 'react';
 import { ModelType } from '../types';
 import {
@@ -76,9 +77,9 @@ const NavIcon = ({ name }: { name: NavIconName }) => {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 };
 
-const navButtonClass = (selected: boolean) => `group flex min-h-11 w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left text-sm font-semibold ${
+const navButtonClass = (selected: boolean) => `group bento-nav-button flex min-h-11 w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left text-sm font-semibold ${
   selected
-    ? 'border-white/10 bg-stone-900/90 text-amber-100 shadow-[0_8px_22px_rgba(28,25,23,0.16)]'
+    ? 'border-transparent text-amber-100'
     : 'border-transparent text-stone-600 hover:bg-white/65 hover:text-stone-900'
 }`;
 
@@ -109,7 +110,7 @@ export function AppNavigation({
   };
 
   return (
-    <nav
+    <SelectionGroup><nav
       className={mobile
         ? 'flex flex-col px-1 pb-2'
         : 'glass-panel-soft flex h-[calc(100vh-92px)] w-[252px] flex-col rounded-[24px] border border-white/70 p-3'}
@@ -119,10 +120,7 @@ export function AppNavigation({
         <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-400">工作台</div>
       </div>
 
-      <button type="button" onClick={() => selectWorkspace('home')} className={`${navButtonClass(workspaceView === 'home')} mb-3`} aria-current={workspaceView === 'home' ? 'page' : undefined}>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${workspaceView === 'home' ? 'bg-white/10' : 'bg-white/55 text-stone-500'}`}><NavIcon name="home" /></span>
-        <span className="flex-1">首页</span><span className="text-stone-400">›</span>
-      </button>
+      <div className="mb-3"><NavButton icon="home" label="首页" selected={workspaceView === 'home'} onClick={() => selectWorkspace('home')} /></div>
 
       <div className={mobile ? 'grid gap-4 md:grid-cols-3' : 'glass-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto pr-1'}>
         <NavGroup label="命理运势">
@@ -181,7 +179,7 @@ export function AppNavigation({
           ))}
         </NavGroup>
       </div>
-    </nav>
+    </nav></SelectionGroup>
   );
 }
 
@@ -197,9 +195,10 @@ function NavGroup({ label, children }: { label: string; children: React.ReactNod
 function NavButton({ icon, label, selected, onClick }: { icon: NavIconName; label: string; selected: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={navButtonClass(selected)} aria-current={selected ? 'page' : undefined}>
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${selected ? 'bg-white/10 text-amber-100' : 'bg-white/55 text-stone-500 group-hover:text-stone-800'}`}><NavIcon name={icon} /></span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className={selected ? 'text-amber-200/75' : 'text-stone-300'}>›</span>
+      <BentoSelection active={selected} />
+      <span className={`bento-nav-label flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${selected ? 'bg-white/10 text-amber-100' : 'bg-white/55 text-stone-500 group-hover:text-stone-800'}`}><NavIcon name={icon} /></span>
+      <span className="bento-nav-label min-w-0 flex-1 truncate">{label}</span>
+      <span className={`bento-nav-label ${selected ? 'text-amber-200/75' : 'text-stone-300'}`}>›</span>
     </button>
   );
 }
@@ -211,7 +210,7 @@ type MobileBottomNavigationProps = {
 };
 
 export function MobileBottomNavigation({ items, moreActive, onMore }: MobileBottomNavigationProps) {
-  const allItems = [...items, { id: 'more-bottom', label: '更多', active: moreActive, onClick: onMore }];
+  const allItems = [...items.map(item => ({ ...item, active: !moreActive && item.active })), { id: 'more-bottom', label: '更多', active: moreActive, onClick: onMore }];
   return (
     <nav className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 rounded-[22px] border border-white/80 bg-white/88 p-1.5 shadow-[0_18px_50px_rgba(28,25,23,0.16)] backdrop-blur-2xl xl:hidden" aria-label="移动端主导航">
       <SelectionGroup><div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${allItems.length}, minmax(0, 1fr))` }}>
@@ -223,7 +222,7 @@ export function MobileBottomNavigation({ items, moreActive, onMore }: MobileBott
             aria-current={item.active ? 'page' : undefined}
             className={`interaction-choice rounded-[16px] px-1.5 py-2 text-[11px] font-bold ${item.active ? 'text-amber-100' : 'text-stone-500 hover:bg-white/70 hover:text-stone-900'}`}
           >
-            <SelectionHighlight active={item.active} className="bg-stone-900 shadow-sm" /><span className="interaction-choice-label block">{item.label}</span>
+            <BentoSelection active={item.active} /><span className="interaction-choice-label block">{item.label}</span>
           </button>
         ))}
       </div></SelectionGroup>

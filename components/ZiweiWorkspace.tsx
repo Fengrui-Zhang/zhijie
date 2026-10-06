@@ -1,6 +1,8 @@
 'use client';
 
-import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
+import { BentoSelection, BentoContentSwitch } from './interactive/BentoSwitch';
+
+import { SelectionGroup } from './InteractionMotion';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ZiweiResponse } from '../types';
@@ -90,12 +92,12 @@ export default function ZiweiWorkspace({
                 : 'border-white/75 bg-white/62 text-stone-700 hover:bg-white'
             }`}
           >
-            <SelectionHighlight active={activeTab === item.key} className="glass-panel-dark border-transparent shadow-[0_14px_30px_rgba(28,25,23,0.16)]" /><span className="interaction-choice-label">{item.label}</span>
+            <BentoSelection active={activeTab === item.key} /><span className="interaction-choice-label">{item.label}</span>
           </button>
         ))}
       </nav></SelectionGroup>
 
-      <div className="mt-5">
+      <div className="mt-5"><BentoContentSwitch activeKey={activeTab}>
         {activeTab === 'professional' ? <ZiweiGrid data={data} embedded /> : null}
         {activeTab === 'fengshui' ? <ZiweiFengshuiPanel data={data} caseId={caseId} onQuotaChange={onQuotaChange} /> : null}
         {activeTab === 'ai' ? (
@@ -108,7 +110,7 @@ export default function ZiweiWorkspace({
           </div>
         ) : null}
         {activeTab === 'notes' ? <ZiweiNotes storageKey={notesKey} /> : null}
-      </div>
+      </BentoContentSwitch></div>
     </div>
   );
 }

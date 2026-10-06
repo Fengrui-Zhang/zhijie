@@ -557,3 +557,12 @@ html[data-input-mode="keyboard"] [data-dialog-root] button:active { transform: n
 .filter-select-tick { display:grid; place-items:center; flex-shrink:0; width:24px; height:24px; border:2px solid #e7e5e4; border-radius:50%; }
 .filter-select-option[aria-selected="true"] .filter-select-tick { border-color:#292524; background:#292524; color:#fff; }
 .app-shell .filter-select-trigger { transition-property:color,background-color,border-color; }
+
+/* useLayouts Bento Card navigation and panel transitions. */
+.bento-nav-button { position:relative; }
+.bento-nav-label { position:relative; z-index:1; }
+.bento-selection { position:absolute; inset:0; border-radius:inherit; background:var(--ink); pointer-events:none; }
+.bento-selection-mark { position:absolute; left:0; top:calc(50% - 8px); width:2px; height:16px; border-radius:999px; background:#d9c89e; pointer-events:none; }
+.bento-switch-stage { position:relative; min-width:0; }
+.bento-switch-pane { min-width:0; }
+.bento-switch-pane[inert] { pointer-events:none; }

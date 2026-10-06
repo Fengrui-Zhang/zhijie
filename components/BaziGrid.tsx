@@ -1,6 +1,8 @@
 'use client';
 
-import { SelectionGroup, SelectionHighlight } from './InteractionMotion';
+import { BentoSelection, BentoContentSwitch } from './interactive/BentoSwitch';
+
+import { SelectionGroup } from './InteractionMotion';
 
 import React, { useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
@@ -847,11 +849,12 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
                 : 'border-stone-100 bg-white/65 text-stone-700 hover:bg-white'
             }`}
           >
-            <SelectionHighlight active={activeTab === item.key} className="glass-panel-dark border-transparent shadow-sm" /><span className="interaction-choice-label font-bold">{item.label}</span>
+            <BentoSelection active={activeTab === item.key} /><span className="interaction-choice-label font-bold">{item.label}</span>
           </button>
         ))}
       </div></SelectionGroup>
 
+      <BentoContentSwitch activeKey={activeTab}>
       {activeTab === 'basic' && (
         <div className="space-y-5">
           <section className="rounded-[28px] border border-white/60 bg-white/55 p-5 shadow-sm backdrop-blur-xl">
@@ -1063,6 +1066,7 @@ const BaziGrid: React.FC<Props> = ({ data, caseId, initialAnalysisData, personal
       {activeTab === 'notes' && (
         <CaseNotes storageKey={notesKey} />
       )}
+      </BentoContentSwitch>
       {activeTab === 'professional' && characterAnalysis && <BaziCharacterInspector
         analysis={characterAnalysis}
         periodLabel={periodLabel}

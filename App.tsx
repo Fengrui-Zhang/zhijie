@@ -2,6 +2,7 @@
 
 import { archiveRepresentatives, findCaseArchive, assertArchiveCanSwitch, caseBirthKey, sharedArchiveParams, chartWithArchiveName } from './lib/case-archives';
 
+import { useTransitionElementRef } from './components/interactive/BentoSwitch';
 import FilterSelect from './components/interactive/FilterSelect';
 import SaveButton from './components/interactive/SaveButton';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -1787,15 +1788,15 @@ const App: React.FC<AppProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isKlineRunning, setIsKlineRunning] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
-  const chatPanelRef = useRef<HTMLDivElement>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [chatScrollRef, bindChatScrollRef] = useTransitionElementRef<HTMLDivElement>();
+  const [chatPanelRef, bindChatPanelRef] = useTransitionElementRef<HTMLDivElement>();
+  const [chatEndRef, bindChatEndRef] = useTransitionElementRef<HTMLDivElement>();
   const shouldAutoScrollRef = useRef(true);
   const pendingCaseSessionScrollRef = useRef(false);
   const initialCaseLoadKeyRef = useRef('');
   const pendingSectionScrollRef = useRef<'report' | 'case-detail' | 'chat' | null>(null);
-  const reportChartRef = useRef<HTMLDivElement>(null);
-  const caseDetailRef = useRef<HTMLDivElement>(null);
+  const [reportChartRef, bindReportChartRef] = useTransitionElementRef<HTMLDivElement>();
+  const [caseDetailRef, bindCaseDetailRef] = useTransitionElementRef<HTMLDivElement>();
   const [useKnowledge, setUseKnowledge] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuAnchorRef = useRef<HTMLButtonElement>(null);
@@ -7806,7 +7807,7 @@ const App: React.FC<AppProps> = ({
   const renderCaseAnalysisPanel = (showCaseActions = true) => {
     if (!isCaseModel || !activeCase) return null;
     return (
-      <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
+      <div ref={bindCaseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
@@ -9765,6 +9766,7 @@ const App: React.FC<AppProps> = ({
         )}
 
       <WorkspaceViewport
+        transitionKey={workspaceView === 'divination' ? `divination:${professionalSelectedProject || modelType}` : workspaceView}
         isLoggedIn={isLoggedIn}
         workspaceView={workspaceView}
         historyCollapsed={persistentHistoryCollapsed}
@@ -10259,7 +10261,7 @@ const App: React.FC<AppProps> = ({
         {/* Result Phase */}
         {step === 'chart' && chartData && (
           <div className="animate-fade-in space-y-6">
-            <div ref={reportChartRef} className="space-y-4">
+            <div ref={bindReportChartRef} className="space-y-4">
               <div className="glass-panel flex justify-between items-center p-4 rounded-[26px]">
                  {isCaseModel && activeCase && !isJointChartData(chartData) && !isBaziCompatibilityChartData(chartData) ? (
                    <div aria-label="档案排盘方式" role="group" aria-busy={archiveSwitchBusy} className="min-w-0">
@@ -10406,7 +10408,7 @@ const App: React.FC<AppProps> = ({
             </div>
 
             {isCaseModel && activeCase && modelType !== ModelType.BAZI && modelType !== ModelType.ZIWEI && (
-              <div ref={caseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
+              <div ref={bindCaseDetailRef} className="glass-panel-soft rounded-[30px] border border-white/60 p-5 md:p-6 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-lg font-bold text-stone-700">{activeCase.title}</div>
@@ -10608,7 +10610,7 @@ const App: React.FC<AppProps> = ({
               (modelType === ModelType.BAZI && baziResultTab === 'ai') ||
               (modelType === ModelType.ZIWEI && ziweiResultTab === 'ai')
             ) && (
-            <div ref={chatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
+            <div ref={bindChatPanelRef} className="glass-panel rounded-[30px] overflow-hidden flex flex-col h-[600px]">
                <div className="glass-panel-soft px-4 py-3 border-b border-white/50 flex justify-between items-center">
                  <h3 className="font-bold text-stone-700 flex items-center gap-2"><TaijiIcon className="w-5 h-5" /> {activeProfessionalFeature === PROFESSIONAL_FEATURE_JOINT ? '联合解读' : activeProfessionalFeature === PROFESSIONAL_FEATURE_BAZI_COMPAT ? '合盘解读' : 'AI 解读'}</h3>
                  <div className="flex items-center gap-3">
@@ -10661,7 +10663,7 @@ const App: React.FC<AppProps> = ({
                  </div>
                </div>
                <div
-                 ref={chatScrollRef}
+                 ref={bindChatScrollRef}
                  onScroll={syncAutoScrollState}
                  className="glass-chat-bg glass-scrollbar flex-1 overflow-y-auto p-4 space-y-6"
                >
@@ -10778,7 +10780,7 @@ const App: React.FC<AppProps> = ({
                      <AiBusyText active state="composing" theme="light">正在分析…</AiBusyText>
                    </div>
                  )}
-                 <div ref={chatEndRef} />
+                 <div ref={bindChatEndRef} />
                </div>
                <div className="glass-panel-soft border-t border-white/50 p-4">
                  <PromptBox value={inputMessage} onChange={setInputMessage} onSubmit={() => void handleSendMessage()}
