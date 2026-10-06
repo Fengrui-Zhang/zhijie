@@ -41,6 +41,8 @@ export type CaseChartParams = {
 };
 
 export interface CaseSessionItem {
+  isPermanent?: boolean;
+  retentionResetAt?: string | null;
   id: string;
   modelType: string;
   title: string;

@@ -129,6 +129,8 @@ model DivinationSession {
   chartData   Json?
   isPinned    Boolean  @default(false)
   isArchived  Boolean  @default(false)
+  isPermanent Boolean  @default(false)
+  retentionResetAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -140,6 +142,7 @@ model DivinationSession {
   @@index([caseId, updatedAt])
   @@index([userId, isPinned, updatedAt])
   @@index([userId, isArchived, updatedAt])
+  @@index([isPermanent, retentionResetAt, createdAt])
 }
 
 model ChatMessage {

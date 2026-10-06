@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../../../../lib/auth';
 import { prisma } from '../../../../../../lib/prisma';
-import { getRetentionCutoff } from '../../../../../../lib/session-retention';
+import { retainedSessionsWhere } from '../../../../../../lib/session-retention';
 
 async function requireAdmin() {
   const session = await auth();
@@ -20,18 +20,19 @@ export async function GET(
   }
 
   const { id } = await params;
-  const cutoff = getRetentionCutoff();
 
   const sessions = await prisma.divinationSession.findMany({
     where: {
       userId: id,
-      createdAt: { gte: cutoff },
+      ...retainedSessionsWhere(),
     },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
       modelType: true,
       title: true,
+      isPermanent: true,
+      retentionResetAt: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { messages: true } },

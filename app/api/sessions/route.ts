@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
-import { getRetentionCutoff } from '../../../lib/session-retention';
+import { retainedSessionsWhere } from '../../../lib/session-retention';
 
 export async function GET() {
   const session = await auth();
@@ -9,11 +9,10 @@ export async function GET() {
     return NextResponse.json({ error: '未登录' }, { status: 401 });
   }
 
-  const cutoff = getRetentionCutoff();
   const sessions = await prisma.divinationSession.findMany({
     where: {
       userId: session.user.id,
-      createdAt: { gte: cutoff },
+      ...retainedSessionsWhere(),
       messages: { some: {} },
     },
     orderBy: { createdAt: 'desc' },
@@ -23,6 +22,8 @@ export async function GET() {
       title: true,
       isPinned: true,
       isArchived: true,
+      isPermanent: true,
+      retentionResetAt: true,
       createdAt: true,
       updatedAt: true,
       _count: { select: { messages: true } },

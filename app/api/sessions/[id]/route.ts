@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { restoreAgentSessionContext } from '../../../../lib/agent/session-context';
 import { auth } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
+import { setSessionPermanence } from '../../../../lib/session-retention';
 
 export async function GET(
   _request: Request,
@@ -72,22 +73,33 @@ export async function PUT(
     return NextResponse.json({ error: '会话不存在' }, { status: 404 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ error: '请求格式无效' }, { status: 400 });
+  }
+  if ('isPermanent' in body && typeof body.isPermanent !== 'boolean') {
+    return NextResponse.json({ error: '永久保存设置无效' }, { status: 400 });
+  }
   const title = typeof body.title === 'string' ? body.title.trim() : undefined;
   const chartParams =
     body.chartParams && typeof body.chartParams === 'object' ? body.chartParams : undefined;
   const isPinned = typeof body.isPinned === 'boolean' ? body.isPinned : undefined;
   const isArchived = typeof body.isArchived === 'boolean' ? body.isArchived : undefined;
 
-  const updated = await prisma.divinationSession.update({
-    where: { id },
-    data: {
-      ...(title !== undefined ? { title } : {}),
-      ...(chartParams !== undefined ? { chartParams } : {}),
-      ...(isPinned !== undefined ? { isPinned } : {}),
-      ...(isArchived !== undefined ? { isArchived } : {}),
-      updatedAt: new Date(),
-    },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (typeof body.isPermanent === 'boolean') {
+      await setSessionPermanence(tx, session.user.id, id, body.isPermanent);
+    }
+    return tx.divinationSession.update({
+      where: { id, userId: session.user.id },
+      data: {
+        ...(title !== undefined ? { title } : {}),
+        ...(chartParams !== undefined ? { chartParams } : {}),
+        ...(isPinned !== undefined ? { isPinned } : {}),
+        ...(isArchived !== undefined ? { isArchived } : {}),
+        updatedAt: new Date(),
+      },
+    });
   });
 
   return NextResponse.json(updated);

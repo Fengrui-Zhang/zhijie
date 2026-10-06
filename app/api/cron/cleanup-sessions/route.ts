@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
-import { getRetentionCutoff } from '../../../../lib/session-retention';
+import { getRetentionCutoff, expiredSessionsWhere } from '../../../../lib/session-retention';
 
 /** 每日清理超过保留期的会话（由 Vercel Cron 调用） */
 export async function GET(request: NextRequest) {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   const cutoff = getRetentionCutoff();
   const result = await prisma.divinationSession.deleteMany({
-    where: { createdAt: { lt: cutoff } },
+    where: expiredSessionsWhere(cutoff),
   });
 
   return NextResponse.json({

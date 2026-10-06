@@ -13,6 +13,7 @@ import {
   getBaziCompatibilityCaseIds,
 } from '../../../../lib/professional-features';
 import { prisma } from '../../../../lib/prisma';
+import { retainedSessionsWhere } from '../../../../lib/session-retention';
 
 export async function GET(
   _request: Request,
@@ -30,12 +31,15 @@ export async function GET(
     where: { id, userId: session.user.id },
     include: {
       sessions: {
+        where: retainedSessionsWhere(),
         orderBy: { updatedAt: 'desc' },
         select: {
           id: true,
           modelType: true,
           title: true,
           caseId: true,
+          isPermanent: true,
+          retentionResetAt: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -79,6 +83,7 @@ export async function GET(
     where: {
       userId: session.user.id,
       modelType: BAZI_COMPATIBILITY_SESSION_TYPE,
+      ...retainedSessionsWhere(),
     },
     orderBy: { updatedAt: 'desc' },
     select: {
@@ -86,6 +91,8 @@ export async function GET(
       modelType: true,
       title: true,
       caseId: true,
+      isPermanent: true,
+      retentionResetAt: true,
       createdAt: true,
       updatedAt: true,
       chartParams: true,
@@ -102,6 +109,8 @@ export async function GET(
       modelType: item.modelType,
       title: item.title,
       caseId: item.caseId,
+      isPermanent: item.isPermanent,
+      retentionResetAt: item.retentionResetAt,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     })),
