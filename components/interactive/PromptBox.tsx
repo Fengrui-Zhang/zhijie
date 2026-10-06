@@ -8,7 +8,7 @@ import AiBusyText from '../AiBusyText';
 
 type Props = {
   value: string; onChange: (value: string) => void; onSubmit: () => void;
-  placeholder?: string; disabled?: boolean; busy?: boolean; submitLabel?: string;
+  placeholder?: string; disabled?: boolean; busy?: boolean; submitLabel?: string; iconOnly?: boolean;
   allowEmpty?: boolean; maxLength?: number; onCopy?: () => void; copied?: boolean;
   context?: React.ReactNode; contextOpen?: boolean; contextCount?: number; onToggleContext?: () => void;
   layout?: 'composer' | 'horizontal';
@@ -17,7 +17,7 @@ const easeOut = [.215, .61, .355, 1] as const;
 const easeOutQuad = [.25, .46, .45, .94] as const;
 function ContextIcon() { return <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
 
-export default function PromptBox({ value, onChange, onSubmit, placeholder = '输入你的问题…', disabled, busy, submitLabel = '发送', allowEmpty = false, maxLength, onCopy, copied, context, contextOpen, contextCount = 0, onToggleContext, layout = 'composer' }: Props) {
+export default function PromptBox({ value, onChange, onSubmit, placeholder = '输入你的问题…', disabled, busy, submitLabel = '发送', iconOnly = false, allowEmpty = false, maxLength, onCopy, copied, context, contextOpen, contextCount = 0, onToggleContext, layout = 'composer' }: Props) {
   const horizontal = layout === 'horizontal';
   const [availableWidth, setAvailableWidth] = useState(440);
   const [focused, setFocused] = useState(false);
@@ -42,7 +42,7 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
   const contextId = useId();
   const enabled = useInteractionTransition().duration > 0;
   const shellTransition = enabled ? { type: 'spring' as const, stiffness: 400, damping: 25, mass: 1.5 } : { duration: 0 };
-  const expanded = focused || contextPressed || Boolean(value) || Boolean(busy) || Boolean(contextOpen) || (!horizontal && allowEmpty);
+  const expanded = focused || contextPressed || Boolean(value) || Boolean(busy) || Boolean(contextOpen);
   useLayoutEffect(() => {
     const parent = root.current?.parentElement;
     if (!horizontal || !parent) return;
@@ -164,10 +164,10 @@ export default function PromptBox({ value, onChange, onSubmit, placeholder = '�
             }} className="prompt-context-trigger"><ContextIcon /><span>添加上下文{contextCount ? ` · ${contextCount}` : ''}</span><motion.svg aria-hidden="true" width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" initial={false} animate={{ rotate: contextOpen ? 180 : 0 }} transition={{ duration: enabled ? .16 : 0, ease: easeOutQuad }}><path d="m5 7 5 5 5-5" /></motion.svg></button>}
           <div className="ml-auto flex min-w-0 items-center gap-2">
             {onCopy && <button type="button" onClick={onCopy} disabled={busy} className="prompt-copy" aria-label={copied ? '已复制' : '复制AI提示词'}><span className="prompt-copy-label">{copied ? '已复制' : '复制AI提示词'}</span><svg className="prompt-copy-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">{copied ? <path d="m5 12 4 4L19 6" strokeLinecap="round" strokeLinejoin="round" /> : <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>}</svg></button>}
-            <motion.button type="button" onClick={submit} disabled={disabled || busy || (!allowEmpty && !value.trim())} aria-busy={busy} className="prompt-send" aria-label={submitLabel}
+            <motion.button type="button" onClick={submit} disabled={disabled || busy || (!allowEmpty && !value.trim())} aria-busy={busy} className="prompt-send" aria-label={submitLabel} title={iconOnly ? submitLabel : undefined}
               initial={false} animate={{ opacity: expanded ? 1 : 0, scale: expanded || !enabled ? 1 : .85 }} whileTap={enabled ? { scale: .92 } : undefined} transition={{ duration: enabled ? .15 : 0, ease: easeOutQuad }}>
               <span className="inline-flex items-center gap-1.5">
-                {!horizontal && submitLabel !== '发送' && <span className="text-xs">{submitLabel}</span>}
+                {!horizontal && !iconOnly && submitLabel !== '发送' && <span className="text-xs">{submitLabel}</span>}
                 <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25"><path d="M12 19V5m-6 6 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </span>
             </motion.button>
